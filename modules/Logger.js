@@ -57,7 +57,7 @@ class Logger {
       var contents = await readFile(this.path);
       var now = new Date();
       await writeFile(this.logPath + '/' + Logger.savifyDate(now) + '.log', contents);
-      await writeFile(this.path, Logger.logifyDate(now) + ': [INFO] Log Rotated\n');
+      await writeFile(this.path, Logger.logifyDate(now) + ': [DATA] Log Rotated\n');
       this.postponed = false;
     }
   }

@@ -90,8 +90,6 @@ client.on('warn', (warn) => {
   Logger.main.log('WARN', warn);
 });
 
-Logger.main.log(undefined, '[Begin Log]');
-
 client.login(config.token);
 
 
