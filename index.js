@@ -5,6 +5,7 @@ const Logger = require('./modules/Logger.js');
 const GuildManager = require('./modules/GuildManager.js');
 const NodeUtil = require('util');
 const Util = require('./modules/util/Util.js');
+const Command = require('./modules/Command.js');
 
 // Constants
 const config = require('./config.json');
@@ -64,14 +65,15 @@ client.on('message', async (message) => {
   var command = args.shift().toLowerCase();
 
   const bundle = {
+    args: args,
     client: client,
     config: config,
     args: args,
     message: message,
-    manager: GuildManager.all.get(message.guild.id),
+    manager: message.guild ? GuildManager.all.get(message.guild.id) : null,
   };
 
-  console.log(message.toString());
+  Command.find(command);
 });
 
 // Send ERR log on client.error
