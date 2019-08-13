@@ -1,0 +1,14 @@
+{
+  "name": "melody_v3",
+  "version": "0.9.0",
+  "description": "A simple bot made by Scotty#4263",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "ScottyThePilot",
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^11.5.1"
+  }
+}

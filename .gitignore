@@ -1,0 +1,16 @@
+# Packages
+node_modules/
+yarn.lock
+package-lock.json
+
+# Logs
+logs/
+*.log
+
+# Secret Data
+config.json
+data/
+
+# Other Secret Stuff
+modules/util/cleverbot_md5.js
+modules/CleverChannel.js
