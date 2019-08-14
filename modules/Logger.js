@@ -14,15 +14,15 @@ class Logger {
     this.logPath = {}.hasOwnProperty.call(options, 'logPath') ? options.logPath : null;
     this.rotation = Boolean(this.logPath);
     this.logStream = fs.createWriteStream(this.path, { flags: 'a' });
-    this.postponed = false;
-    if (this.rotation) {
-      this.checkRotation().then(() => {
-        this.log('Begin Log');
-      });
-    } else {
-      this.log('Begin Log');
-    }
-    
+
+    var logStreamReady = new Promise((resolve) => this.logStream.once('ready', resolve));
+
+    var rotationCheckFinished = this.rotation ? this.checkRotation() : Promise.resolve();
+
+    this.ready = Promise.all([logStreamReady, rotationCheckFinished]);
+    this.locked = false;
+
+    this.ready.then(() => this.log('Begin Log'));
   }
 
   log(header, text, ...rest) {
@@ -30,14 +30,13 @@ class Logger {
     const data = text + (rest.length > 0 ? ':\n' + rest.map(e => '  ' + e).join('\n') : '');
     const l = Logger.logifyDate() + ':' + h + (data !== 'undefined' ? ' ' + data : '');
     if (this.logToConsole) console.log(l);
-    if (this.postponed) return;
-    this.logStream.write(l + '\n');
+    if (!this.locked) this.logStream.write(l + '\n');
   }
 
   end() {
-    var stream = this.logStream;
     return new Promise((resolve, reject) => {
-      stream.end((err) => {
+      this.locked = true;
+      this.logStream.end((err) => {
         if (err) {
           reject(err);
         } else {
@@ -51,19 +50,21 @@ class Logger {
     if (!fs.existsSync(this.logPath)) await mkdir(this.logPath);
     
     var fileStats = await stat(this.path);
-    console.log(fileStats);
+    
     if (fileStats.size >= Logger.sizeThreshold) {
-      this.postponed = true;
+      this.locked = true;
       var contents = await readFile(this.path);
       var now = new Date();
       await writeFile(this.logPath + '/' + Logger.savifyDate(now) + '.log', contents);
-      await writeFile(this.path, Logger.logifyDate(now) + ': [DATA] Log Rotated\n');
-      this.postponed = false;
+      await writeFile(this.path, `${Logger.logifyDate(now)}: [DATA] Log Rotated`);
+      this.locked = false;
+      Logger.main.log('DATA', `Log ${this.path} Rotated into ${this.logPath}`);
     }
   }
 
-  static msgFailCatcher() {
-    Logger.main.log('MSG', 'Failed to send a message');
+  static msgFailCatcher(err) {
+    console.log(err);
+    Logger.main.log('WARN', 'Failed to send a message');
   }
 
   static logifyDate(date = new Date()) {

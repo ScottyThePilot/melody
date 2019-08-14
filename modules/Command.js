@@ -1,10 +1,11 @@
 'use strict';
-const config = require('../config.js');
+const config = require('../config.json');
 const Util = require('./util/Util.js');
 const Logger = require('./Logger.js');
+const readdir = require('util').promisify(require('fs').readdir);
 
 const defaultOptions = {
-  name: 'Default',
+  name: 'default',
   disabled: false,
   level: 0,
   plugin: 'general',
@@ -25,11 +26,11 @@ const defaultOptions = {
 const pluginsDM = ['general', 'core'];
 
 class Command {
-  static create(options) {
+  /*static create(options) {
     const saved = new this(options);
     Command.manifest.set(saved.name, saved);
     return saved;
-  }
+  }*/
 
   constructor(options) {
     var o = Util.mergeDefault(defaultOptions, options);
@@ -55,37 +56,51 @@ class Command {
     var newBundle = Object.assign({ userLevel: Command.getUserLevel(bundle) }, bundle);
 
     if (this.disabled) {
-      Logger.main.log('USER', `Denying Access to Command ${this.name} for user ${Util.logifyUser(newBundle.message.author)}`, 'Reason: Command Disabled');
+      Logger.main.log('USER', `Denying Access to Command ${this.name} for user ${Logger.logifyUser(newBundle.message.author)}`, 'Reason: Command Disabled');
       await Command.sendMessage(newBundle.message.channel, 'That command is disabled.');
       // 0xf0: Rejected [Command Disabled]
       return 0xf0;
     } else if (!this.inGuild && newBundle.message.guild) {
-      Logger.main.log('USER', `Denying Access to Command ${this.name} for user ${Util.logifyUser(newBundle.message.author)}`, 'Reason: Command is Dissallowed in Guilds');
+      Logger.main.log('USER', `Denying Access to Command ${this.name} for user ${Logger.logifyUser(newBundle.message.author)}`, 'Reason: Command is Dissallowed in Guilds');
       await Command.sendMessage(newBundle.message.channel, 'You cannot use this command in a Guild, try it in DM.');
       // 0xf1: Rejected [Command is Dissallowed in Guild]
       return 0xf1;
     } else if (!this.inDM && !newBundle.message.guild) {
-      Logger.main.log('USER', `Denying Access to Command ${this.name} for user ${Util.logifyUser(newBundle.message.author)}`, 'Reason: Command is Dissallowed in DM');
+      Logger.main.log('USER', `Denying Access to Command ${this.name} for user ${Logger.logifyUser(newBundle.message.author)}`, 'Reason: Command is Dissallowed in DM');
       await Command.sendMessage(newBundle.message.channel, 'You cannot use this command in DM, try it in a Guild.');
       // 0xf2: Rejected [Command is Dissallowed in DM]
       return 0xf2;
     } else if (this.level > newBundle.userLevel) {
-      Logger.main.log('USER', `Denying Access to Command ${this.name} for user ${Util.logifyUser(newBundle.message.author)}`, 'Reason: Insufficient Permissions');
+      Logger.main.log('USER', `Denying Access to Command ${this.name} for user ${Logger.logifyUser(newBundle.message.author)}`, 'Reason: Insufficient Permissions');
       await Command.sendMessage(newBundle.message.channel, 'You do not have permission to do that.');
       // 0xf3: Rejected [Insufficient Permissions]
+      return 0xf3;
     } else {
-      Logger.main.log('USER', `Running Command ${this.name} for user ${Util.logifyUser(newBundle.message.author)}`);
+      Logger.main.log('USER', `Running Command ${this.name} for user ${Logger.logifyUser(newBundle.message.author)}`);
       await this.run(newBundle);
       // 0xd0: Accepted
       return 0xd0;
     }
   }
 
+  save() {
+    Command.manifest.set(this.name, this);
+  }
+
   static find(alias) {
     for (var [name, command] of Command.manifest) {
-      if (name.toLowerCase() === alias.toLowerCase() && command.aliases.includes(alias.toLowerCase())) return command;
+      if (name.toLowerCase() === alias.toLowerCase() || command.aliases.includes(alias.toLowerCase())) return command;
     }
     return null;
+  }
+
+  static async buildManifest() {
+    if (Command.manifest.size > 0) throw new Error('Manifest already built');
+    var commandFiles = await readdir('./commands');
+    commandFiles.forEach((fileName) => {
+      if (fileName instanceof Buffer) fileName = fileName.toString();
+      require('../commands/' + fileName).save();
+    });
   }
 
   static getUserLevel(bundle) {
@@ -100,12 +115,12 @@ class Command {
         userLevel = 2;
       }
     } else {
-      if (bundle.config.trustedIDs.includes(bundle.message.author.id)) {
+      if (config.trustedUsers.includes(bundle.message.author.id)) {
         userLevel = 3;
       }
     }
   
-    if (bundle.config.ownerID === bundle.message.author.id) {
+    if (config.ownerID === bundle.message.author.id) {
       userLevel = 10;
     }
 

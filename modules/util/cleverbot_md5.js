@@ -1,4 +1,5 @@
 // md5 hash function extracted from the official CleverBot website
+'use strict';
 
 var c = function(n, p) {
   var o = n[0], m = n[1], r = n[2], q = n[3];
