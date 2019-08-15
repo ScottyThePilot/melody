@@ -13,7 +13,7 @@
 ;mute <@mention|user id>
 
 ;whatis|wi <id>
-;info|i <'role'|'guild'|'user'|'channel'|'melody'> [@mention|#mention|id]
+;info|i <'role'|'guild'|'user'|'channel'> [@mention|#mention|id]
 ;uptime
 ;memory
 
