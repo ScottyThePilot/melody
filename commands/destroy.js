@@ -1,24 +1,6 @@
 'use strict';
 const Command = require('../modules/Command.js');
-const Logger = require('../modules/Logger.js');
-const GuildManager = require('../modules/GuildManager.js');
-const Util = require('../modules/util/Util.js');
 const config = require('../config.json');
-
-async function destroyBot(client) {
-  Logger.main.log('INFO', 'Shutting Down...');
-
-  await Util.asyncForEach(client.guilds.array(), async (guild) => {
-    await GuildManager.unload(guild.id);
-    Logger.main.log('DATA', `Guild ${Logger.logifyGuild(guild)} unloaded`);
-  });
-
-  setTimeout(() => {
-    Logger.main.end().then(() => {
-      client.destroy();
-    });
-  }, 3000);
-}
 
 module.exports = new Command({
   name: 'destroy',
@@ -31,10 +13,10 @@ module.exports = new Command({
     example: `${config.prefix}destroy`
   },
   run: async function (bundle) {
-    const { message, client } = bundle;
+    const { message, controller } = bundle;
 
     message.react(String.fromCharCode(0x2705)).catch();
 
-    await destroyBot(client);
+    await controller.destroyBot();
   }
 });

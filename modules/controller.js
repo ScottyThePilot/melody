@@ -1,7 +1,8 @@
 'use strict';
 const Logger = require('./Logger.js');
 const GuildManager = require('./GuildManager.js');
-const manager = {};
+const Util = require('./util/Util.js');
+const controller = {};
 
 async function destroyBot(client) {
   Logger.main.log('INFO', 'Shutting Down...');
@@ -11,14 +12,13 @@ async function destroyBot(client) {
     Logger.main.log('DATA', `Guild ${Logger.logifyGuild(guild)} unloaded`);
   });
 
-  Logger.main.end().then(() => {
+  return Logger.main.end().then(() => {
     client.destroy();
   });
 }
 
-manager.setup = function setup(client) {
-  manager.destroyBot = destroyBot.bind(manager, client);
-  manager.shutDownBot
+controller.setup = function setup(client) {
+  controller.destroyBot = () => destroyBot(client);
 };
 
-module.exports = manager;
+module.exports = controller;

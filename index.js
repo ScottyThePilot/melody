@@ -5,6 +5,7 @@ const Logger = require('./modules/Logger.js');
 const GuildManager = require('./modules/GuildManager.js');
 const Command = require('./modules/Command.js');
 const Util = require('./modules/util/Util.js');
+const controller = require('./modules/controller.js');
 const NodeUtil = require('util');
 
 // Constants
@@ -25,9 +26,11 @@ process.on('unhandledRejection', (err) => {
 client.on('ready', async () => {
   Logger.main.log('INFO', 'Bot Loading...');
 
-  await wait(500);
+  await wait(750);
 
   var then = new Date();
+
+  controller.setup(client);
 
   await Util.asyncForEach(client.guilds.array(), async (guild) => {
     await GuildManager.load(guild.id);
@@ -54,15 +57,13 @@ client.on('guildCreate', async (guild) => {
 
 
 client.on('guildDelete', async (guild) => {
-  Logger.main.log('INFO', `Guild Found: ${Logger.logifyGuild(guild)}`);
+  Logger.main.log('INFO', `Guild Lost: ${Logger.logifyGuild(guild)}`);
   await GuildManager.unload(guild.id);
   Logger.main.log('DATA', `Guild ${Logger.logifyGuild(guild)} unloaded`);
 });
 
 
 client.on('message', async (message) => {
-  //Analytics.data.messagesSeen.add(1);
-
   if (message.author.bot) return;
 
   var args = message.cleanContent.trim().slice(config.prefix.length).trim().split(/ +/g);
@@ -76,12 +77,11 @@ client.on('message', async (message) => {
     args: args,
     client: client,
     message: message,
-    manager: message.guild ? GuildManager.all.get(message.guild.id) : null
+    manager: message.guild ? GuildManager.all.get(message.guild.id) : null,
+    controller: controller
   };
 
   await found.attempt(bundle);
-
-  //if (outcome === 0xd0) Analytics.data.commands.add(1);
 });
 
 

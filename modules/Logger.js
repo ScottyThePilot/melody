@@ -14,21 +14,18 @@ class Logger {
     this.logPath = {}.hasOwnProperty.call(options, 'logPath') ? options.logPath : null;
     this.rotation = Boolean(this.logPath);
     this.logStream = fs.createWriteStream(this.path, { flags: 'a' });
-
-    var logStreamReady = new Promise((resolve) => this.logStream.once('ready', resolve));
-
+    this.locked = false;
+    
     var rotationCheckFinished = this.rotation ? this.checkRotation() : Promise.resolve();
 
-    this.ready = Promise.all([logStreamReady, rotationCheckFinished]);
-    this.locked = false;
-
-    this.ready.then(() => this.log('Begin Log'));
+    rotationCheckFinished.then(() => this.log('Begin Log'));
   }
 
-  log(header, text, ...rest) {
-    const h = header ? ` [${header.toString().toUpperCase()}]` : '';
-    const data = text + (rest.length > 0 ? ':\n' + rest.map(e => '  ' + e).join('\n') : '');
-    const l = Logger.logifyDate() + ':' + h + (data !== 'undefined' ? ' ' + data : '');
+  log(header, text = '', ...rest) {
+    if (this.locked) rest.push('[Not Written to LogFile]');
+    const h = header ? `[${header.toString().toUpperCase()}]` : '';
+    const data = (text + (rest.length > 0 ? ':\n' + rest.map(e => '  ' + e).join('\n') : '')).trim();
+    const l = Logger.logifyDate() + ': ' + h + (data.length > 0 ? ' ' + data : '');
     if (this.logToConsole) console.log(l);
     if (!this.locked) this.logStream.write(l + '\n');
   }
@@ -82,6 +79,22 @@ class Logger {
 
   static logifyGuild(guild) {
     return `${guild.name} (${guild.id})` + (guild.available ? '' : ' (Unavailable)');
+  }
+
+  static getUptime(client) {
+    let up = client.uptime;
+    let upD = Math.floor(up / 8.64e+7);
+    let upH = Math.floor(up / 3.6e+6) % 24;
+    let upM = Math.floor(up / 60000) % 60;
+    return [upD, upH, upM];
+  }
+
+  static phrasifyUptime(client) {
+    let [upD, upH, upM] = Logger.getUptime(client);
+    upD += (upD === 1 ? ' day' : ' days');
+    upH += (upH === 1 ? ' hour' : ' hours');
+    upM += (upM === 1 ? ' minute' : ' minutes');
+    return upD + ', ' + upH + ' and ' + upM;
   }
 
   static escape(str) {
