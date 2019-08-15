@@ -19,6 +19,7 @@ async function destroyBot(client) {
 
 controller.setup = function setup(client) {
   controller.destroyBot = () => destroyBot(client);
+  controller.userOwnsAGuild = (user) => client.guilds.some((guild) => guild.owner.id === user.id);
 };
 
 module.exports = controller;

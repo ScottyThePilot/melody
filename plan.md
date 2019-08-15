@@ -8,7 +8,7 @@
 ;feedback <@mention|user id>
 
 ;configure|config|cfg [config option] [value]
-;dump [server name|server id]
+;dump [server name|server id] ['latest'|log number]
 ;flush [server name|server id]
 ;mute <@mention|user id>
 

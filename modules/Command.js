@@ -24,6 +24,7 @@ const defaultOptions = {
 };
 
 const pluginsDM = ['general', 'core'];
+const pluginsAll = ['general', 'core'];
 
 class Command {
   /*static create(options) {
@@ -46,14 +47,20 @@ class Command {
   }
 
   async attempt(bundle) {
-    var plugins = bundle.manager ? await bundle.manager.configdb.get('plugins') : pluginsDM;
+    var isTrusted = [config.ownerID, ...config.trustedUsers].includes(bundle.message.author.id)
+    var plugins = bundle.manager ? await bundle.manager.configdb.get('plugins') 
+      : isTrusted ? pluginsAll
+      : pluginsDM;
 
     // Exit silently if this command's plugin is not enabled in the given server
     // 0xe0: Ignored: [Command not on plugin list]
     if (!plugins.includes(this.plugin)) return 0xe0;
 
     // Clone bundle and insert userLevel
-    var newBundle = Object.assign({ userLevel: Command.getUserLevel(bundle) }, bundle);
+    var newBundle = Object.assign({
+      plugins: plugins,
+      userLevel: Command.getUserLevel(bundle)
+    }, bundle);
 
     if (this.disabled) {
       Logger.main.log('USER', `Denying Access to Command ${this.name} for user ${Logger.logifyUser(newBundle.message.author)}`, 'Reason: Command Disabled');
