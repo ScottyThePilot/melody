@@ -23,16 +23,7 @@ const defaultOptions = {
   }
 };
 
-const pluginsDM = ['general', 'core'];
-const pluginsAll = ['general', 'core'];
-
 class Command {
-  /*static create(options) {
-    const saved = new this(options);
-    Command.manifest.set(saved.name, saved);
-    return saved;
-  }*/
-
   constructor(options) {
     var o = Util.mergeDefault(defaultOptions, options);
     this.name = o.name;
@@ -48,16 +39,15 @@ class Command {
 
   async attempt(bundle) {
     var isTrusted = [config.ownerID, ...config.trustedUsers].includes(bundle.message.author.id)
-    var plugins = bundle.manager ? await bundle.manager.configdb.get('plugins') 
-      : isTrusted ? pluginsAll
-      : pluginsDM;
+    var plugins = bundle.manager ? await bundle.manager.configdb.get('plugins') : Command.pluginsDM;
 
     // Exit silently if this command's plugin is not enabled in the given server
     // 0xe0: Ignored: [Command not on plugin list]
-    if (!plugins.includes(this.plugin)) return 0xe0;
+    if (!plugins.includes(this.plugin) && this.plugin !== 'owner') return 0xe0;
 
     // Clone bundle and insert userLevel
     var newBundle = Object.assign({
+      trusted: isTrusted,
       plugins: plugins,
       userLevel: Command.getUserLevel(bundle)
     }, bundle);
@@ -145,6 +135,8 @@ class Command {
   }
 }
 
+Command.pluginsDM = ['general', 'core'];
+Command.pluginsAll = ['general', 'core', 'owner'];
 Command.manifest = new Map(); // Lists each command once
 
 module.exports = Command;

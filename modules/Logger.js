@@ -60,8 +60,7 @@ class Logger {
   }
 
   static msgFailCatcher(err) {
-    console.log(err);
-    Logger.main.log('WARN', 'Failed to send a message');
+    Logger.main.log('WARN', Logger.logifyError(err));
   }
 
   static logifyDate(date = new Date()) {
@@ -79,6 +78,10 @@ class Logger {
 
   static logifyGuild(guild) {
     return `${guild.name} (${guild.id})` + (guild.available ? '' : ' (Unavailable)');
+  }
+
+  static logifyError(err) {
+    return `${err.name}: ${err.message} (${err.code} ${err.path})`;
   }
 
   static getUptime(client) {

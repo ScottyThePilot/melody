@@ -75,6 +75,7 @@ client.on('message', async (message) => {
 
   const bundle = {
     args: args,
+    command: command,
     client: client,
     message: message,
     manager: message.guild ? GuildManager.all.get(message.guild.id) : null,
@@ -86,7 +87,7 @@ client.on('message', async (message) => {
 
 
 client.on('error', (err) => {
-  Logger.main.log('ERR', err.message);
+  Logger.main.log('ERR', Logger.logifyError(err));
 });
 
 

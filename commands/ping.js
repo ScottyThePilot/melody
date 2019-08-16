@@ -5,6 +5,7 @@ const config = require('../config.json');
 
 module.exports = new Command({
   name: 'ping',
+  plugin: 'core',
   help: {
     short: 'Gets the current ping.',
     long: 'Gets the current latency.',

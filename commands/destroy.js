@@ -5,7 +5,7 @@ const config = require('../config.json');
 module.exports = new Command({
   name: 'destroy',
   level: 10,
-  plugin: 'core',
+  plugin: 'owner',
   help: {
     short: 'Logs the bot off of Discord.',
     long: 'Logs out, terminates the connection to Discord, and destroys the client.',

@@ -2,7 +2,7 @@
 // Edited by Scotty
 'use strict';
 const https = require('https');
-const md5 = require('./cb_md5.js');
+const md5 = require('./util/cb_md5.js');
 
 class CleverChannel {
   constructor(historyLength = 30) {
