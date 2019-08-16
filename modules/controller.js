@@ -42,4 +42,6 @@ controller.setup = function setup(client) {
   controller.getAccessiblePlugins = (user) => getAccessiblePlugins(user, client);
 };
 
+controller.firstReady = false;
+
 module.exports = controller;

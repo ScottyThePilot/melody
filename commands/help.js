@@ -6,11 +6,11 @@ const config = require('../config.json');
 const Util = require('../modules/util/Util.js');
 
 const permissions = {
-  0: 'Everyone',
-  1: 'Server administrators',
-  2: 'Server owners',
-  3: 'Trusted users',
-  10: 'Bot owner'
+  [0]: 'Everyone',
+  [1]: 'Server administrators',
+  [2]: 'Server owners',
+  [3]: 'Trusted users',
+  [10]: 'Bot owner'
 };
 
 module.exports = new Command({

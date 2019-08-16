@@ -24,24 +24,28 @@ process.on('unhandledRejection', (err) => {
 
 
 client.on('ready', async () => {
-  Logger.main.log('INFO', 'Bot Loading...');
+  if (!controller.firstReady) {
+    Logger.main.log('INFO', 'Bot Loading...');
 
-  await wait(750);
+    await wait(750);
 
-  var then = new Date();
+    var then = new Date();
 
-  controller.setup(client);
+    controller.setup(client);
 
-  await Util.asyncForEach(client.guilds.array(), async (guild) => {
-    await GuildManager.load(guild.id);
-    Logger.main.log('DATA', `Guild ${Logger.logifyGuild(guild)} loaded`);
-  });
+    await Util.asyncForEach(client.guilds.array(), async (guild) => {
+      await GuildManager.load(guild.id);
+      Logger.main.log('DATA', `Guild ${Logger.logifyGuild(guild)} loaded`);
+    });
 
-  await Command.buildManifest();
+    await Command.buildManifest();
 
-  Logger.main.log('DATA', `${Command.manifest.size} Commands loaded`);
+    Logger.main.log('DATA', `${Command.manifest.size} Commands loaded`);
 
-  await client.user.setActivity('in Beta');
+    await client.user.setActivity('in Beta');
+
+    controller.firstReady = true;
+  }
 
   Logger.main.log('INFO', 'Bot Ready! (' + (new Date() - then) + 'ms)');
 
