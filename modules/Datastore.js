@@ -47,6 +47,7 @@ const defaultOptions = {
   spacing: true,
   encrypt: false,
   key: null,
+  persistence: true,
   data: {}
 };
 
@@ -61,6 +62,7 @@ class Datastore {
    * @param {Boolean} [options.spacing=true] Whether or not the JSON in files should be spaced or not
    * @param {Boolean} [options.encrypt=false] Whether or not the JSON in the files should be encrypted or not
    * @param {*} [options.key] The encryption key to be used if encryption is enabled
+   * @param {Boolean} [options.persistence=true] Whether the filestate should be stored in memory after writes to speed up get operations
    * @param {*} [options.data={}] Data to be written if the file does not exist
    */
   constructor(path, options) {
@@ -88,9 +90,19 @@ class Datastore {
 
     // Disable spacing if encryption is enabled
     this.options.spacing = this.options.encrypt ? false : this.options.spacing;
+
+    if (this.options.persistence) this.persistentState = '';
     
     // Call initialize if no file exists at the given path
-    if (!fs.existsSync(path)) this.init(this.options.data);
+    if (!fs.existsSync(path)) {
+      this.init(this.options.data);
+    } else if (this.options.persistence) {
+      let that = this;
+      this.sequencer.push(async function () {
+        let out = await readJSONFile(that.path, that.options);
+        that.persistentState = JSON.stringify(out);
+      });
+    }
   }
 
   /**
@@ -105,14 +117,13 @@ class Datastore {
    * Used internally to initialize files.
    */
   init(data) {
-    var path = this.path;
-    var sequencer = this.sequencer;
-    var options = this.options;
+    let that = this;
     return new Promise(function (resolve, reject) {
       // Add an operation to this Datastore's sequencer
-      sequencer.push(async function () {
-        await writeJSONFile(path, data, options);
-        resolve();
+      that.sequencer.push(async function () {
+        let out = await writeJSONFile(that.path, data, that.options).catch(reject);
+        if (this.persistence) this.persistentState = out;
+        resolve(out);
       });
     });
   }
@@ -124,18 +135,15 @@ class Datastore {
    * @returns {Promise<Any>} The data resulting from the transformation
    */
   set(identifier, val) {
-    var path = this.path;
-    var sequencer = this.sequencer;
-    var options = this.options;
+    let that = this;
     return new Promise(function (resolve, reject) {
       // Add an operation to this Datastore's sequencer
-      sequencer.push(async function () {
+      that.sequencer.push(async function () {
         // Await file edit
-        var out;
-        await editJSONFile(path, function (data) {
-          out = setPropertyInTree(identifier, data, val);
-          return out;
-        }, options).catch(reject);
+        let out = await editJSONFile(that.path, function (data) {
+          return setPropertyInTree(identifier, data, val);
+        }, that.options).catch(reject);
+        if (that.options.persistence) that.persistentState = JSON.stringify(out);
         resolve(out);
       });
     });
@@ -147,12 +155,12 @@ class Datastore {
    * @returns {Promise<Any>} The data at the given identifier
    */
   get(identifier) {
-    var path = this.path;
-    var sequencer = this.sequencer;
-    var options = this.options;
+    let that = this;
     return new Promise(function (resolve, reject) {
-      sequencer.push(async function () {
-        var data = await readJSONFile(path, options).catch(reject);
+      that.sequencer.push(async function () {
+        let data = that.options.persistence ? 
+          await readJSONFile(that.path, that.options).catch(reject) :
+          JSON.parse(that.persistentState);
         resolve(getPropertyInTree(identifier, data));
       });
     });
@@ -164,27 +172,21 @@ class Datastore {
    * @returns {Promise<Any>} The data resulting from the transformation
    */
   transform(fn) {
-    var path = this.path;
-    var sequencer = this.sequencer;
-    var options = this.options;
+    let that = this;
     return new Promise(function (resolve, reject) {
-      sequencer.push(async function () {
-        var data = await editJSONFile(path, fn, options).catch(reject);
-        resolve(data);
+      that.sequencer.push(async function () {
+        let out = await editJSONFile(that.path, fn, that.options).catch(reject);
+        if (that.options.persistence) that.persistentState = JSON.stringify(out);
+        resolve(out);
       });
     });
   }
 }
 
-/**
- * A string designating the path through an object to a property. `'*'` or an empty string designates the object itself
- * @typedef {String} Identifier
- */
-
 module.exports = Datastore;
 
 function hashKey(plaintext) {
-  var hash = crypto.createHash('sha256').update(plaintext);
+  let hash = crypto.createHash('sha256').update(plaintext);
   return Buffer.from(hash.digest());
 }
 
@@ -221,20 +223,21 @@ function mergeDefault(def, given) {
 }
 
 function editJSONFile(path, func, options) {
-  var spaces = options.spacing && !options.encrypt ? 2 : 0;
+  let spaces = options.spacing && !options.encrypt ? 2 : 0;
   return new Promise(function (resolve, reject) {
     fs.readFile(path, 'utf8', function (err, data) {
       if (err) {
         reject(err);
       } else {
-        var parsed = JSON.parse(options.encrypt ? decrypt(data, options.key) : data);
-        var editedData = JSON.stringify(func(parsed), null, spaces);
-        if (options.encrypt) editedData = encrypt(editedData, options.key);
-        fs.writeFile(path, editedData, 'utf8', function (err2) {
+        let parsed = JSON.parse(options.encrypt ? decrypt(data, options.key) : data);
+        let edited = func(parsed);
+        let dataToWrite = JSON.stringify(edited, null, spaces);
+        if (options.encrypt) dataToWrite = encrypt(dataToWrite, options.key);
+        fs.writeFile(path, dataToWrite, 'utf8', function (err2) {
           if (err2) {
             reject(err2);
           } else {
-            resolve();
+            resolve(edited);
           }
         });
       }
@@ -248,7 +251,7 @@ function readJSONFile(path, options) {
       if (err) {
         reject(err);
       } else {
-        var parsed = JSON.parse(options.encrypt ? decrypt(data, options.key) : data);
+        let parsed = JSON.parse(options.encrypt ? decrypt(data, options.key) : data);
         resolve(parsed);
       }
     });
@@ -256,29 +259,28 @@ function readJSONFile(path, options) {
 }
 
 function writeJSONFile(path, data, options) {
-  var spaces = options.spacing && !options.encrypt ? 2 : 0;
+  let spaces = options.spacing && !options.encrypt ? 2 : 0;
   return new Promise(function (resolve, reject) {
-    var dataToWrite = JSON.stringify(data, null, spaces);
+    let dataToWrite = JSON.stringify(data, null, spaces);
     if (options.encrypt) dataToWrite = encrypt(dataToWrite, options.key);
     fs.writeFile(path, dataToWrite, 'utf8', function (err) {
       if (err) {
         reject(err);
       } else {
-        resolve();
+        resolve(data);
       }
     });
   });
 }
 
 function getPropertyInTree(identifier, obj) {
-  var all = ['*', ''].includes(identifier.trim()) || !identifier;
+  let all = !Array.isArray(identifier) && (['*', ''].includes(identifier.trim())  || !identifier);
   if (all) {
     return obj;
   } else {
-    // Remove leading periods
-    identifier = identifier.match(/[^.].+/)[0];
-    var steps = identifier.split('.').filter(e => e.trim().length);
-    var current = Object.assign(obj);
+    let steps = Array.isArray(identifier) ? identifier
+      : identifier.match(/[^.].+/)[0].split('.').filter(e => e.trim().length);
+    let current = Object.assign(obj);
     for (let step of steps) {
       // Current step is not an object, cannot proceed
       if (!{}.hasOwnProperty.call(current, step)) {
@@ -296,14 +298,13 @@ function getPropertyInTree(identifier, obj) {
 }
 
 function setPropertyInTree(identifier, obj, val) {
-  var all = ['*', ''].includes(identifier.trim())  || !identifier;
+  let all = !Array.isArray(identifier) && (['*', ''].includes(identifier.trim())  || !identifier);
   if (all) {
     return val;
   } else {
-    // Remove leading periods
-    identifier = identifier.match(/[^.].+/)[0];
-    var steps = identifier.split('.').filter(e => e.trim().length);
-    var current = Object.assign(obj);
+    let steps = Array.isArray(identifier) ? identifier
+      : identifier.match(/[^.].+/)[0].split('.').filter(e => e.trim().length);
+    let current = Object.assign(obj);
     for (let step of steps) {
       if (step === steps[steps.length - 1]) {
         // Set value if on last step of the path
