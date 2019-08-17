@@ -19,14 +19,14 @@ async function destroyBot(client) {
 }
 
 async function getAccessiblePlugins(user, client) {
-  var userPlugins = Command.pluginsDM.slice(0);
+  let userPlugins = Command.pluginsDM.slice(0);
 
   await Util.asyncForEach([...GuildManager.all.values()], async (manager) => {
-    var guild = client.guilds.get(manager.id);
+    let guild = client.guilds.get(manager.id);
 
     if (!guild.members.has(user.id)) return;
 
-    var plugins = await manager.configdb.get('plugins');
+    let plugins = await manager.configdb.get('plugins');
 
     plugins.forEach((plugin) => {
       if (!userPlugins.includes(plugin)) userPlugins.push(plugin);

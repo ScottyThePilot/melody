@@ -25,7 +25,7 @@ const defaultOptions = {
 
 class Command {
   constructor(options) {
-    var o = Util.mergeDefault(defaultOptions, options);
+    let o = Util.mergeDefault(defaultOptions, options);
     this.name = o.name;
     this.disabled = o.disabled;
     this.level = o.level;
@@ -38,15 +38,15 @@ class Command {
   }
 
   async attempt(bundle) {
-    var isTrusted = [config.ownerID, ...config.trustedUsers].includes(bundle.message.author.id)
-    var plugins = bundle.manager ? await bundle.manager.configdb.get('plugins') : Command.pluginsDM;
+    let isTrusted = [config.ownerID, ...config.trustedUsers].includes(bundle.message.author.id)
+    let plugins = bundle.manager ? await bundle.manager.configdb.get('plugins') : Command.pluginsDM;
 
     // Exit silently if this command's plugin is not enabled in the given server
     // 0xe0: Ignored: [Command not on plugin list]
     if (!plugins.includes(this.plugin) && this.plugin !== 'owner') return 0xe0;
 
     // Clone bundle and insert userLevel
-    var newBundle = Object.assign({
+    let newBundle = Object.assign({
       trusted: isTrusted,
       plugins: plugins,
       userLevel: Command.getUserLevel(bundle)
@@ -85,7 +85,7 @@ class Command {
   }
 
   static find(alias) {
-    for (var [name, command] of Command.manifest) {
+    for (let [name, command] of Command.manifest) {
       if (name.toLowerCase() === alias.toLowerCase() || command.aliases.includes(alias.toLowerCase())) return command;
     }
     return null;
@@ -93,7 +93,7 @@ class Command {
 
   static async buildManifest() {
     if (Command.manifest.size > 0) throw new Error('Manifest already built');
-    var commandFiles = await readdir('./commands');
+    let commandFiles = await readdir('./commands');
     commandFiles.forEach((fileName) => {
       if (fileName instanceof Buffer) fileName = fileName.toString();
       require('../commands/' + fileName).save();
@@ -101,7 +101,7 @@ class Command {
   }
 
   static getUserLevel(bundle) {
-    var userLevel = 0;
+    let userLevel = 0;
 
     if (bundle.message.guild) {
       if (bundle.message.member.hasPermission('ADMINISTRATOR')) {

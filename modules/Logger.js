@@ -16,7 +16,7 @@ class Logger {
     this.logStream = fs.createWriteStream(this.path, { flags: 'a' });
     this.locked = false;
     
-    var rotationCheckFinished = this.rotation ? this.checkRotation() : Promise.resolve();
+    let rotationCheckFinished = this.rotation ? this.checkRotation() : Promise.resolve();
 
     rotationCheckFinished.then(() => this.log('Begin Log'));
   }
@@ -46,12 +46,12 @@ class Logger {
   async checkRotation() {
     if (!fs.existsSync(this.logPath)) await mkdir(this.logPath);
     
-    var fileStats = await stat(this.path);
+    let fileStats = await stat(this.path);
     
     if (fileStats.size >= Logger.sizeThreshold) {
       this.locked = true;
-      var contents = await readFile(this.path);
-      var now = new Date();
+      let contents = await readFile(this.path);
+      let now = new Date();
       await writeFile(this.logPath + '/' + Logger.savifyDate(now) + '.log', contents);
       await writeFile(this.path, `${Logger.logifyDate(now)}: [DATA] Log Rotated`);
       this.locked = false;
@@ -72,7 +72,7 @@ class Logger {
   }
 
   static logifyUser(entity) {
-    var user = entity.hasOwnProperty('user') ? entity.user : entity;
+    let user = entity.hasOwnProperty('user') ? entity.user : entity;
     return `${user.tag} (${user.id})`;
   }
 
