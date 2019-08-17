@@ -76,7 +76,7 @@ function onMessageDeleteBulk(messages, manager) {
     return [header, content, ...meta];
   });
 
-
+  manager.log('LOGGER', `Bulk message deletion in channel ${Logger.logify(message.channel)}`, ...[].concat(...list));
 }
 
 controller.setup = function setup(client) {
