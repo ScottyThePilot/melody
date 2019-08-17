@@ -70,7 +70,11 @@ client.on('guildDelete', async (guild) => {
 client.on('message', async (message) => {
   if (message.author.bot) return;
 
-  var args = message.cleanContent.trim().slice(config.prefix.length).trim().split(/ +/g);
+  // AutoMod Goes here :)
+
+  if (!message.cleanContent.trim().startsWith(config.prefix)) return;
+
+  var args = message.cleanContent.trim().slice(config.prefix.length).split(/\s+/g);
   var command = args.shift().toLowerCase();
 
   const found = Command.find(command);
