@@ -13,9 +13,9 @@ async function destroyBot(client) {
     Logger.main.log('DATA', `Guild ${Logger.logifyGuild(guild)} unloaded`);
   });
 
-  Logger.main.end().then(() => {
-    client.destroy();
-  });
+  await Logger.main.end();
+  
+  await client.destroy();
 }
 
 async function getAccessiblePlugins(user, client) {

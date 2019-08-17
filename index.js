@@ -44,12 +44,12 @@ client.on('ready', async () => {
 
     await client.user.setActivity('in Beta');
 
+    Logger.main.log('INFO', `Tracking ${client.guilds.size} Guilds with ${client.users.size} Users`);
+
     controller.firstReady = true;
   }
 
   Logger.main.log('INFO', 'Bot Ready! (' + (new Date() - then) + 'ms)');
-
-  Logger.main.log('INFO', `Tracking ${client.guilds.size} Guilds with ${client.users.size} Users`);
 });
 
 
