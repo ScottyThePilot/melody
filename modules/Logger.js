@@ -77,11 +77,15 @@ class Logger {
   }
 
   static logifyGuild(guild) {
-    return `${guild.name} (${guild.id})` + (guild.available ? '' : ' (Unavailable)');
+    return Logger.logify(guild) + (guild.available ? '' : ' (Unavailable)');
   }
 
   static logifyError(err) {
     return `${err.name}: ${err.message} (${err.code} ${err.path})`;
+  }
+
+  static logify(obj) {
+    return `${obj.name} (${obj.id})`;
   }
 
   static getUptime(client) {

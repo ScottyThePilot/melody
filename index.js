@@ -93,6 +93,38 @@ client.on('message', async (message) => {
   await found.attempt(bundle);
 });
 
+client.on('guildMemberAdd', async (member) => {
+  if (controller.firstReady) controller.onGuildMemberAdd(member, GuildManager.all.get(member.guild.id));
+});
+
+client.on('guildMemberRemove', async (member) => {
+  if (controller.firstReady) controller.onGuildMemberRemove(member, GuildManager.all.get(member.guild.id));
+})
+
+client.on('messageUpdate', async (oldMessage, newMessage) => {
+  let guild = oldMessage.guild;
+  if (controller.firstReady && guild) {
+    let manager = GuildManager.all.get(guild.id);
+    if (await manager.configdb.get('logMessages')) controller.onMessageUpdate(oldMessage, newMessage, manager);
+  }
+});
+
+client.on('messageDelete', async (message) => {
+  let guild = message.guild;
+  if (controller.firstReady && guild) {
+    let manager = GuildManager.all.get(guild.id);
+    if (await manager.configdb.get('logMessages')) controller.onMessageDelete(message, manager);
+  }
+});
+
+client.on('messageDeleteBulk', async (messages) => {
+  let guild = messages.first().guild;
+  if (controller.firstReady, guild) {
+    let manager = GuildManager.all.get(guild.id);
+    if (await manager.configdb.get('logMessages')) controller.onMessageDeleteBulk(messages, manager);
+  }
+});
+
 
 client.on('error', (err) => {
   Logger.main.log('ERR', Logger.logifyError(err));

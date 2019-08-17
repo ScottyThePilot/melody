@@ -5,6 +5,16 @@ const Command = require('./Command.js');
 const Util = require('./util/Util.js');
 const controller = {};
 
+function stylizeAttachment(attachment) {
+  return `${attachment.filename} (${attachment.filesize}): ${attachment.url}`;
+}
+
+function stylizeMetaData(message) {
+  let c = message.embeds.length;
+  let out = !c ? [] : [`[${c} Embed${c <= 1 ? '' : 's'}]`];
+  return out.concat(message.attachments.array().map(stylizeAttachment));
+}
+
 async function destroyBot(client) {
   Logger.main.log('INFO', 'Shutting Down...');
 
@@ -36,12 +46,68 @@ async function getAccessiblePlugins(user, client) {
   return userPlugins;
 }
 
+function onGuildMemberAdd(member, manager) {
+  manager.log('LOGGER', `User ${Logger.logifyUser(member)} added to guild`);
+}
+
+function onGuildMemberRemove(member, manager) {
+  manager.log('LOGGER', `User ${Logger.logifyUser(member)} removed from guild`);
+}
+
+function onMessageUpdate(oldMessage, newMessage, manager) {
+  const oldContent = `Old Content: ${Logger.escape(oldMessage.cleanContent)}`;
+  const oldMeta = stylizeMetaData(oldMessage).map((e) => '  ' + e);
+  const newContent = `New Content: ${Logger.escape(newMessage.cleanContent)}`;
+  const newMeta = stylizeMetaData(newMessage).map((e) => '  ' + e);
+  manager.log('LOGGER', `Message by user ${Logger.logifyUser(oldMessage.author)} edited in channel ${Logger.logify(oldMessage.channel)}`, oldContent, ...oldMeta, newContent, ...newMeta);
+}
+
+function onMessageDelete(message, manager) {
+  const content = `Content: ${Logger.escape(message.cleanContent)}`;
+  const meta = stylizeMetaData(message).map((e) => '  ' + e);
+  manager.log('LOGGER', `Message by user ${Logger.logifyUser(message.author)} deleted in channel ${Logger.logify(message.channel)}`, content, meta);
+}
+
+function onMessageDeleteBulk(messages, manager) {
+  const list = messages.array().map((message) => {
+    const header = `Message by user ${Logger.logifyUser(message.author)}:`;
+    const content = `  Content: ${Logger.escape(message.cleanContent)}`;
+    const meta = stylizeMetaData(message).map((e) => '    ' + e);
+    return [header, content, ...meta];
+  });
+
+
+}
+
 controller.setup = function setup(client) {
   controller.destroyBot = () => destroyBot(client);
   controller.userOwnsAGuild = (user) => client.guilds.some((guild) => guild.owner.id === user.id);
   controller.getAccessiblePlugins = (user) => getAccessiblePlugins(user, client);
+
+  controller.onMessageUpdate = onMessageUpdate;
+  controller.onMessageDelete = onMessageDelete;
+  controller.onMessageDeleteBulk = onMessageDeleteBulk;
+  controller.onGuildMemberAdd = (member, manager) => onGuildMemberAdd(client, member, manager);
+  controller.onGuildMemberRemove = (member, manager) => onGuildMemberRemove(client, member, manager);
 };
 
 controller.firstReady = false;
+
+controller.wittyMuteMessages = [
+  'I\'m afraid I can\'t let you do that. Send messages slower next time.',
+  'Looks like you\'re sending messages a little too quickly.',
+  'Please slow down, you\'re sending messages awful quickly.',
+  'Please calm down, you\'re upsetting the robo-hampsters.',
+  'Looks like you were sending messages too quickly.',
+  'Try not to send messages so fast next time :(',
+  'Whoa there! Slow down with the messages.',
+  'Please don\'t send messages so quickly :(',
+  'Next time, send messages a bit slower.',
+  'Oh! So that\'s what that button does...',
+  'It\'s rude to send messages so quickly.',
+  'Enhance your calm.'
+];
+
+controller.muteNoticeMessage = 'You were automatically muted for spamming. If you believe this is a bug, please contact this bot\'s owner, Scotty#4263';
 
 module.exports = controller;
