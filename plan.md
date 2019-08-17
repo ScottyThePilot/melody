@@ -1,6 +1,29 @@
 # Bot Plan
 
-### Commands
+## Objectives
+
+* Create ;ping and ;destroy - **Done**
+* Create ;help - **Done**
+* Create ;configure - **Done**
+* Add message logging functionality
+* Create ;dump and ;flush
+* Add database filestate persistency
+* Create ;blacklist
+* Add analytics tracking
+* Create ;uptime and ;memory
+* Create ;whatis and ;info
+* Create ;mute
+* Add autoMod and antiSpam functionality
+
+## Roadmap
+
+**Beta**: The bot will be in Beta until message logging is finished, then it will move into Alpha. Expected time to completion: About 1 Week.
+
+**Alpha**: The bot will be in Alpha until muting, autoMod, antiSpam, and all current objectives are finished. Expected time to completion: About 2-4 Weeks.
+
+**The Future**: Once out of Alpha, I will move the bot towards more fun things like CleverBot and Connect Four.
+
+## Commands
 
 ```
 ;help|halp|h [command]
