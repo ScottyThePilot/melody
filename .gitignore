@@ -1,11 +1,6 @@
 # Packages
 node_modules/
-yarn.lock
 package-lock.json
-
-# Logs
-logs/
-*.log
 
 # Secret Data
 config.json
@@ -13,3 +8,4 @@ data/
 
 # Other
 *.lnk
+start.bat
