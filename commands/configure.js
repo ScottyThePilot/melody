@@ -85,8 +85,8 @@ module.exports = new Command({
 });
 
 function getConfigProp(name) {
-  const n = name.replace(/\W+/g, '').toLowerCase();
-  return configProperties.find((p) => p[0].toLowerCase() === n)[0];
+  const n = name.replace(/[^a-zA-Z]+/g, '').toLowerCase();
+  return (configProperties.find((p) => p[0].toLowerCase() === n) || [])[0];
 }
 
 function verifyBool(val) {
