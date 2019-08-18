@@ -84,6 +84,13 @@ class Logger {
     return `${err.name}: ${err.message} (${err.code} ${err.path})`;
   }
 
+  static logifyBytes(bytes) {
+    return bytes < 1024 ? bytes + 'b'
+      : bytes < 1048576 ? (bytes / 1024).toFixed(3) + 'kb'
+      : bytes < 1073741824 ? (bytes / 1048576).toFixed(3) + 'mb'
+      : (bytes / 1073741824).toFixed(3) + 'gb';
+  }
+
   static logify(obj) {
     return `${obj.name} (${obj.id})`;
   }

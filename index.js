@@ -102,6 +102,7 @@ client.on('guildMemberRemove', async (member) => {
 })
 
 client.on('messageUpdate', async (oldMessage, newMessage) => {
+  if (oldMessage.author.bot) return;
   let guild = oldMessage.guild;
   if (controller.firstReady && guild) {
     let manager = GuildManager.all.get(guild.id);

@@ -6,7 +6,7 @@ const Util = require('./util/Util.js');
 const controller = {};
 
 function stylizeAttachment(attachment) {
-  return `${attachment.filename} (${attachment.filesize}): ${attachment.url}`;
+  return `${attachment.filename} (${Logger.logifyBytes(attachment.filesize)}): ${attachment.url}`;
 }
 
 function stylizeMetaData(message) {
@@ -65,7 +65,7 @@ function onMessageUpdate(oldMessage, newMessage, manager) {
 function onMessageDelete(message, manager) {
   const content = `Content: ${Logger.escape(message.cleanContent)}`;
   const meta = stylizeMetaData(message).map((e) => '  ' + e);
-  manager.log('LOGGER', `Message by user ${Logger.logifyUser(message.author)} deleted in channel ${Logger.logify(message.channel)}`, content, meta);
+  manager.log('LOGGER', `Message by user ${Logger.logifyUser(message.author)} deleted in channel ${Logger.logify(message.channel)}`, content, ...meta);
 }
 
 function onMessageDeleteBulk(messages, manager) {
@@ -75,8 +75,7 @@ function onMessageDeleteBulk(messages, manager) {
     const meta = stylizeMetaData(message).map((e) => '    ' + e);
     return [header, content, ...meta];
   });
-
-  manager.log('LOGGER', `Bulk message deletion in channel ${Logger.logify(message.channel)}`, ...[].concat(...list));
+  manager.log('LOGGER', `Bulk message deletion in channel ${Logger.logify(messages.first().channel)}`, ...[].concat(...list));
 }
 
 controller.setup = function setup(client) {
