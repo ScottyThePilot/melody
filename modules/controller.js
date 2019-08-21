@@ -15,6 +15,32 @@ function stylizeMetaData(message) {
   return out.concat(message.attachments.array().map(stylizeAttachment));
 }
 
+function cleanContent(message) {
+  return message.content
+    .replace(/@(everyone|here)/g, '@\u200b$1')
+    .replace(/<@!?[0-9]+>/g, input => {
+      const id = input.replace(/<|!|>|@/g, '');
+      if (message.channel.type === 'dm' || message.channel.type === 'group') {
+        return message.client.users.has(id) ? `@${message.client.users.get(id).tag}` : input;
+      }
+
+      const user = message.client.users.get(id);
+      if (user) return `@${user.tag}`;
+      return input;
+    })
+    .replace(/<#[0-9]+>/g, input => {
+      const channel = message.client.channels.get(input.replace(/<|#|>/g, ''));
+      if (channel) return `#${channel.name}`;
+      return input;
+    })
+    .replace(/<@&[0-9]+>/g, input => {
+      if (message.channel.type === 'dm' || message.channel.type === 'group') return input;
+      const role = message.guild.roles.get(input.replace(/<|@|>|&/g, ''));
+      if (role) return `@${role.name}`;
+      return input;
+    });
+}
+
 async function destroyBot(client) {
   Logger.main.log('INFO', 'Shutting Down...');
 
@@ -55,15 +81,15 @@ function onGuildMemberRemove(member, manager) {
 }
 
 function onMessageUpdate(oldMessage, newMessage, manager) {
-  const oldContent = `Old Content: ${Logger.escape(oldMessage.cleanContent)}`;
+  const oldContent = `Old Content: ${Logger.escape(cleanContent(oldMessage))}`;
   const oldMeta = stylizeMetaData(oldMessage).map((e) => '  ' + e);
-  const newContent = `New Content: ${Logger.escape(newMessage.cleanContent)}`;
+  const newContent = `New Content: ${Logger.escape(cleanContent(newMessage))}`;
   const newMeta = stylizeMetaData(newMessage).map((e) => '  ' + e);
   manager.log('LOGGER', `Message by user ${Logger.logifyUser(oldMessage.author)} edited in channel ${Logger.logify(oldMessage.channel)}`, oldContent, ...oldMeta, newContent, ...newMeta);
 }
 
 function onMessageDelete(message, manager) {
-  const content = `Content: ${Logger.escape(message.cleanContent)}`;
+  const content = `Content: ${Logger.escape(cleanContent(message))}`;
   const meta = stylizeMetaData(message).map((e) => '  ' + e);
   manager.log('LOGGER', `Message by user ${Logger.logifyUser(message.author)} deleted in channel ${Logger.logify(message.channel)}`, content, ...meta);
 }
@@ -71,7 +97,7 @@ function onMessageDelete(message, manager) {
 function onMessageDeleteBulk(messages, manager) {
   const list = messages.array().map((message) => {
     const header = `Message by user ${Logger.logifyUser(message.author)}:`;
-    const content = `  Content: ${Logger.escape(message.cleanContent)}`;
+    const content = `  Content: ${Logger.escape(cleanContent(message))}`;
     const meta = stylizeMetaData(message).map((e) => '    ' + e);
     return [header, content, ...meta];
   });
@@ -86,8 +112,8 @@ controller.setup = function setup(client) {
   controller.onMessageUpdate = onMessageUpdate;
   controller.onMessageDelete = onMessageDelete;
   controller.onMessageDeleteBulk = onMessageDeleteBulk;
-  controller.onGuildMemberAdd = (member, manager) => onGuildMemberAdd(client, member, manager);
-  controller.onGuildMemberRemove = (member, manager) => onGuildMemberRemove(client, member, manager);
+  controller.onGuildMemberAdd = onGuildMemberAdd;
+  controller.onGuildMemberRemove = onGuildMemberRemove;
 };
 
 controller.firstReady = false;
