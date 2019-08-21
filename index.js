@@ -42,7 +42,7 @@ client.on('ready', async () => {
 
     Logger.main.log('DATA', `${Command.manifest.size} Commands loaded`);
 
-    await client.user.setActivity('in Beta');
+    await client.user.setActivity('in Alpha');
 
     Logger.main.log('INFO', `Tracking ${client.guilds.size} Guilds with ${client.users.size} Users`);
 
