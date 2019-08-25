@@ -81,7 +81,8 @@ class Logger {
   }
 
   static logifyError(err) {
-    return `${err.name}: ${err.message} (${err.code} ${err.path})`;
+    var info = err.code && err.path ? err.code + ' ' + err.path : err.code || err.path;
+    return `${err.name || 'Error'}: ${err.message} (${info})`;
   }
 
   static logifyBytes(bytes) {
