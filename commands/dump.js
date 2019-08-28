@@ -20,10 +20,11 @@ module.exports = new Command({
     const ownedGuilds = message.author.id === config.ownerID ? message.client.guilds
       : message.client.guilds.filter((guild) => guild.ownerID === message.author.id);
 
-    if (message.author.id === config.ownerID && args[0].startsWith('activity')) {
+    if (message.author.id === config.ownerID && (args[0] || '').startsWith('activity')) {
       await message.author.send(`Core Bot Logs:`, {
         file: new Attachment('./activity.log', 'activity.log')
       }).catch((reason) => {
+        console.log(reason);
         message.author.send('Unable to attach file.').catch(msgFailCatcher);
       });
     } else if (ownedGuilds.size < 1) {
@@ -34,6 +35,7 @@ module.exports = new Command({
         await message.author.send(`Message logs for ${guild.name}:`, {
           file: new Attachment(`./data/${guild.id}/latest.log`, `guild${guild.id}.log`)
         }).catch((reason) => {
+          console.log(reason);
           message.author.send('Unable to attach file.').catch(msgFailCatcher);
         });
       } else {
@@ -48,6 +50,7 @@ module.exports = new Command({
           await message.author.send(`Message logs for ${guild.name}:`, {
             file: new Attachment(`./data/${guild.id}/latest.log`, `guild${guild.id}.log`)
           }).catch((reason) => {
+            console.log(reason);
             message.author.send('Unable to attach file.').catch(msgFailCatcher);
           });
         } else {
