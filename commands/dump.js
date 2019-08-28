@@ -22,7 +22,7 @@ module.exports = new Command({
 
     if (message.author.id === config.ownerID && (args[0] || '').startsWith('activity')) {
       await message.author.send(`Core Bot Logs:`, {
-        file: new Attachment('./activity.log', 'activity.log')
+        file: new Attachment('./data/main.log', 'main.log')
       }).catch((reason) => {
         console.log(reason);
         message.author.send('Unable to attach file.').catch(msgFailCatcher);
@@ -57,7 +57,7 @@ module.exports = new Command({
           await message.author.send(`${guild.name} has no message logs.`).catch(msgFailCatcher);
         }
       } else {
-        await message.author.send('').catch(msgFailCatcher);
+        await message.author.send('I can\'t find that guild.').catch(msgFailCatcher);
       }
     }
   }
