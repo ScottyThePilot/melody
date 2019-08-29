@@ -49,7 +49,10 @@ client.on('ready', async () => {
     controller.firstReady = true;
   }
 
-  Logger.main.log('INFO', 'Bot Ready! (' + (new Date() - then) + 'ms)');
+    Logger.main.log('INFO', 'Bot Ready! (' + (new Date() - then) + 'ms)');
+  } else {
+    Logger.main.log('INFO', 'Bot Ready!');
+  }
 });
 
 
