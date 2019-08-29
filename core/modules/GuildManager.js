@@ -10,10 +10,10 @@ const write = NodeUtil.promisify(fs.writeFile);
 class GuildManager {
   static async load(id) {
     await this.mount(id);
-    const logger = new Logger(`./data/${id}/latest.log`, {
-      logPath: `./data/${id}/logs`
+    const logger = new Logger(`./core/data/${id}/latest.log`, {
+      logPath: `./core/data/${id}/logs`
     });
-    const configdb = new Datastore(`./data/${id}/guildConfig.json`, {
+    const configdb = new Datastore(`./core/data/${id}/guildConfig.json`, {
       data: this.defaultConfig
     });
     const saved = new this(id, logger, configdb);
@@ -25,13 +25,13 @@ class GuildManager {
   static async mount(id) {
     let exists = GuildManager.exists(id);
     if (!exists) {
-      await mkdir(`./data/${id}`);
-      await mkdir(`./data/${id}/logs`);
-      await write(`./data/${id}/latest.log`, '');
+      await mkdir(`./core/data/${id}`);
+      await mkdir(`./core/data/${id}/logs`);
+      await write(`./core/data/${id}/latest.log`, '');
       return;
     }
-    if (!fs.existsSync(`./data/${id}/latest.log`)) {
-      await write(`./data/${id}/latest.log`, '');
+    if (!fs.existsSync(`./core/data/${id}/latest.log`)) {
+      await write(`./core/data/${id}/latest.log`, '');
     }
   } // Creates the assigned directories and files
 
@@ -41,7 +41,7 @@ class GuildManager {
   }
 
   static exists(id) {
-    return fs.existsSync('./data/' + id);
+    return fs.existsSync('./core/data/' + id);
   } // Checks whether a guild is stored or not
 
   constructor(id, logger, configdb) {

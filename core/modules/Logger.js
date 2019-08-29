@@ -117,9 +117,9 @@ class Logger {
   }
 }
 
-Logger.main = new Logger('./data/main.log', {
+Logger.main = new Logger('./core/data/main.log', {
   logToConsole: true,
-  logPath: './data/logs'
+  logPath: './core/data/logs'
 });
 
 Logger.sizeThreshold = 1048576; // File threshold in bytes

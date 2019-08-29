@@ -18,15 +18,20 @@ const client = new Discord.Client({
 const wait = NodeUtil.promisify(setTimeout);
 
 
-process.on('unhandledRejection', (err) => { 
-  throw err; 
-});
+const errHandler = (err) => {
+  //process.send({ err: err ? err.stack : err });
+  //process.exit(1);
+  throw err;
+};
+
+process.on('unhandledRejection', errHandler);
+//process.on('uncaughtException', errHandler);
 
 
 client.on('ready', async () => {
   if (!controller.firstReady) {
     Logger.main.log('INFO', 'Bot Loading...');
-
+    
     await wait(750);
 
     let then = new Date();
@@ -146,5 +151,3 @@ client.on('warn', (warn) => {
 
 
 client.login(config.token);
-
-

@@ -93,7 +93,7 @@ class Command {
 
   static async buildManifest() {
     if (Command.manifest.size > 0) throw new Error('Manifest already built');
-    let commandFiles = await readdir('./commands');
+    let commandFiles = await readdir('./core/commands');
     commandFiles.forEach((fileName) => {
       if (fileName instanceof Buffer) fileName = fileName.toString();
       require('../commands/' + fileName).save();
