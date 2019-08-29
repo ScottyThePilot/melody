@@ -5,8 +5,8 @@
 * Create ;ping and ;destroy - **Done**
 * Create ;help - **Done**
 * Create ;configure - **Done**
-* Add message logging functionality
-* Create ;dump and ;flush
+* Add message logging functionality - **Done**
+* Create ;dump and ;flush - Almost there
 * Add database filestate persistency
 * Create ;blacklist
 * Add analytics tracking
@@ -19,7 +19,7 @@
 
 **Beta**: The bot will be in Beta until message logging is finished, then it will move into Alpha. Expected time to completion: About 1 Week.
 
-**Alpha**: The bot will be in Alpha until muting, autoMod, antiSpam, and all current objectives are finished. Expected time to completion: About 2-4 Weeks.
+**Alpha**: The bot will be in Alpha until muting, autoMod, antiSpam, and all current objectives are finished. Expected time to completion: About 4-6 Weeks.
 
 **The Future**: Once out of Alpha, I will move the bot towards more fun things like CleverBot and Connect Four.
 
