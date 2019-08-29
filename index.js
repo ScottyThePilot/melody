@@ -29,7 +29,7 @@ client.on('ready', async () => {
 
     await wait(750);
 
-    var then = new Date();
+    let then = new Date();
 
     controller.setup(client);
 
@@ -47,7 +47,6 @@ client.on('ready', async () => {
     Logger.main.log('INFO', `Tracking ${client.guilds.size} Guilds with ${client.users.size} Users`);
 
     controller.firstReady = true;
-  }
 
     Logger.main.log('INFO', 'Bot Ready! (' + (new Date() - then) + 'ms)');
   } else {
@@ -77,8 +76,8 @@ client.on('message', async (message) => {
 
   if (!message.cleanContent.trim().startsWith(config.prefix)) return;
 
-  var args = message.cleanContent.trim().slice(config.prefix.length).split(/\s+/g);
-  var command = args.shift().toLowerCase();
+  let args = message.cleanContent.trim().slice(config.prefix.length).split(/\s+/g);
+  let command = args.shift().toLowerCase();
 
   const found = Command.find(command);
 
@@ -136,7 +135,7 @@ client.on('error', (err) => {
 
 
 client.on('rateLimit', (err) => {
-  var message = `RateLimit ${err.method.toUpperCase()}: ${err.timeDifference}ms (${err.path})`;
+  let message = `RateLimit ${err.method.toUpperCase()}: ${err.timeDifference}ms (${err.path})`;
   Logger.main.log('WARN', message);
 });
 
