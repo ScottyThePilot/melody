@@ -5,16 +5,6 @@ const Command = require('./Command.js');
 const Util = require('./util/Util.js');
 const controller = {};
 
-function stylizeAttachment(attachment) {
-  return `${attachment.filename} (${Logger.logifyBytes(attachment.filesize)}): ${attachment.url}`;
-}
-
-function stylizeMetaData(message) {
-  let c = message.embeds.length;
-  let out = !c ? [] : [`[${c} Embed${c <= 1 ? '' : 's'}]`];
-  return out.concat(message.attachments.array().map(stylizeAttachment));
-}
-
 function cleanContent(message) {
   return message.content
     .replace(/@(everyone|here)/g, '@\u200b$1')
@@ -82,15 +72,15 @@ function onGuildMemberRemove(member, manager) {
 
 function onMessageUpdate(oldMessage, newMessage, manager) {
   const oldContent = `Old Content: ${Logger.escape(cleanContent(oldMessage))}`;
-  const oldMeta = stylizeMetaData(oldMessage).map((e) => '  ' + e);
+  const oldMeta = Logger.stylizeMetaData(oldMessage).map((e) => '  ' + e);
   const newContent = `New Content: ${Logger.escape(cleanContent(newMessage))}`;
-  const newMeta = stylizeMetaData(newMessage).map((e) => '  ' + e);
+  const newMeta = Logger.stylizeMetaData(newMessage).map((e) => '  ' + e);
   manager.log('LOGGER', `Message by user ${Logger.logifyUser(oldMessage.author)} edited in channel ${Logger.logify(oldMessage.channel)}`, oldContent, ...oldMeta, newContent, ...newMeta);
 }
 
 function onMessageDelete(message, manager) {
   const content = `Content: ${Logger.escape(cleanContent(message))}`;
-  const meta = stylizeMetaData(message).map((e) => '  ' + e);
+  const meta = Logger.stylizeMetaData(message).map((e) => '  ' + e);
   manager.log('LOGGER', `Message by user ${Logger.logifyUser(message.author)} deleted in channel ${Logger.logify(message.channel)}`, content, ...meta);
 }
 
@@ -98,7 +88,7 @@ function onMessageDeleteBulk(messages, manager) {
   const list = messages.array().map((message) => {
     const header = `Message by user ${Logger.logifyUser(message.author)}:`;
     const content = `  Content: ${Logger.escape(cleanContent(message))}`;
-    const meta = stylizeMetaData(message).map((e) => '    ' + e);
+    const meta = Logger.stylizeMetaData(message).map((e) => '    ' + e);
     return [header, content, ...meta];
   });
   manager.log('LOGGER', `Bulk message deletion in channel ${Logger.logify(messages.first().channel)}`, ...[].concat(...list));
@@ -106,7 +96,7 @@ function onMessageDeleteBulk(messages, manager) {
 
 function onMessage(message) {
   const content = `Content: ${Logger.escape(cleanContent(message))}`;
-  const meta = stylizeMetaData(message).map((e) => '  ' + e);
+  const meta = Logger.stylizeMetaData(message).map((e) => '  ' + e);
   manager.log('LOGGER', `Message by user ${Logger.logifyUser(message.author)} sent in channel ${Logger.logify(message.channel)}`, content, ...meta);
 }
 

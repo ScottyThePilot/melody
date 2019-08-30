@@ -96,6 +96,16 @@ class Logger {
       : (bytes / 1073741824).toFixed(3) + 'gb';
   }
 
+  static stylizeAttachment(attachment) {
+    return `${attachment.filename} (${Logger.logifyBytes(attachment.filesize)}): ${attachment.url}`;
+  }
+  
+  static stylizeMetaData(message) {
+    let c = message.embeds.length;
+    let out = !c ? [] : [`[${c} Embed${c <= 1 ? '' : 's'}]`];
+    return out.concat(message.attachments.array().map(Logger.stylizeAttachment));
+  }
+
   static logify(obj) {
     return `${obj.name} (${obj.id})`;
   }
