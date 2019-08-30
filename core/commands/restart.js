@@ -15,7 +15,7 @@ module.exports = new Command({
   run: async function (bundle) {
     const { message, controller } = bundle;
 
-    message.react(String.fromCharCode(0x2705)).catch();
+    await message.react(String.fromCharCode(0x2705)).catch();
 
     await controller.destroyBot();
 
