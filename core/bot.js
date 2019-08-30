@@ -18,14 +18,15 @@ const client = new Discord.Client({
 const wait = NodeUtil.promisify(setTimeout);
 
 
-const errHandler = (err) => {
-  //process.send({ err: err ? err.stack : err });
-  //process.exit(1);
-  throw err;
-};
+process.on('uncaughtException', (err) => {
+  console.error(err);
+  process.send({ err: err ? err.stack : err });
+  process.exit(1);
+});
 
-process.on('unhandledRejection', errHandler);
-//process.on('uncaughtException', errHandler);
+process.on('unhandledRejection', (reason) => {
+  throw reason;
+});
 
 
 client.on('ready', async () => {
