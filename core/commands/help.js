@@ -6,6 +6,7 @@ const config = require('../config.json');
 const Util = require('../modules/util/Util.js');
 
 const permissions = {
+  [-1]: null,
   [0]: 'Everyone',
   [1]: 'Server administrators',
   [2]: 'Server owners',
@@ -32,7 +33,7 @@ module.exports = new Command({
     const commandListFull = [...Command.manifest.values()]
       .sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
 
-    const plugins = isHelpAll && !trusted ? await controller.getAccessiblePlugins(message.author, client) 
+    const plugins = isHelpAll && !trusted ? await controller.getAccessiblePlugins(message.author, client)
       : bundle.plugins;
 
     const commandList = (isHelpAll || !message.guild) && trusted ? commandListFull
@@ -80,7 +81,7 @@ module.exports = new Command({
         embed.addField('Example', '\`' + cmd.help.example + '\`', true);
         embed.addField('Aliases', aliases);
         embed.addField('Plugin', '\`' + cmd.plugin.toUpperCase() + '\`');
-        embed.addField('Permissions', permissions[cmd.level]);
+        embed.addField('Permissions', permissions[cmd.level] || this.permissions || 'Custom');
 
         await message.channel.send(embed).catch(msgFailCatcher);
       } else {

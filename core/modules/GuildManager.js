@@ -63,6 +63,7 @@ GuildManager.defaultConfig = {
   trackInvites: false,
   preserveRoles: false,
   logMessages: false,
+  logMessageChanges: false,
   autoMod: false,
   antiSpam: false,
   mutedRole: null

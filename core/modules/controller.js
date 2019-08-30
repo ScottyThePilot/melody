@@ -104,6 +104,12 @@ function onMessageDeleteBulk(messages, manager) {
   manager.log('LOGGER', `Bulk message deletion in channel ${Logger.logify(messages.first().channel)}`, ...[].concat(...list));
 }
 
+function onMessage(message) {
+  const content = `Content: ${Logger.escape(cleanContent(message))}`;
+  const meta = stylizeMetaData(message).map((e) => '  ' + e);
+  manager.log('LOGGER', `Message by user ${Logger.logifyUser(message.author)} sent in channel ${Logger.logify(message.channel)}`, content, ...meta);
+}
+
 controller.setup = function setup(client) {
   controller.destroyBot = () => destroyBot(client);
   controller.userOwnsAGuild = (user) => client.guilds.some((guild) => guild.owner.id === user.id);

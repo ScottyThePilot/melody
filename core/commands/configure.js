@@ -3,10 +3,13 @@ const Command = require('../modules/Command.js');
 const { msgFailCatcher } = require('../modules/Logger.js');
 const config = require('../config.json');
 
+const logsNotice = `Logs can be retrieved with \`${config.prefix}dump\`, or cleared with \`${config.prefix}flush\``;
+
 const configProperties = [
   //['trackInvites', 'bool'],
   //['preserveRoles', 'bool'],
-  ['logMessages', 'bool', `If \`logMessages\` is true, the bot will log message edits and deletions. Logs can be retrieved with \`${config.prefix}dump\`, or cleared with \`${config.prefix}flush\`.`],
+  ['logMessages', 'bool', `If \`logMessages\` is true, the bot will log all sent messages. ${logsNotice}`]
+  ['logMessageChanges', 'bool', `If \`logMessageChanges\` is true, the bot will log message edits and deletions. ${logsNotice}`],
   //['autoMod', 'bool'],
   //['antiSpam', 'bool'],
   //['mutedRole', 'role']
@@ -41,7 +44,7 @@ module.exports = new Command({
     short: 'Changes server config settings.',
     long: 'Allows the server owner to modify server configuration settings for the bot. Exclude the \`value\` argument to get the current value of a property or exclude the \`config property\` argument to list all valid properties.',
     usage: `${config.prefix}configure [config property] [value]`,
-    example: `${config.prefix}configure logMessages enable`
+    example: `${config.prefix}configure logMessageChanges enable`
   },
   aliases: ['config', 'cfg'],
   inDM: false,

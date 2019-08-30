@@ -25,7 +25,6 @@ class Util {
   /**
    * Sets default properties on an object that aren't already specified
    * @param {Object} def Default properties
-   * 
    */
   static mergeDefault(def, given) {
     if (!given) return def;
@@ -68,7 +67,7 @@ class Util {
    */
   static format(str, ...replacers) {
     if (typeof str !== 'string') throw new TypeError('Expected a string');
-    return str.replace(/{(\d+)}/g, function(match, number) { 
+    return str.replace(/{(\d+)}/g, function(match, number) {
       return typeof replacers[number] !== 'undefined' ? replacers[number] : match;
     });
   }

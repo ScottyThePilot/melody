@@ -158,7 +158,7 @@ class Datastore {
     let that = this;
     return new Promise(function (resolve, reject) {
       that.sequencer.push(async function () {
-        let data = that.options.persistence ? 
+        let data = that.options.persistence ?
           JSON.parse(that.persistentState) :
           await readJSONFile(that.path, that.options).catch(reject);
         resolve(getPropertyInTree(identifier, data));
