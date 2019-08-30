@@ -4,7 +4,7 @@ const config = require('../config.json');
 
 module.exports = new Command({
   name: 'restart',
-  level: 10,
+  level: 3,
   plugin: 'owner',
   help: {
     short: 'Logs the bot off of Discord.',
