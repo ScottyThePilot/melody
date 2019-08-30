@@ -17,12 +17,11 @@ const client = new Discord.Client({
 });
 const wait = NodeUtil.promisify(setTimeout);
 
-
-process.on('uncaughtException', (err) => {
-  console.error(err);
-  process.send({ err: err ? err.stack : err });
-  process.exit(1);
+Logger.main = new Logger('./core/data/main.log', {
+  logToConsole: true,
+  logPath: './core/data/logs'
 });
+
 
 process.on('unhandledRejection', (reason) => {
   throw reason;
@@ -79,6 +78,13 @@ client.on('message', async (message) => {
   if (message.author.bot) return;
 
   // AutoMod Goes here :)
+
+  let guild = message.guild;
+
+  if (controller.firstReady && guild) {
+    let manager = GuildManager.all.get(guild.id);
+    if (await manager.configdb.get('logMessageChanges')) controller.onMessage(message, manager);
+  }
 
   if (!message.cleanContent.trim().startsWith(config.prefix)) return;
 

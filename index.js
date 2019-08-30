@@ -1,15 +1,9 @@
 const { fork } = require('child_process');
 const fs = require('fs');
 
-const errLogStream = fs.createWriteStream('/err.log', { flags: 'a' });
-
 function log(text) {
   const date = '[' + (new Date()).toISOString().replace(/T/, '][').replace(/Z/, ']');
   console.log(`${date}: ${text}`);
-}
-
-function logErr(err) {
-  errLogStream.write(err);
 }
 
 function launch() {
@@ -17,9 +11,7 @@ function launch() {
 
   const subprocess = fork('./core/bot.js');
 
-  subprocess.on('message', (message) => {
-    if (message.err) logErr(message.err);
-  });
+  //subprocess.on('message', (message) => {});
 
   subprocess.on('exit', (code) => {
     log('Child Exiting with Code: ' + code);

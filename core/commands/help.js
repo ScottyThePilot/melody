@@ -24,7 +24,7 @@ module.exports = new Command({
   },
   aliases: ['helpall', 'halp', 'h'],
   run: async function run(bundle) {
-    const { message, trusted, controller } = bundle;
+    const { client, message, trusted, controller } = bundle;
     const args = bundle.args.map((arg) => arg.toLowerCase());
 
     const isHelpAll = bundle.command === 'helpall';
@@ -32,7 +32,7 @@ module.exports = new Command({
     const commandListFull = [...Command.manifest.values()]
       .sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
 
-    const plugins = isHelpAll && !trusted ? await controller.getAccessiblePlugins(message.author) 
+    const plugins = isHelpAll && !trusted ? await controller.getAccessiblePlugins(message.author, client) 
       : bundle.plugins;
 
     const commandList = (isHelpAll || !message.guild) && trusted ? commandListFull

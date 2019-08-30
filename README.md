@@ -12,7 +12,7 @@ This is a simple Discord bot, made by me, Scotty#4263. My lazy ass is still in t
 * Add message logging functionality - **Done**
 * Create ;dump - **Done**
 * Create ;flush
-* Add database filestate persistency
+* Add database filestate persistency - **Done**
 * Create ;blacklist
 * Add analytics tracking
 * Create ;uptime and ;memory

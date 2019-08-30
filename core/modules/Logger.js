@@ -23,11 +23,9 @@ class Logger {
 
   log(header, text = '', ...rest) {
     if (this.locked) rest.push('[Not Written to LogFile]');
-    const h = header ? `[${header.toString().toUpperCase()}]` : '';
-    const data = (text + (rest.length > 0 ? ':\n' + rest.map(e => '  ' + e).join('\n') : '')).trim();
-    const l = Logger.logifyDate() + ': ' + h + (data.length > 0 ? ' ' + data : '');
-    if (this.logToConsole) console.log(l);
-    if (!this.locked) this.logStream.write(l + '\n');
+    const entry = Logger.makeLogEntry(header, text, ...rest);
+    if (this.logToConsole) console.log(entry);
+    if (!this.locked) this.logStream.write(entry + '\n');
   }
 
   end() {
@@ -61,6 +59,12 @@ class Logger {
 
   static msgFailCatcher(err) {
     Logger.main.log('WARN', Logger.logifyError(err));
+  }
+
+  static makeLogEntry(header, text = '', ...rest) {
+    const h = header ? `[${header.toString().toUpperCase()}]` : '';
+    const data = (text + (rest.length > 0 ? ':\n' + rest.map(e => '  ' + e).join('\n') : '')).trim();
+    return Logger.logifyDate() + ': ' + h + (data.length > 0 ? ' ' + data : '');
   }
 
   static logifyDate(date = new Date()) {
@@ -116,11 +120,6 @@ class Logger {
     return ''.replace.call(''.replace.call(str, /\n/g, '\\n'), /[\f\r\t\v]/g, '');
   }
 }
-
-Logger.main = new Logger('./core/data/main.log', {
-  logToConsole: true,
-  logPath: './core/data/logs'
-});
 
 Logger.sizeThreshold = 1048576; // File threshold in bytes
 
