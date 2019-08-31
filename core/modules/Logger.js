@@ -129,6 +129,32 @@ class Logger {
   static escape(str) {
     return ''.replace.call(''.replace.call(str, /\n/g, '\\n'), /[\f\r\t\v]/g, '');
   }
+
+  static cleanContent(message) {
+    return message.content
+      .replace(/@(everyone|here)/g, '@\u200b$1')
+      .replace(/<@!?[0-9]+>/g, input => {
+        const id = input.replace(/<|!|>|@/g, '');
+        if (message.channel.type === 'dm' || message.channel.type === 'group') {
+          return message.client.users.has(id) ? `@${message.client.users.get(id).tag}` : input;
+        }
+  
+        const user = message.client.users.get(id);
+        if (user) return `@${user.tag}`;
+        return input;
+      })
+      .replace(/<#[0-9]+>/g, input => {
+        const channel = message.client.channels.get(input.replace(/<|#|>/g, ''));
+        if (channel) return `#${channel.name}`;
+        return input;
+      })
+      .replace(/<@&[0-9]+>/g, input => {
+        if (message.channel.type === 'dm' || message.channel.type === 'group') return input;
+        const role = message.guild.roles.get(input.replace(/<|@|>|&/g, ''));
+        if (role) return `@${role.name}`;
+        return input;
+      });
+  }
 }
 
 Logger.sizeThreshold = 1048576; // File threshold in bytes

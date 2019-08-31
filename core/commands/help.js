@@ -59,7 +59,7 @@ module.exports = new Command({
       const embed = new RichEmbed();
 
       embed.setTitle('Command Help' + from);
-      embed.setDescription(`Below is a list of ${what} and a short description of what they do.\nType \`;help <command>\` for more info about a command.\n${extra}`);
+      embed.setDescription(`Below is a list of **${what}** and a short description of what they do.\nType \`;help <command>\` for more info about a command.\n${extra}`);
       embed.setColor([114, 137, 218]);
       embed.addField('Command List', body);
 

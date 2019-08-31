@@ -7,7 +7,6 @@ const fs = require('fs');
 
 module.exports = new Command({
   name: 'dump',
-  level: 0,
   plugin: 'core',
   help: {
     short: 'Gets message logs.',

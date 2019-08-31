@@ -36,8 +36,6 @@ client.on('ready', async () => {
 
     let then = new Date();
 
-    controller.setup(client);
-
     await Util.asyncForEach(client.guilds.array(), async (guild) => {
       await GuildManager.load(guild.id);
       Logger.main.log('DATA', `Guild ${Logger.logifyGuild(guild)} loaded`);
