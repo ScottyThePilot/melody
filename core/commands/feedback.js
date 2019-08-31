@@ -23,7 +23,7 @@ module.exports = new Command({
 
       embed.setTitle('*Provides some feedback...*');
       embed.setDescription(msg);
-      embed.setAuthor(message.author.tag, message.author.avatarURL);
+      embed.setAuthor(message.author.tag, message.author.displayAvatarURL);
       embed.setColor([114, 137, 218]);
 
       client.users.get(config.ownerID).send(embed).then(function () {

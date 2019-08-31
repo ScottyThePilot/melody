@@ -7,6 +7,10 @@ const readFile = promisify(fs.readFile);
 const mkdir = promisify(fs.mkdir);
 const stat = promisify(fs.stat);
 
+function pad(val) {
+  return val < 10 ? '0' + val : val + '';
+}
+
 class Logger {
   constructor(path, options = {}) {
     this.path = path;
@@ -68,7 +72,35 @@ class Logger {
   }
 
   static logifyDate(date = new Date()) {
-    return '[' + Date.prototype.toISOString.call(date).replace(/T/, '][').replace(/Z/, ']');
+    let y = date.getFullYear();
+    let d = pad(date.getDate());
+    let m = pad(date.getMonth() + 1);
+    let ms = (date.getMilliseconds() / 1000).toFixed(3).slice(2, 5);
+    let t = date.toTimeString().split(' ');
+    return `[${y}-${d}-${m}][${t[0]}.${ms}][${t[1]}]`;
+  }
+
+  static logifyDateLocale(date = new Date(), timeZone) {
+    return '[' + date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZoneName: 'short',
+      timeZone: timeZone
+    }) + ']';
+  }
+
+  static parseLogDate(str) {
+    const args = str.match(/\d+/g).slice(0, -1).map((e) => parseInt(e));
+    return new Date(args[0], args[2] - 1, args[1], ...args.slice(3));
+   }
+
+  static replaceWithDateLocale(text, timeZone) {
+    return text.replace(/\[\d{4}-\d{2}-\d{2}\]\[\d{2}:\d{2}:\d{2}.\d{3}\]\[.{8}\]/g, (m) => {
+      return Logger.logifyDateLocale(parse(m), timeZone);
+    });
   }
 
   static savifyDate(date = new Date()) {

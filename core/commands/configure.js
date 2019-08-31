@@ -6,13 +6,8 @@ const config = require('../config.json');
 const logsNotice = `Logs can be retrieved with \`${config.prefix}dump\`, or cleared with \`${config.prefix}flush\``;
 
 const configProperties = [
-  //['trackInvites', 'bool'],
-  //['preserveRoles', 'bool'],
-  ['logMessages', 'bool', `If \`logMessages\` is true, the bot will log all sent messages. ${logsNotice}`]
-  ['logMessageChanges', 'bool', `If \`logMessageChanges\` is true, the bot will log message edits and deletions. ${logsNotice}`],
-  //['autoMod', 'bool'],
-  //['antiSpam', 'bool'],
-  //['mutedRole', 'role']
+  ['logMessages', 'bool', `If \`logMessages\` is true, the bot will log all sent messages. ${logsNotice}`],
+  ['logMessageChanges', 'bool', `If \`logMessageChanges\` is true, the bot will log message edits and deletions. ${logsNotice}`]
 ];
 
 const configBoolMap = {
