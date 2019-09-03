@@ -110,7 +110,7 @@ class Logger {
 
   static replaceWithDateLocale(text, timeZone) {
     return text.replace(/\[\d{4}-\d{2}-\d{2}\]\[\d{2}:\d{2}:\d{2}.\d{3}\]\[.{8}\]/g, (m) => {
-      return Logger.logifyDateLocale(parse(m), timeZone);
+      return Logger.logifyDateLocale(Logger.parseLogDate(m), timeZone);
     });
   }
 
