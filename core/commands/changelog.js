@@ -3,20 +3,15 @@ const { RichEmbed } = require('discord.js');
 const Command = require('../modules/Command.js');
 const { msgFailCatcher } = require('../modules/Logger.js');
 const config = require('../config.json');
-const { readFile } = require('fs');
 
-const contents = new Promise((resolve, reject) => {
-  readFile('./core/changeloglatest.txt', (err, data) => {
-    if (err) {
-      reject(err);
-    } else {
-      resolve(data
-        .toString()
-        .replace(/\r/g, '')
-        .split(/\n{2,}/)
-        .map((e) => e.trim()));
-    }
-  });
+const contents = require('../changeloglatest.json');
+const embed = new RichEmbed();
+
+embed.setTitle(contents.title);
+embed.setDescription(contents.description);
+embed.setColor([114, 137, 218]);
+[].forEach.call(contents.fields, function (field) {
+  embed.addField(field.name, field.value);
 });
 
 module.exports = new Command({
@@ -30,14 +25,6 @@ module.exports = new Command({
   },
   run: async function (bundle) {
     const { message } = bundle;
-
-    const [version, entry] = await contents;
-
-    const embed = new RichEmbed();
-
-    embed.setTitle(version);
-    embed.setDescription(entry);
-    embed.setColor([114, 137, 218]);
 
     message.channel.send(embed).catch(msgFailCatcher);
   }
