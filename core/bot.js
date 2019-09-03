@@ -28,6 +28,7 @@ process.on('unhandledRejection', (reason) => {
 });
 
 
+
 client.on('ready', async () => {
   if (!controller.firstReady) {
     Logger.main.log('INFO', 'Bot Loading...');
@@ -56,6 +57,7 @@ client.on('ready', async () => {
     Logger.main.log('INFO', 'Bot Ready!');
   }
 });
+
 
 
 client.on('guildCreate', async (guild) => {
@@ -140,6 +142,7 @@ client.on('messageDeleteBulk', async (messages) => {
 });
 
 
+
 client.on('error', (err) => {
   Logger.main.log('ERR', Logger.logifyError(err));
 });
@@ -153,6 +156,28 @@ client.on('rateLimit', (err) => {
 
 client.on('warn', (warn) => {
   Logger.main.log('WARN', warn);
+});
+
+
+client.on('debug', (info) => {
+  Logger.main.log('DEBUG', 'DiscordDebugInfo: ' + info);
+});
+
+
+
+client.on('resume', () => {
+  Logger.main.log('INFO', 'WebSocket resumed');
+});
+
+
+client.on('reconnecting', () => {
+  Logger.main.log('INFO', 'WebSocket reconnecting...');
+});
+
+
+client.on('disconnect', (event) => {
+  Logger.main.log('WARN', `WebSocket closed (${event.code})`, event.reason);
+  process.exit(0);
 });
 
 
