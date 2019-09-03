@@ -20,8 +20,8 @@ module.exports = new Command({
   help: {
     short: 'Gets the latest changes.',
     long: 'Grabs the latest changelog entry, listing recent bot functionality updates.',
-    usage: `${config.prefix}feedback [message]`,
-    example: `${config.prefix}feedback I like this bot!`
+    usage: `${config.prefix}changelog`,
+    example: `${config.prefix}changelog`
   },
   run: async function (bundle) {
     const { message } = bundle;

@@ -18,23 +18,24 @@ class Logger {
     this.logPath = {}.hasOwnProperty.call(options, 'logPath') ? options.logPath : null;
     this.rotation = Boolean(this.logPath);
     this.logStream = fs.createWriteStream(this.path, { flags: 'a' });
-    this.locked = false;
     
-    let rotationCheckFinished = this.rotation ? this.checkRotation() : Promise.resolve();
-
-    rotationCheckFinished.then(() => this.log('Begin Log'));
+    if (this.rotation) {
+      this.checkRotation();
+    } else {
+      this.log('Begin Log');
+    }
   }
 
   log(header, text = '', ...rest) {
-    if (this.locked) rest.push('[Not Written to LogFile]');
+    const writable = this.logStream.writable;
+    if (!writable) rest.push('[Not Written to LogFile]');
     const entry = Logger.makeLogEntry(header, text, ...rest);
     if (this.logToConsole) console.log(entry);
-    if (!this.locked) this.logStream.write(entry + '\n');
+    if (writable) return this.logStream.write(entry + '\n');
   }
 
   end() {
     return new Promise((resolve, reject) => {
-      this.locked = true;
       this.logStream.end((err) => {
         if (err) {
           reject(err);
@@ -46,19 +47,29 @@ class Logger {
   }
 
   async checkRotation() {
+    this.logStream.cork();
     if (!fs.existsSync(this.logPath)) await mkdir(this.logPath);
     
     let fileStats = await stat(this.path);
     
     if (fileStats.size >= Logger.sizeThreshold) {
-      this.locked = true;
-      let contents = await readFile(this.path);
-      let now = new Date();
-      await writeFile(this.logPath + '/' + Logger.savifyDate(now) + '.log', contents);
-      await writeFile(this.path, `${Logger.logifyDate(now)}: [DATA] Log Rotated`);
-      this.locked = false;
-      Logger.main.log('DATA', `Log ${this.path} Rotated into ${this.logPath}`);
+      const contents = await readFile(this.path);
+
+      await writeFile(this.logPath + '/' + Logger.savifyDate() + '.log', contents);
+
+      const entry1 = Logger.makeLogEntry('DATA', 'Log Rotated');
+      const entry2 = Logger.makeLogEntry('Begin Log');
+
+      if (this.logToConsole) {
+        console.log(entry1);
+        console.log(entry2);
+      }
+
+      await writeFile(this.path, entry1 + '\n' + entry2 + '\n');
+
+      Logger.main.log('DATA', `Log ${this.path} Rotated into ${this.logPath} and data written`);
     }
+    process.nextTick(() => this.logStream.uncork());
   }
 
   static msgFailCatcher(err) {
@@ -104,7 +115,7 @@ class Logger {
   }
 
   static savifyDate(date = new Date()) {
-    return Date.prototype.toISOString.call(date).slice(0, 19).replace(/[^0-9]/g, '_');
+    return Logger.logifyDate(date).slice(1, 25).replace(/[^0-9]+/g, '-');
   }
 
   static logifyUser(entity) {

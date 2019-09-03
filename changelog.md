@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.2.01 - 2019-9-3
+### Changed
+* Changelog reports generated with the `changelog` are organized better.
+### Fixed
+* `changelog` how has a proper usage and example in the `help` menu.
 
 ## 0.9.2 - 2019-8-30
 This is the version I started doing changelogs on. Previous changelogs may not be available.
