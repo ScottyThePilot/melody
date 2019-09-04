@@ -75,10 +75,6 @@ client.on('guildDelete', async (guild) => {
 
 
 client.on('message', async (message) => {
-  if (message.author.bot) return;
-
-  // AutoMod Goes here :)
-
   let guild = message.guild;
 
   if (controller.firstReady && guild) {
@@ -86,9 +82,22 @@ client.on('message', async (message) => {
     if (await manager.configdb.get('logMessageChanges')) controller.onMessage(message, manager);
   }
 
-  if (!message.cleanContent.trim().startsWith(config.prefix)) return;
+  if (message.author.bot) return;
 
-  let args = message.cleanContent.trim().slice(config.prefix.length).split(/\s+/g);
+  const content = message.content.trim();
+
+  const match = content.match(/^<@!?([0-9]+)>/);
+  if (match && match[1] === client.user.id) {
+    const msg = content.slice(match[0].length).trim();
+    console.log('Someone: ' + msg);
+    const response = await controller.getCleverBotResponse(msg, message.channel.id);
+    //message.channel.send(response);
+    console.log('CleverBot: ' + response);
+  }
+
+  if (!content.startsWith(config.prefix)) return;
+
+  let args = content.slice(config.prefix.length).split(/\s+/g);
   let command = args.shift().toLowerCase();
 
   const found = Command.find(command);

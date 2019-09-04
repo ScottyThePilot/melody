@@ -3,6 +3,9 @@ const Logger = require('./Logger.js');
 const GuildManager = require('./GuildManager.js');
 const Command = require('./Command.js');
 const Util = require('./util/Util.js');
+const CleverChannel = require('./CleverChannel.js');
+
+const cleverChannels = new Map();
 
 
 async function destroyBot(client) {
@@ -78,6 +81,12 @@ function userOwnsAGuild(user, client) {
   return client.guilds.some((guild) => guild.owner.id === user.id);
 }
 
+async function getCleverBotResponse(msg, ch) {
+  if (!cleverChannels.has(ch)) cleverChannels.set(ch, new CleverChannel(25));
+  const channel = cleverChannels.get(ch);
+  return await channel.send(msg);
+}
+
 function setup() {
   
 }
@@ -100,6 +109,7 @@ module.exports = {
   onMessageDeleteBulk,
   onMessage,
   userOwnsAGuild,
+  getCleverBotResponse,
   setup,
   firstReady: false
 };
