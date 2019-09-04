@@ -95,7 +95,6 @@ var k = function(o, n, u, r, m, q, p) {
 };
 
 var i = function(p) {
-  txt = "";
   var r = p.length,
     q = [1732584193, -271733879, -1732584194, 271733878],
     o;
