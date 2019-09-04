@@ -21,7 +21,7 @@ module.exports = new Command({
 
     if (message.author.id === config.ownerID && (args[0] || '').startsWith('activity')) {
       await message.author.send(`Core Bot Logs:`, {
-        file: new Attachment('./data/main.log', 'main.log')
+        file: new Attachment('./core/data/main.log', 'main.log')
       }).catch((reason) => {
         console.log(reason);
         message.author.send('Unable to attach file.').catch(msgFailCatcher);
@@ -30,9 +30,9 @@ module.exports = new Command({
       await message.author.send('There are no logs to dump as you do not own any servers.');
     } else if (ownedGuilds.size === 1) {
       const guild = ownedGuilds.first();
-      if (fs.existsSync(`./data/${guild.id}/latest.log`)) {
+      if (fs.existsSync(`./core/data/${guild.id}/latest.log`)) {
         await message.author.send(`Message logs for ${guild.name}:`, {
-          file: new Attachment(`./data/${guild.id}/latest.log`, `guild${guild.id}.log`)
+          file: new Attachment(`./core/data/${guild.id}/latest.log`, `guild${guild.id}.log`)
         }).catch((reason) => {
           console.log(reason);
           message.author.send('Unable to attach file.').catch(msgFailCatcher);
@@ -45,9 +45,9 @@ module.exports = new Command({
     } else {
       if (ownedGuilds.has(args[0])) {
         const guild = ownedGuilds.get(args[0]);
-        if (fs.existsSync(`./data/${guild.id}/latest.log`)) {
+        if (fs.existsSync(`./core/data/${guild.id}/latest.log`)) {
           await message.author.send(`Message logs for ${guild.name}:`, {
-            file: new Attachment(`./data/${guild.id}/latest.log`, `guild${guild.id}.log`)
+            file: new Attachment(`./core/data/${guild.id}/latest.log`, `guild${guild.id}.log`)
           }).catch((reason) => {
             console.log(reason);
             message.author.send('Unable to attach file.').catch(msgFailCatcher);
