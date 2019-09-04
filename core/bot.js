@@ -160,6 +160,8 @@ client.on('warn', (warn) => {
 
 
 client.on('debug', (info) => {
+  if (info.includes('Sending a heartbeat')) return;
+  if (info.includes('Heartbeat acknowledged, latency of')) return;
   Logger.main.log('DEBUG', 'DiscordDebugInfo: ' + info);
 });
 
