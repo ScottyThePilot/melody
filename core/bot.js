@@ -1,5 +1,4 @@
 'use strict';
-// Modules
 const Discord = require('discord.js');
 const Logger = require('./modules/Logger.js');
 const GuildManager = require('./modules/GuildManager.js');
@@ -8,7 +7,6 @@ const Util = require('./modules/util/Util.js');
 const controller = require('./modules/controller.js');
 const NodeUtil = require('util');
 
-// Constants
 const config = require('./config.json');
 const client = new Discord.Client({
   disableEveryone: true,
@@ -26,7 +24,6 @@ Logger.main = new Logger('./core/data/main.log', {
 process.on('unhandledRejection', (reason) => {
   throw reason;
 });
-
 
 
 client.on('ready', async () => {
@@ -59,13 +56,11 @@ client.on('ready', async () => {
 });
 
 
-
 client.on('guildCreate', async (guild) => {
   Logger.main.log('INFO', `Guild Found: ${Logger.logifyGuild(guild)}`);
   await GuildManager.load(guild.id);
   Logger.main.log('DATA', `Guild ${Logger.logifyGuild(guild)} loaded`);
 });
-
 
 client.on('guildDelete', async (guild) => {
   Logger.main.log('INFO', `Guild Lost: ${Logger.logifyGuild(guild)}`);
@@ -156,17 +151,14 @@ client.on('messageDeleteBulk', async (messages) => {
 });
 
 
-
 client.on('error', (err) => {
   Logger.main.log('ERR', Logger.logifyError(err));
 });
-
 
 client.on('rateLimit', (err) => {
   let message = `RateLimit ${err.method.toUpperCase()}: ${err.timeDifference}ms (${err.path})`;
   Logger.main.log('WARN', message);
 });
-
 
 client.on('warn', (warn) => {
   Logger.main.log('WARN', warn);
@@ -179,17 +171,13 @@ client.on('debug', (info) => {
   Logger.main.log('DEBUG', 'DiscordDebugInfo: ' + info);
 });
 
-
-
 client.on('resume', () => {
   Logger.main.log('INFO', 'WebSocket resumed');
 });
 
-
 client.on('reconnecting', () => {
   Logger.main.log('INFO', 'WebSocket reconnecting...');
 });
-
 
 client.on('disconnect', (event) => {
   Logger.main.log('WARN', `WebSocket closed (${event.code})`, event.reason);
