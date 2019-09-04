@@ -77,15 +77,18 @@ client.on('guildDelete', async (guild) => {
 client.on('message', async (message) => {
   let guild = message.guild;
 
+  // Log message and continue
   if (controller.firstReady && guild) {
     let manager = GuildManager.all.get(guild.id);
     if (await manager.configdb.get('logMessageChanges')) controller.onMessage(message, manager);
   }
 
+  // Exit if bot
   if (message.author.bot) return;
 
   const content = message.content.trim();
 
+  // Send CleverBot response and exit if mentioned
   const match = content.match(/^<@!?([0-9]+)>/);
   if (match && match[1] === client.user.id) {
     const msg = content.slice(match[0].length).trim();
@@ -94,11 +97,13 @@ client.on('message', async (message) => {
     return;
   }
 
+  // Exit if message doesn't start with prefix
   if (!content.startsWith(config.prefix)) return;
 
   let args = content.slice(config.prefix.length).split(/\s+/g);
   let command = args.shift().toLowerCase();
 
+  // Look for command in command list
   const found = Command.find(command);
 
   if (!found) return;
@@ -112,6 +117,7 @@ client.on('message', async (message) => {
     controller: controller
   };
 
+  // Attempt command
   await found.attempt(bundle);
 });
 

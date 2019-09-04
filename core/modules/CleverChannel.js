@@ -28,12 +28,13 @@ class CleverChannel {
   }
 
   getPostbody(msg) {
-    var postbody = `stimulus=${encodeURIComponent(msg)}${this.getHistoryString()}&cb_settings_scripting=no&islearning=1&icognoid=wsf&icognocheck=`;
+    var postbody = `stimulus=${encodeURIComponent(msg.trim())}${this.getHistoryString()}&cb_settings_scripting=no&islearning=1&icognoid=wsf&icognocheck=`;
     postbody += md5(postbody.substring(7, 33));
     return postbody;
   }
 
   send(msg) {
+    if (!msg.trim().length) return;
     var postbody = this.getPostbody(msg);
     var that = this;
     return new Promise((resolve, reject) => {
