@@ -38,7 +38,7 @@ class CleverChannel {
     var postbody = this.getPostbody(msg);
     var that = this;
     return new Promise((resolve, reject) => {
-      var req = https.request(/*CleverChannel.postUrl, */CleverChannel.reqOptions, (res) => {
+      var req = https.request(CleverChannel.reqOptions, (res) => {
         res.on('data', (data) => {
           var respMsg = data.toString().split('\r')[0];
           that.saveToHistory(respMsg);
@@ -52,8 +52,6 @@ class CleverChannel {
     });
   }
 }
-
-//CleverChannel.postUrl = 'https://www.cleverbot.com/webservicemin?uc=UseOfficialCleverbotAPI&';
 
 CleverChannel.reqOptions = {
   hostname: 'www.cleverbot.com',

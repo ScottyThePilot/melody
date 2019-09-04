@@ -84,7 +84,9 @@ function userOwnsAGuild(user, client) {
 async function getCleverBotResponse(msg, ch) {
   if (!cleverChannels.has(ch)) cleverChannels.set(ch, new CleverChannel(25));
   const channel = cleverChannels.get(ch);
-  return await channel.send(msg);
+  return await channel.send(msg).catch((err) => {
+    Logger.main.log('WARN', 'Error while Communicating with CleverBot API: ' + err.message);
+  });
 }
 
 function setup() {
