@@ -89,10 +89,9 @@ client.on('message', async (message) => {
   const match = content.match(/^<@!?([0-9]+)>/);
   if (match && match[1] === client.user.id) {
     const msg = content.slice(match[0].length).trim();
-    console.log('Someone: ' + msg);
     const response = await controller.getCleverBotResponse(msg, message.channel.id);
-    //message.channel.send(response);
-    console.log('CleverBot: ' + response);
+    await message.channel.send(response);
+    return;
   }
 
   if (!content.startsWith(config.prefix)) return;
