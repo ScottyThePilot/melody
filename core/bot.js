@@ -90,7 +90,7 @@ client.on('message', async (message) => {
   if (match && match[1] === client.user.id) {
     const msg = content.slice(match[0].length).trim();
     const response = await controller.getCleverBotResponse(msg, message.channel.id);
-    await message.channel.send(response);
+    await message.channel.send(response, { reply: message.author }).catch(Logger.msgFailCatcher);
     return;
   }
 
