@@ -11,7 +11,7 @@ This is a simple Discord bot, made by me, Scotty#4263. My lazy ass is still in t
 * Create ;configure - **Done**
 * Add message logging functionality - **Done**
 * Create ;dump - **Done**
-* Create ;flush
+* Create ;flush - ***Canceled***
 * Add database filestate persistency - **Done**
 * Create ;blacklist
 * Add analytics tracking

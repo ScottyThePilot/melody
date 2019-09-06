@@ -7,7 +7,7 @@ const config = require('../config.json');
 const contents = require('../changeloglatest.json');
 const embed = new RichEmbed();
 
-const extra = 'Read the full changelog [here](https://github.com/ScottyThePilot/melody_v3/blob/master/changelog.md)';
+const extra = 'Read the full changelog [here](https://github.com/ScottyThePilot/melody_v3/blob/master/changelog.md).';
 const description = (contents.description ? contents.description + '\n' : '') + extra;
 
 embed.setTitle(contents.title);

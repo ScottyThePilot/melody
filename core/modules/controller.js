@@ -4,8 +4,10 @@ const GuildManager = require('./GuildManager.js');
 const Command = require('./Command.js');
 const Util = require('./util/Util.js');
 const CleverChannel = require('./CleverChannel.js');
+const Datastore = require('./Datastore.js');
 
 const cleverChannels = new Map();
+const blacklist = new Datastore('./core/data/blacklist.json');
 
 
 async function destroyBot(client) {
@@ -89,6 +91,42 @@ async function getCleverBotResponse(msg, ch) {
   });
 }
 
+async function blacklistAdd(user) {
+  let out;
+  await blacklist.transform((data) => {
+    if (!data.includes(user.id)) {
+      data.push(user.id);
+      out = true;
+    } else {
+      out = false;
+    }
+    return data;
+  });
+  return out;
+}
+
+async function blacklistRemove(user) {
+  let out;
+  await blacklist.transform((data) => {
+    if (data.includes(user.id)) {
+      data.splice(data.indexOf(user.id), 1);
+      out = true;
+    } else {
+      out = false;
+    }
+    return data;
+  });
+  return out;
+}
+
+function resolveUser(val, client) {
+  if (!val || typeof value !== 'string' || !val.trim().length) return null;
+  if (client.users.has(val.trim())) return client.users.get(val.trim());
+  const match = val.trim().match(/[0-9]+/);
+  if (!match) return null;
+  return client.users.get(match[0]) || null;
+}
+
 function setup() {
   
 }
@@ -104,14 +142,22 @@ let job = scheduleJob('15 7 * * *', () => {
 module.exports = {
   destroyBot,
   getAccessiblePlugins,
+  userOwnsAGuild,
+  getCleverBotResponse,
+
   onGuildMemberAdd,
   onGuildMemberRemove,
   onMessageUpdate,
   onMessageDelete,
   onMessageDeleteBulk,
   onMessage,
-  userOwnsAGuild,
-  getCleverBotResponse,
+
+  blacklistAdd,
+  blacklistRemove,
+
+  resolveUser,
+
   setup,
+
   firstReady: false
 };
