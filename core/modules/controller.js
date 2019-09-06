@@ -7,7 +7,10 @@ const CleverChannel = require('./CleverChannel.js');
 const Datastore = require('./Datastore.js');
 
 const cleverChannels = new Map();
-const blacklist = new Datastore('./core/data/blacklist.json');
+const blacklist = new Datastore('./core/data/blacklist.json', {
+  persistence: false,
+  data: []
+});
 
 
 async function destroyBot(client) {
