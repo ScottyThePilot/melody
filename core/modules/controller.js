@@ -53,15 +53,15 @@ function onGuildMemberRemove(member, manager) {
 }
 
 function onMessageUpdate(oldMessage, newMessage, manager) {
-  const oldContent = `Old Content: ${Logger.escape(Logger.cleanContent(oldMessage))}`;
+  const oldContent = `Old Content: \"${Logger.escape(Logger.cleanContent(oldMessage))}\"`;
   const oldMeta = Logger.stylizeMetaData(oldMessage).map((e) => '  ' + e);
-  const newContent = `New Content: ${Logger.escape(Logger.cleanContent(newMessage))}`;
+  const newContent = `New Content: \"${Logger.escape(Logger.cleanContent(newMessage))}\"`;
   const newMeta = Logger.stylizeMetaData(newMessage).map((e) => '  ' + e);
   manager.log('LOGGER', `Message by user ${Logger.logifyUser(oldMessage.author)} edited in channel ${Logger.logify(oldMessage.channel)}`, oldContent, ...oldMeta, newContent, ...newMeta);
 }
 
 function onMessageDelete(message, manager) {
-  const content = `Content: ${Logger.escape(Logger.cleanContent(message))}`;
+  const content = `Content: \"${Logger.escape(Logger.cleanContent(message))}\"`;
   const meta = Logger.stylizeMetaData(message).map((e) => '  ' + e);
   manager.log('LOGGER', `Message by user ${Logger.logifyUser(message.author)} deleted in channel ${Logger.logify(message.channel)}`, content, ...meta);
 }
@@ -69,7 +69,7 @@ function onMessageDelete(message, manager) {
 function onMessageDeleteBulk(messages, manager) {
   const list = messages.array().map((message) => {
     const header = `Message by user ${Logger.logifyUser(message.author)}:`;
-    const content = `  Content: ${Logger.escape(Logger.cleanContent(message))}`;
+    const content = `  Content: \"${Logger.escape(Logger.cleanContent(message))}\"`;
     const meta = Logger.stylizeMetaData(message).map((e) => '    ' + e);
     return [header, content, ...meta];
   });
@@ -77,7 +77,7 @@ function onMessageDeleteBulk(messages, manager) {
 }
 
 function onMessage(message, manager) {
-  const content = `Content: ${Logger.escape(Logger.cleanContent(message))}`;
+  const content = `Content: \"${Logger.escape(Logger.cleanContent(message))}\"`;
   const meta = Logger.stylizeMetaData(message).map((e) => '  ' + e);
   manager.log('LOGGER', `Message by user ${Logger.logifyUser(message.author)} sent in channel ${Logger.logify(message.channel)}`, content, ...meta);
 }

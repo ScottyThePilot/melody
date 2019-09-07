@@ -1,6 +1,6 @@
 'use strict';
 const fs = require('fs');
-const promisify = require('util').promisify;
+const { promisify } = require('util');
 
 const writeFile = promisify(fs.writeFile);
 const readFile = promisify(fs.readFile);
@@ -120,7 +120,7 @@ class Logger {
 
   static logifyUser(entity) {
     let user = entity.hasOwnProperty('user') ? entity.user : entity;
-    return `${user.tag} (${user.id})`;
+    return `${user.tag} (${user.id})` + (user.bot ? '' : ' (BOT)');
   }
 
   static logifyGuild(guild) {
@@ -170,7 +170,17 @@ class Logger {
   }
 
   static escape(str) {
-    return ''.replace.call(''.replace.call(str, /\n/g, '\\n'), /[\f\r\t\v]/g, '');
+    return ('' + str).replace(/["'\\\n\r\u2028\u2029]/g, function (ch) {
+      switch (ch) {
+        case '\"': return '\\\"';
+        case '\'': return '\\\'';
+        case '\\': return '\\\\';
+        case '\n': return '\\n';
+        case '\r': return '\\r';
+        case '\u2028': return '\\u2028';
+        case '\u2029': return '\\u2029';
+      }
+    });
   }
 
   static cleanContent(message) {

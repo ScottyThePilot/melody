@@ -165,12 +165,6 @@ client.on('warn', (warn) => {
 });
 
 
-client.on('debug', (info) => {
-  if (info.includes('Sending a heartbeat')) return;
-  if (info.includes('Heartbeat acknowledged, latency of')) return;
-  Logger.main.log('DEBUG', 'DiscordDebugInfo: ' + info);
-});
-
 client.on('resume', () => {
   Logger.main.log('INFO', 'WebSocket resumed');
 });
@@ -180,7 +174,7 @@ client.on('reconnecting', () => {
 });
 
 client.on('disconnect', (event) => {
-  Logger.main.log('WARN', `WebSocket closed (${event.code})`, event.reason);
+  Logger.main.log('WARN', `WebSocket disconnected (${event.code})`, event.reason);
   process.exit(0);
 });
 
