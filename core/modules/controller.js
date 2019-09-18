@@ -212,12 +212,34 @@ function setup(client) {
   });
 }
 
+function getLifetime() {
+  process.send({
+    head: 'info.lifetime',
+    type: 'request'
+  });
+
+  return new Promise(function (resolve) {
+    process.on('message', function handler(message) {
+      if (message.head === 'info.lifetime' && message.type === 'response') {
+        resolve(message.data);
+      }
+    });
+  });
+}
+
+function getDataTree() {
+  function getDirStructure(path) {
+    
+  }
+}
+
 
 module.exports = {
   destroyBot,
   getAccessiblePlugins,
   userOwnsAGuild,
   getCleverBotResponse,
+  getLifetime,
 
   onGuildMemberAdd,
   onGuildMemberRemove,
