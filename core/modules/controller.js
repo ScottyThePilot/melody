@@ -43,7 +43,7 @@ const activities = [
 
 
 function average(arr) {
-  return arr.reduce((a, c) => a + c) / arr.length;
+  return arr.reduce((a, c) => a + c, 0) / arr.length;
 }
 
 async function destroyBot(client) {
@@ -165,7 +165,7 @@ function resolveUser(val, client) {
 
 function setup(client) {
   // Daily report sent at 7:15
-  jobs.dailyReport = scheduleJob('45 7 * * *', () => {
+  jobs.dailyReport = scheduleJob('30 20 * * *', () => {
     const owner = client.users.get(ownerID);
 
     const ping = average(analytics.pings).toFixed(3);
