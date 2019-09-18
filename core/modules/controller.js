@@ -168,7 +168,7 @@ function setup(client) {
   jobs.dailyReport = scheduleJob('45 7 * * *', () => {
     const owner = client.users.get(ownerID);
 
-    const ping = average(analytics.pings);
+    const ping = average(analytics.pings).toFixed(3);
     const rss = Logger.logifyBytes(average(analytics.memory.rss));
     const heapTotal = Logger.logifyBytes(average(analytics.memory.heapTotal));
     const heapUsed = Logger.logifyBytes(average(analytics.memory.heapUsed));
