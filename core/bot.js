@@ -43,7 +43,9 @@ client.on('ready', async () => {
 
     Logger.main.log('DATA', `${Command.manifest.size} Commands loaded`);
 
-    await client.user.setActivity('in Alpha');
+    await client.user.setActivity('waiting...');
+
+    controller.setup(client);
 
     Logger.main.log('INFO', `Tracking ${client.guilds.size} Guilds with ${client.users.size} Users`);
 
@@ -88,6 +90,7 @@ client.on('message', async (message) => {
   if (match && match[1] === client.user.id) {
     const msg = content.slice(match[0].length).trim();
     const response = await controller.getCleverBotResponse(msg, message.channel.id);
+    if (!response || !response.trim().length) return;
     await message.channel.send(response, { reply: message.author }).catch(Logger.msgFailCatcher);
     return;
   }
@@ -162,6 +165,14 @@ client.on('rateLimit', (err) => {
 
 client.on('warn', (warn) => {
   Logger.main.log('WARN', warn);
+});
+
+client.on('debug', (info) => {
+  if (info.startsWith('[ws] [connection] Sending a heartbeat')) return;
+  if (info.startsWith('[ws] [connection] Heartbeat acknowledged, latency of')) return;
+  if (info.startsWith('READY')) info = 'READY';
+  if (info.startsWith('Authenticated using token')) info = 'Authenticated';
+  Logger.main.log('DEBUG', 'DiscordDebugInfo: ' + info);
 });
 
 

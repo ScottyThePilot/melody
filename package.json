@@ -9,9 +9,8 @@
   "author": "ScottyThePilot",
   "license": "MIT",
   "dependencies": {
+    "bufferutil": "^4.0.1",
     "discord.js": "^11.5.1",
-    "kind-of": "^6.0.2",
-    "ml-matrix": "^6.4.0",
     "node-schedule": "^1.3.2"
   }
 }

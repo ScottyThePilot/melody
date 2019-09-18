@@ -5,6 +5,8 @@ const Command = require('./Command.js');
 const Util = require('./util/Util.js');
 const CleverChannel = require('./CleverChannel.js');
 const Datastore = require('./Datastore.js');
+const { scheduleJob } = require('node-schedule');
+const { version, ownerID } = require('../config.json');
 
 const cleverChannels = new Map();
 const blacklist = new Datastore('./core/data/blacklist.json', {
@@ -12,6 +14,37 @@ const blacklist = new Datastore('./core/data/blacklist.json', {
   data: []
 });
 
+const jobs = {};
+
+const analytics = {
+  messages: 0,
+  commands: 0,
+  pings: [],
+  memory: {
+    rss: [],
+    heapTotal: [],
+    heapUsed: []
+  }
+};
+
+const activities = [
+  { type: 'WATCHING', name: 'over {server_count} servers' },
+  { type: 'WATCHING', name: 'over {user_count} users' },
+  { type: 'PLAYING', name: 'use ;help' },
+  //{ type: 'PLAYING', name: '{global_uptime} days without crashing' },
+  //{ type: 'PLAYING', name: 'after {message_count} messages' },
+  { type: 'PLAYING', name: 'for {uptime}' },
+  { type: 'PLAYING', name: `in version ${version[1]} ${version[0]}` },
+  { type: 'PLAYING', name: 'Minecraft 2' },
+  { type: 'WATCHING', name: 'anime' },
+  { type: 'WATCHING', name: 'Scotty\'s lazy ass' },
+  { type: 'LISTENING', name: 'existential dread' }
+];
+
+
+function average(arr) {
+  return arr.reduce((a, c) => a + c) / arr.length;
+}
 
 async function destroyBot(client) {
   Logger.main.log('INFO', 'Shutting Down...');
@@ -130,17 +163,55 @@ function resolveUser(val, client) {
   return client.users.get(match[0]) || null;
 }
 
-function setup() {
-  
+function setup(client) {
+  // Daily report sent at 7:15
+  jobs.dailyReport = scheduleJob('45 7 * * *', () => {
+    const owner = client.users.get(ownerID);
+
+    const ping = average(analytics.pings);
+    const rss = Logger.logifyBytes(average(analytics.memory.rss));
+    const heapTotal = Logger.logifyBytes(average(analytics.memory.heapTotal));
+    const heapUsed = Logger.logifyBytes(average(analytics.memory.heapUsed));
+
+    owner.send(`**Daily Report:**\nAverage Ping: \`${ping}ms\`\nAverage Resident Set Size: \`${rss}\`\nAverage Heap Total: \`${heapTotal}\`\nAverage Heap Used: \`${heapUsed}\``);
+
+    analytics.pings = [];
+    analytics.memory.rss = [];
+    analytics.memory.heapTotal = [];
+    analytics.memory.heapUsed = [];
+  });
+
+  // Change client activity randomly every 20 seconds
+  jobs.cycleActivity = scheduleJob('*/20 * * * * *', () => {
+    const msg = activities[Math.floor(Math.random() * activities.length)];
+    const uptime = Logger.getUptime(client);
+    const name = msg.name
+      .replace('{server_count}', client.guilds.size)
+      .replace('{user_count}', client.users.size)
+      .replace('{uptime}', `${uptime[0]}d, ${uptime[1]}h, and ${uptime[2]}m`);
+    client.user.setActivity(name, { type: msg.type });
+  });
+
+  // Check log rotation every 2 hours
+  jobs.checkLogRotation = scheduleJob('* */2 * * *', async () => {
+    await Logger.main.checkRotation();
+    await Util.asyncForEach([...GuildManager.all.values()], async (manager) => {
+      await manager.logger.checkRotation();
+    });
+  });
+
+  // Collect analytics data every 10 minutes
+  jobs.collectAnalytics = scheduleJob('*/10 * * * *', () => {
+    let ping = client.ping;
+    let { rss, heapTotal, heapUsed } = process.memoryUsage();
+
+    analytics.pings.push(ping);
+    analytics.memory.rss.push(rss);
+    analytics.memory.heapTotal.push(heapTotal);
+    analytics.memory.heapUsed.push(heapUsed);
+  });
 }
 
-/*
-const { scheduleJob } = require('node-schedule');
-
-let job = scheduleJob('15 7 * * *', () => {
-
-});
-*/
 
 module.exports = {
   destroyBot,

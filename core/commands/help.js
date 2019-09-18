@@ -62,6 +62,7 @@ module.exports = new Command({
       embed.setDescription(`Below is a list of **${what}** and a short description of what they do.\nType \`;help <command>\` for more info about a command.\n${extra}`);
       embed.setColor([114, 137, 218]);
       embed.addField('Command List', body);
+      embed.setFooter(`Melody v${config.version[1]} ${config.version[0]}`);
 
       await message.author.send(embed).catch(msgFailCatcher);
     } else {

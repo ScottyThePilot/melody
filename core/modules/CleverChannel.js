@@ -34,7 +34,7 @@ class CleverChannel {
   }
 
   send(msg) {
-    if (!msg.trim().length) return;
+    if (!msg.trim().length) return Promise.resolve();
     var postbody = this.getPostbody(msg);
     var that = this;
     return new Promise((resolve, reject) => {

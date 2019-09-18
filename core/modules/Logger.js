@@ -133,7 +133,7 @@ class Logger {
   }
 
   static logifyBytes(bytes) {
-    return bytes < 1024 ? bytes + 'b'
+    return bytes < 1024 ? bytes.toFixed(3) + 'b'
       : bytes < 1048576 ? (bytes / 1024).toFixed(3) + 'kb'
       : bytes < 1073741824 ? (bytes / 1048576).toFixed(3) + 'mb'
       : (bytes / 1073741824).toFixed(3) + 'gb';

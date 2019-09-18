@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.2.02 - 2019-9-17
+`;dump` has been canceled.
+### Added
+* CleverBot itegration has been added - Ping Melody to have it respond with a message from CleverBot.
+* Scheduled tasks have been implemented - Melody will now periodically check if files need rotation, and tracks self analytics.
+### Fixed
+* Too many dumb little tiny bugs for me to remember
+
 ## 0.9.2.01 - 2019-9-3
 ### Changed
 * Changelog reports generated with the `changelog` are organized better.

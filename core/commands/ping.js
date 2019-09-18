@@ -15,6 +15,6 @@ module.exports = new Command({
   run: async function (bundle) {
     const { message, client } = bundle;
     const msg = await message.channel.send('Ping?').catch(msgFailCatcher);
-    await msg.edit(`Pong! Latency is \`${msg.createdTimestamp - message.createdTimestamp}\`ms. API Latency is \`${client.ping.toFixed(2)}\`ms`).catch(msgFailCatcher);
+    await msg.edit(`Pong! Latency is \`${msg.createdTimestamp - message.createdTimestamp}ms\`. API Latency is \`${client.ping.toFixed(2)}ms\``).catch(msgFailCatcher);
   }
 });

@@ -3,7 +3,7 @@ const Command = require('../modules/Command.js');
 const { msgFailCatcher } = require('../modules/Logger.js');
 const config = require('../config.json');
 
-const logsNotice = `Logs can be retrieved with \`${config.prefix}dump\`, or cleared with \`${config.prefix}flush\``;
+const logsNotice = `Logs can be retrieved with \`${config.prefix}dump\``;
 
 const configProperties = [
   ['logMessages', 'bool', `If \`logMessages\` is true, the bot will log all sent messages. ${logsNotice}`],
