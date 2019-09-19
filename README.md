@@ -14,7 +14,7 @@ This is a simple Discord bot, made by me, Scotty#4263. My lazy ass is still in t
 * Create ;flush - ***Canceled***
 * Add database filestate persistency - **Done**
 * Create ;blacklist
-* Add analytics tracking
+* Add analytics tracking - **Done**
 * Create ;uptime and ;memory
 * Create ;whatis and ;info
 * Create ;mute
@@ -23,6 +23,7 @@ This is a simple Discord bot, made by me, Scotty#4263. My lazy ass is still in t
 ### Completed Side Objectives
 
 * Added a parent process to monitor the bot, log any errors and restart on zero exit codes.
+* Added scheduled activities like log rotation checking, daily analytics reporting, and a randomly cycling discord status.
 
 ### Roadmap
 

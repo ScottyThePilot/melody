@@ -3,6 +3,7 @@ const config = require('../config.json');
 const Util = require('./util/Util.js');
 const Logger = require('./Logger.js');
 const readdir = require('util').promisify(require('fs').readdir);
+const controller = require('./controller.js');
 
 const defaultOptions = {
   name: 'default',
@@ -38,6 +39,10 @@ class Command {
   }
 
   async attempt(bundle) {
+    // Exit silently if the user is blacklisted
+    // 0xe1: Ignored: [User is blacklisted]
+    if ((await controller.blacklist.get('*')).includes(bundle.message.author.id)) return 0xe1;
+
     let isTrusted = [config.ownerID, ...config.trustedUsers].includes(bundle.message.author.id)
     let plugins = bundle.manager ? await bundle.manager.configdb.get('plugins') : Command.pluginsDM;
 

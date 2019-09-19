@@ -10,7 +10,6 @@ const { version, ownerID } = require('../config.json');
 
 const cleverChannels = new Map();
 const blacklist = new Datastore('./core/data/blacklist.json', {
-  persistence: false,
   data: []
 });
 
@@ -156,7 +155,7 @@ async function blacklistRemove(user) {
 }
 
 function resolveUser(val, client) {
-  if (!val || typeof value !== 'string' || !val.trim().length) return null;
+  if (!val || typeof val !== 'string' || !val.trim().length) return null;
   if (client.users.has(val.trim())) return client.users.get(val.trim());
   const match = val.trim().match(/[0-9]+/);
   if (!match) return null;
@@ -254,6 +253,11 @@ module.exports = {
   resolveUser,
 
   setup,
+
+  cleverChannels,
+  blacklist,
+  jobs,
+  analytics,
 
   firstReady: false
 };

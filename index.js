@@ -30,6 +30,8 @@ function launch() {
     if (code === 0) {
       log('PARENT', 'Relaunching in 10 Seconds...');
       setTimeout(launch, 10000);
+    } else {
+      process.exit();
     }
   });
 }

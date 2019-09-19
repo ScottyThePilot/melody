@@ -13,7 +13,6 @@ const modeMap = {
 
 module.exports = new Command({
   name: 'blacklist',
-  disabled: true,
   level: 3,
   plugin: 'owner',
   help: {
@@ -31,14 +30,19 @@ module.exports = new Command({
     if (!user) {
       await message.channel.send('Please specify a valid user to blacklist or unblacklist.').catch(msgFailCatcher);
     } else {
+      const trusted = [config.ownerID, ...config.trustedUsers].includes(user.id);
       const mode = bundle.command === 'unblacklist' ? 1 : modeMap[args[1]] || 0;
       if (mode === 0) {
-        const result = await controller.blacklistAdd(user);
-        if (result) {
-          Logger.main.log('INFO', `User ${Logger.logifyUser(user)} added to the blacklist`);
-          await message.channel.send(`Added ${Logger.logifyUser(user)} to the blacklist.`).catch(msgFailCatcher);
+        if (trusted) {
+          await message.channel.send('I cannot blacklist a trusted user!').catch(msgFailCatcher);
         } else {
-          await message.channel.send(`User ${Logger.logifyUser(user)} is already on the blacklist.`).catch(msgFailCatcher);
+          const result = await controller.blacklistAdd(user);
+          if (result) {
+            Logger.main.log('INFO', `User ${Logger.logifyUser(user)} added to the blacklist`);
+            await message.channel.send(`Added ${Logger.logifyUser(user)} to the blacklist.`).catch(msgFailCatcher);
+          } else {
+            await message.channel.send(`User ${Logger.logifyUser(user)} is already on the blacklist.`).catch(msgFailCatcher);
+          }
         }
       } else {
         const result = await controller.blacklistRemove(user);
