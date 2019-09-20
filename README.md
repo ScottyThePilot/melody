@@ -13,7 +13,7 @@ This is a simple Discord bot, made by me, Scotty#4263. My lazy ass is still in t
 * Create ;dump - **Done**
 * Create ;flush - ***Canceled***
 * Add database filestate persistency - **Done**
-* Create ;blacklist
+* Create ;blacklist - **Done**
 * Add analytics tracking - **Done**
 * Create ;uptime and ;memory
 * Create ;whatis and ;info
