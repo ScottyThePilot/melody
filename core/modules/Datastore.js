@@ -122,7 +122,7 @@ class Datastore {
       // Add an operation to this Datastore's sequencer
       that.sequencer.push(async function () {
         let out = await writeJSONFile(that.path, data, that.options).catch(reject);
-        if (this.persistence) this.persistentState = out;
+        if (that.persistence) that.persistentState = out;
         resolve(out);
       });
     });
