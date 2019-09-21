@@ -120,7 +120,7 @@ class Logger {
 
   static logifyUser(entity) {
     let user = entity.hasOwnProperty('user') ? entity.user : entity;
-    return `${user.tag} (${user.id})` + (user.bot ? '' : ' (BOT)');
+    return `${user.tag} (${user.id})` + (user.bot ? ' (BOT)' : '');
   }
 
   static logifyGuild(guild) {
