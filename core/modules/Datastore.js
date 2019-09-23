@@ -18,16 +18,17 @@ class Sequencer {
   /**
    * Adds a function to the queue to be executed.
    * @param fn {Function<Promise>} The function to be added
-   * @param callback A function to be executed once the function
-   *   resolves but before the next function executes
    */
-  push(fn, callback) {
-    if (callback) fn.callback = callback;
-    this.items.push(fn);
-    if (!this.working) {
-      this.working = true;
-      this.next();
-    }
+  push(fn) {
+    return new Promise((resolve, reject) => {
+      fn.resolve = resolve;
+      fn.reject = reject;
+      this.items.push(fn);
+      if (!this.working) {
+        this.working = true;
+        this.next();
+      }
+    });
   }
 
   /**
@@ -38,12 +39,13 @@ class Sequencer {
     if (this.items.length) {
       this.working = true;
       let next = this.items.shift();
-
       let current = wait(next());
       this.current = current;
       current.then((out) => {
-        if (next.callback) next.callback(out);
-        return this.next();
+        next.resolve(out);
+        this.next();
+      }).catch((reason) => {
+        if (next.reject(reason)) this.next();
       });
     } else {
       this.working = false;
@@ -83,44 +85,42 @@ class ActionBatch {
   }
 
   async go() {
-    return await new Promise((resolve) =>
-      this.datastore.sequencer.push(async () => {
-        const ds = this.datastore;
-        let data = await ds.resolveData(Symbol.for('wipe'));
-        let shouldWrite = data === Symbol.for('wipe');
+    return this.datastore.sequencer.push(async () => {
+      const ds = this.datastore;
+      let data = await ds.resolveData(Symbol.for('wipe'));
+      let shouldWrite = data === Symbol.for('wipe');
 
-        if (shouldWrite) data = deepClone(ds.options.defaultData);
+      if (shouldWrite) data = deepClone(ds.options.defaultData);
 
-        const operations = {
-          get(action) {
-            return get(data, action.path);
-          },
-          set(action) {
-            shouldWrite = true;
-            return set(data, action.path, action.value);
-          },
-          has(action) {
-            return has(data, action.path);
-          },
-          edit(action) {
-            shouldWrite = true;
-            return action.callback(data);
-          }
-        };
-
-        this.actions.forEach((action) => operations[action.type](action));
-
-        if (shouldWrite) {
-          await write(
-            ds.path,
-            stringifyJSON(data, ds.options.compact)
-          );
+      const operations = {
+        get(action) {
+          return get(data, action.path);
+        },
+        set(action) {
+          shouldWrite = true;
+          return set(data, action.path, action.value);
+        },
+        has(action) {
+          return has(data, action.path);
+        },
+        edit(action) {
+          shouldWrite = true;
+          return action.callback(data);
         }
+      };
 
-        resolve(data);
-        return data;
-      })
-    );
+      this.actions.forEach((action) => operations[action.type](action));
+
+      if (shouldWrite) {
+        await write(
+          ds.path,
+          stringifyJSON(data, ds.options.compact)
+        );
+      }
+
+      resolve(data);
+      return data;
+    });
   }
 
   static async batchFunction(ds, fn) {
@@ -185,23 +185,19 @@ class Datastore {
     if (this.ready) throw new Error('Already Initialized');
 
     if (!exists(this.path)) {
-      await new Promise((resolve) =>
-        this.sequencer.push(async () => {
-          await write(
-            this.path,
-            stringifyJSON(this.options.defaultData, this.options.compact)
-          );
-        }, resolve)
-      );
+      await this.sequencer.push(async () => {
+        await write(
+          this.path,
+          stringifyJSON(this.options.defaultData, this.options.compact)
+        );
+      });
     }
 
     if (this.options.persistence) {
-      await new Promise((resolve) =>
-        this.sequencer.push(async () => {
-          let data = await this.resolveDataWrite();
-          this.persistentState = get(data);
-        }, resolve)
-      );
+      await this.sequencer.push(async () => {
+        let data = await this.resolveDataWrite(true);
+        this.persistentState = get(data);
+      });
     }
 
     this.ready = true;
@@ -213,12 +209,10 @@ class Datastore {
    * @param {String|Array} path The string path to the property
    */
   get(path) {
-    return new Promise((resolve) =>
-      this.sequencer.push(async () => {
-        let data = await this.resolveDataWrite();
-        return get(data, path);
-      }, resolve)
-    );
+    return this.sequencer.push(async () => {
+      let data = await this.resolveDataWrite();
+      return get(data, path);
+    });
   }
 
   /**
@@ -228,19 +222,17 @@ class Datastore {
    * @param {*} value The value to set
    */
   set(path, value) {
-    return new Promise((resolve) =>
-      this.sequencer.push(async () => {
-        let data = await this.resolveData();
-        set(data, path, value);
+    return this.sequencer.push(async () => {
+      let data = await this.resolveData();
+      set(data, path, value);
 
-        await write(
-          this.path,
-          stringifyJSON(data, this.options.compact)
-        );
+      await write(
+        this.path,
+        stringifyJSON(data, this.options.compact)
+      );
 
-        return data;
-      }, resolve)
-    );
+      return data;
+    });
   }
 
   /**
@@ -250,12 +242,10 @@ class Datastore {
    * @returns {Boolean}
    */
   has(path) {
-    return new Promise((resolve) =>
-      this.sequencer.push(async () => {
-        let data = await this.resolveDataWrite();
-        return has(data, path);
-      }, resolve)
-    );
+    return this.sequencer.push(async () => {
+      let data = await this.resolveDataWrite();
+      return has(data, path);
+    });
   }
 
   /**
@@ -264,19 +254,17 @@ class Datastore {
    *   the file's data. This function takes one argument, `data`
    */
   edit(callback) {
-    return new Promise((resolve) =>
-      this.sequencer.push(async () => {
-        let data = await this.resolveData();
-        callback(data);
+    return this.sequencer.push(async () => {
+      let data = await this.resolveData();
+      callback(data);
 
-        await write(
-          this.path,
-          stringifyJSON(data, this.options.compact)
-        );
+      await write(
+        this.path,
+        stringifyJSON(data, this.options.compact)
+      );
 
-        return data;
-      }, resolve)
-    );
+      return data;
+    });
   }
 
   /**
@@ -286,12 +274,11 @@ class Datastore {
    * @returns {ActionBatch}
    */
   batch(obj) {
-    if (typeof obj === 'function') return new Promise((resolve) => {
-      this.sequencer.push(
+    if (typeof obj === 'function') 
+      return this.sequencer.push(
         () => ActionBatch.batchFunction(this, obj),
         resolve  
       );
-    });
     return new ActionBatch(obj);
   }
 
@@ -299,8 +286,8 @@ class Datastore {
    * Retrieves data from the file, overwriting it if it is corrupt.
    * @private
    */
-  async resolveDataWrite() {
-    let data = await this.resolveData(Symbol.for('wipe'));
+  async resolveDataWrite(ignorePersistence) {
+    let data = await this.resolveData(Symbol.for('wipe'), ignorePersistence);
 
     if (data === Symbol.for('wipe')) {
       data = deepClone(this.options.defaultData);
@@ -317,11 +304,11 @@ class Datastore {
    * Retrieves data from the file, ignoring it if it is corrupt.
    * @private
    */
-  async resolveData(def) {
+  async resolveData(def, ignorePersistence) {
     def = def === undefined 
       ? deepClone(this.options.defaultData)
       : def;
-    return this.options.persistence
+    return this.options.persistence && !ignorePersistence
       ? this.persistentState
       : tryParseJSON(
         await read(this.path),
@@ -387,7 +374,7 @@ function deepClone(obj) {
 }
 
 function validate(obj, path) {
-  if (obj === null || obj === undefined) throw new Error('Invalid Object');
+  if (obj === null || obj === undefined) throw new Error('Invalid Object: ' + obj);
   if (path === undefined || !(Array.isArray(path) ? path : '' + path).length)
     return null;
   const a = Array.isArray(path)
