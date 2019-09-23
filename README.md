@@ -1,67 +1,20 @@
 # Melody
 
-This is a simple Discord bot, made by me, Scotty#4263. My lazy ass is still in the process of writing it, so I would not recommend using it. I really only have this public so I can show the code to other people.
+This is a simple Discord bot, made by me, Scotty#4263. My lazy ass is still in the process of writing it, so I would not recommend using it. I really only have this public so I can show the horrible code to other people.
 
 ## The Plan
 
-### Objectives
+### Current Objective: AutoMod
 
-* Create ;ping and ;destroy - **Done**
-* Create ;help - **Done**
-* Create ;configure - **Done**
-* Add message logging functionality - **Done**
-* Create ;dump - **Done**
-* Create ;flush - ***Canceled***
-* Add database filestate persistency - **Done**
-* Create ;blacklist - **Done**
-* Add analytics tracking - **Done**
-* Create ;uptime and ;memory
-* Create ;whatis and ;info
-* Create ;mute
-* Add autoMod and antiSpam functionality
+I'm currently in the process of adding an "auto-moderator" to my bot to allow server owners to filter spam and automate other moderation-related tasks. The main thing I'm focusing on adding to AutoMod is a spam filter. Just like nearly everything server-related on my bot, this will be toggleable and configurable.
 
-### Completed Side Objectives
+Completion goal: 9/28/2019
 
-* Added a parent process to monitor the bot, log any errors and restart on zero exit codes.
-* Added scheduled activities like log rotation checking, daily analytics reporting, and a randomly cycling discord status.
+### Previous Objective: Scheduled Tasks
 
-### Roadmap
+For a while, I had very much been in the need of a way to scheduled tasks. I knew this almost since the beginning, since `node-schedule` sat unused in my dependencies for well over a month or two. You won't notice it, but behind the scenes, melody is running scheduled tasks such as:
+* Daily reports on memory usage and Discord API ping
+* Randomly cycled activity messages
+* Bi-hourly checks on logs to make sure they're not exceeding their maximum file size
 
-**Beta**: Logging has been (Mostly) Finished
-
-**Alpha**: The bot will be in Alpha until muting, autoMod, antiSpam, and all current objectives are finished. Expected time to completion: About 4-6 Weeks.
-
-**The Future**: Once out of Alpha, I will move the bot towards more fun things like CleverBot and Connect Four.
-
-### Current & Planned Commands
-
-Core
-```
-;ping
-;help|helpall|halp|h [command]
-;adminhelp ['plugins'|'config'|'logging']
-;feedback <feedback>
-;configure|config|cfg [config option] [value]
-;dump [server name|server id] ['latest'|log number]
-;flush [server name|server id]
-```
-
-Moderation
-```
-;mute <@mention|user id>
-```
-
-Utility
-```
-;whatis|wi <id>
-;info|i <'role'|'guild'|'user'|'channel'> [@mention|#mention|id]
-;uptime
-;memory
-```
-
-Owner
-```
-;blacklist <@mention|user id>
-;stop
-;restart
-```
+Completed on: 9/18/2019
