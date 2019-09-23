@@ -49,8 +49,8 @@ module.exports = new Command({
         : message.guild ? 'commands available in ' + message.guild.name
         : 'standard commands';
       
-      const extra = !isHelpAll ? 'Type \`;helpall\` for a list of all commands available to you from other servers.'
-        : 'Type \`;help\` anywhere for a list of all commands usable there.';
+      const extra = !isHelpAll ? `Type \`${config.prefix}helpall\` for a list of all commands available to you from other servers.`
+        : `Type \`${config.prefix}help\` anywhere for a list of all commands usable there.`;
       
       const from = isHelpAll ? ' (All)'
         : message.guild ? ' (' + message.guild.name + ')'
@@ -59,7 +59,7 @@ module.exports = new Command({
       const embed = new RichEmbed();
 
       embed.setTitle('Command Help' + from);
-      embed.setDescription(`Below is a list of **${what}** and a short description of what they do.\nType \`;help <command>\` for more info about a command.\n${extra}`);
+      embed.setDescription(`Below is a list of **${what}** and a short description of what they do.\nType \`${config.prefix}help <command>\` for more info about a command.\n${extra}`);
       embed.setColor([114, 137, 218]);
       embed.addField('Command List', body);
       embed.setFooter(`Melody v${config.version[1]} ${config.version[0]}`);
