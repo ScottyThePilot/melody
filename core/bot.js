@@ -77,7 +77,8 @@ client.on('message', async (message) => {
   // Log message and continue
   if (controller.firstReady && guild) {
     let manager = GuildManager.all.get(guild.id);
-    if (await manager.configdb.get('logMessages')) controller.onMessage(message, manager);
+    if (manager.configdb.getSync('logMessages'))
+      controller.onMessage(message, manager);
   }
 
   // Exit if bot
@@ -121,11 +122,13 @@ client.on('message', async (message) => {
 
 
 client.on('guildMemberAdd', async (member) => {
-  if (controller.firstReady) controller.onGuildMemberAdd(member, GuildManager.all.get(member.guild.id));
+  if (controller.firstReady)
+    controller.onGuildMemberAdd(member, GuildManager.all.get(member.guild.id));
 });
 
 client.on('guildMemberRemove', async (member) => {
-  if (controller.firstReady) controller.onGuildMemberRemove(member, GuildManager.all.get(member.guild.id));
+  if (controller.firstReady)
+    controller.onGuildMemberRemove(member, GuildManager.all.get(member.guild.id));
 })
 
 client.on('messageUpdate', async (oldMessage, newMessage) => {
@@ -133,7 +136,8 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
   let guild = oldMessage.guild;
   if (controller.firstReady && guild) {
     let manager = GuildManager.all.get(guild.id);
-    if (await manager.configdb.get('logMessageChanges')) controller.onMessageUpdate(oldMessage, newMessage, manager);
+    if (manager.configdb.getSync('logMessageChanges'))
+      controller.onMessageUpdate(oldMessage, newMessage, manager);
   }
 });
 
@@ -141,7 +145,8 @@ client.on('messageDelete', async (message) => {
   let guild = message.guild;
   if (controller.firstReady && guild) {
     let manager = GuildManager.all.get(guild.id);
-    if (await manager.configdb.get('logMessageChanges')) controller.onMessageDelete(message, manager);
+    if (manager.configdb.getSync('logMessageChanges'))
+      controller.onMessageDelete(message, manager);
   }
 });
 
@@ -149,7 +154,8 @@ client.on('messageDeleteBulk', async (messages) => {
   let guild = messages.first().guild;
   if (controller.firstReady, guild) {
     let manager = GuildManager.all.get(guild.id);
-    if (await manager.configdb.get('logMessageChanges')) controller.onMessageDeleteBulk(messages, manager);
+    if (manager.configdb.getSync('logMessageChanges'))
+      controller.onMessageDeleteBulk(messages, manager);
   }
 });
 

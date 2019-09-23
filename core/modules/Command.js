@@ -41,10 +41,10 @@ class Command {
   async attempt(bundle) {
     // Exit silently if the user is blacklisted
     // 0xe1: Ignored: [User is blacklisted]
-    if ((await controller.blacklist.get()).includes(bundle.message.author.id)) return 0xe1;
+    if (controller.blacklist.getSync().includes(bundle.message.author.id)) return 0xe1;
 
     let isTrusted = [config.ownerID, ...config.trustedUsers].includes(bundle.message.author.id)
-    let plugins = bundle.manager ? await bundle.manager.configdb.get('plugins') : Command.pluginsDM;
+    let plugins = bundle.manager ? bundle.manager.configdb.getSync('plugins') : Command.pluginsDM;
 
     // Exit silently if this command's plugin is not enabled in the given server
     // 0xe0: Ignored: [Command not on plugin list]
@@ -91,7 +91,9 @@ class Command {
 
   static find(alias) {
     for (let [name, command] of Command.manifest) {
-      if (name.toLowerCase() === alias.toLowerCase() || command.aliases.includes(alias.toLowerCase())) return command;
+      if (name.toLowerCase() === alias.toLowerCase() ||
+        command.aliases.includes(alias.toLowerCase()))
+        return command;
     }
     return null;
   }

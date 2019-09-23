@@ -157,6 +157,8 @@ class ActionBatch {
   }
 }
 
+const noPersistenceError = 'Persistence is not enabled';
+
 class Datastore {
   /**
    * Creates a new Datastore object
@@ -215,6 +217,12 @@ class Datastore {
     });
   }
 
+  getSync(path) {
+    if (!this.options.persistence)
+      throw new Error(noPersistenceError);
+    return get(this.persistentState, path);
+  }
+
   /**
    * Sets the value at the given path. Creates objects or arrays
    * to the path if they do not exist.
@@ -246,6 +254,12 @@ class Datastore {
       let data = await this.resolveDataWrite();
       return has(data, path);
     });
+  }
+
+  hasSync(path) {
+    if (!this.options.persistence)
+      throw new Error(noPersistenceError);
+    return has(this.persistentState, path);
   }
 
   /**
