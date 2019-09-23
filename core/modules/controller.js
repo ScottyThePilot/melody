@@ -10,7 +10,8 @@ const { version, ownerID } = require('../config.json');
 
 const cleverChannels = new Map();
 const blacklist = new Datastore('./core/data/blacklist.json', {
-  data: []
+  defaultData: [],
+  persistence: true
 });
 
 const jobs = {};

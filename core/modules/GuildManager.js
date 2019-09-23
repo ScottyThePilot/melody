@@ -10,7 +10,8 @@ class GuildManager {
       logPath: `./core/data/${id}/logs`
     });
     const configdb = new Datastore(`./core/data/${id}/guildConfig.json`, {
-      data: this.defaultConfig
+      defaultData: this.defaultConfig,
+      persistence: true
     });
     const saved = new this(id, logger, configdb);
     GuildManager.all.set(id, saved);
