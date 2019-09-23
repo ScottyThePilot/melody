@@ -19,8 +19,7 @@ class GuildManager {
   }
   
   static async mount(id) {
-    let exists = GuildManager.exists(id);
-    if (!exists) {
+    if (!GuildManager.exists(id)) {
       await mkdir(`./core/data/${id}`);
       await mkdir(`./core/data/${id}/logs`);
       await write(`./core/data/${id}/latest.log`, '');

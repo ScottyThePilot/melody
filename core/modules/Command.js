@@ -2,7 +2,7 @@
 const config = require('../config.json');
 const Util = require('./util/Util.js');
 const Logger = require('./Logger.js');
-const readdir = require('./util/fswrapper.js');
+const { readdir } = require('./util/fswrapper.js');
 const controller = require('./controller.js');
 
 const defaultOptions = {
