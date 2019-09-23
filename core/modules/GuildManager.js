@@ -44,7 +44,7 @@ class GuildManager {
     this.id = id;
     this.logger = logger;
     this.configdb = configdb;
-    this.memory = new Map();
+    this.autoModContext = new Map();
   }
 
   log(...args) {

@@ -161,6 +161,29 @@ function resolveUser(val, client) {
   return client.users.get(match[0]) || null;
 }
 
+async function userSetMuted(guild, userId, muted, manager) {
+  if (!guild.members.has(userId)) return 'invalid_user';
+
+  let member = guild.members.get(userId);
+
+  const mutedRoleId = manager.configdb.getSync('mutedRole');
+
+  if (mutedRoleId === null) return 'invalid_role';
+
+  if (!guild.roles.has(mutedRoleId)) {
+    await manager.configdb.set('mutedRole', null);
+    return 'invalid_role';
+  }
+  
+  try {
+    return muted
+      ? await member.addRole(mutedRoleId, 'Muting User')
+      : await member.removeRole(mutedRoleId, 'Unmuting User');
+  } catch (e) {
+    return 'failure';
+  }
+}
+
 function setup(client) {
   // Daily report sent at 7:15
   jobs.dailyReport = scheduleJob('30 20 * * *', () => {
