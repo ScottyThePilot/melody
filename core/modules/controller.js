@@ -129,28 +129,26 @@ async function getCleverBotResponse(msg, ch) {
 
 async function blacklistAdd(user) {
   let out;
-  await blacklist.transform((data) => {
+  await blacklist.edit((data) => {
     if (!data.includes(user.id)) {
       data.push(user.id);
       out = true;
     } else {
       out = false;
     }
-    return data;
   });
   return out;
 }
 
 async function blacklistRemove(user) {
   let out;
-  await blacklist.transform((data) => {
+  await blacklist.edit((data) => {
     if (data.includes(user.id)) {
       data.splice(data.indexOf(user.id), 1);
       out = true;
     } else {
       out = false;
     }
-    return data;
   });
   return out;
 }
