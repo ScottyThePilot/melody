@@ -8,6 +8,7 @@ Automod/anti-spam functionality is currently in the works.
 * Fixed an issue where Scotty couldn't spell words in his changelog correctly.
 * Fixed an issue where standard message logging was checking for the `logMessageChanges` config property instead of the `logMessages` property.
 * Fixed an issue where the bot prefix wasn't displayed correctly in the `help` command.
+* Corrected the `restart` command's help overview
 
 ## 0.9.2.03 - 2019-9-19
 ### Added

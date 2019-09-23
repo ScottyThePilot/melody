@@ -7,7 +7,7 @@ module.exports = new Command({
   level: 3,
   plugin: 'owner',
   help: {
-    short: 'Logs the bot off of Discord.',
+    short: 'Restarts the bot.',
     long: 'Stops the bot, waits 10 seconds, and then restarts the bot.',
     usage: `${config.prefix}restart`,
     example: `${config.prefix}restart`
