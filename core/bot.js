@@ -77,7 +77,7 @@ client.on('message', async (message) => {
   // Log message and continue
   if (controller.firstReady && guild) {
     let manager = GuildManager.all.get(guild.id);
-    if (await manager.configdb.get('logMessageChanges')) controller.onMessage(message, manager);
+    if (await manager.configdb.get('logMessage')) controller.onMessage(message, manager);
   }
 
   // Exit if bot
