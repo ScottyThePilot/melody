@@ -1,15 +1,6 @@
 /* jshint esversion: 8 */
 'use strict';
-const { write, read, exists } = (() => {
-  const fs = require('fs');
-  const { promisify: p } = require('util');
-  return {
-    write: p(fs.writeFile),
-    read: p(fs.readFile),
-    exists: fs.existsSync
-  };
-})();
-
+const { write, read, exists } = require('./util/fswrapper.js');
 
 /**
  * A class to manage the execution of async functions or

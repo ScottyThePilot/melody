@@ -1,11 +1,6 @@
 'use strict';
-const fs = require('fs');
-const { promisify } = require('util');
-
-const writeFile = promisify(fs.writeFile);
-const readFile = promisify(fs.readFile);
-const mkdir = promisify(fs.mkdir);
-const stat = promisify(fs.stat);
+const { createWriteStream } = require('fs');
+const { write, read, mkdir, stat, exists } = require('./util/fswrapper.js');
 
 function pad(val) {
   return val < 10 ? '0' + val : val + '';
@@ -17,7 +12,7 @@ class Logger {
     this.logToConsole = {}.hasOwnProperty.call(options, 'logToConsole') ? options.logToConsole : false;
     this.logPath = {}.hasOwnProperty.call(options, 'logPath') ? options.logPath : null;
     this.rotation = Boolean(this.logPath);
-    this.logStream = fs.createWriteStream(this.path, { flags: 'a' });
+    this.logStream = createWriteStream(this.path, { flags: 'a' });
     
     if (this.rotation) {
       this.checkRotation();
@@ -48,14 +43,14 @@ class Logger {
 
   async checkRotation() {
     this.logStream.cork();
-    if (!fs.existsSync(this.logPath)) await mkdir(this.logPath);
+    if (!exists(this.logPath)) await mkdir(this.logPath);
     
     let fileStats = await stat(this.path);
     
     if (fileStats.size >= Logger.sizeThreshold) {
-      const contents = await readFile(this.path);
+      const contents = await read(this.path);
 
-      await writeFile(this.logPath + '/' + Logger.savifyDate() + '.log', contents);
+      await write(this.logPath + '/' + Logger.savifyDate() + '.log', contents);
 
       const entry1 = Logger.makeLogEntry('DATA', 'Log Rotated');
       const entry2 = Logger.makeLogEntry('Begin Log');
@@ -65,7 +60,7 @@ class Logger {
         console.log(entry2);
       }
 
-      await writeFile(this.path, entry1 + '\n' + entry2 + '\n');
+      await write(this.path, entry1 + '\n' + entry2 + '\n');
 
       Logger.main.log('DATA', `Log ${this.path} Rotated into ${this.logPath} and data written`);
     }

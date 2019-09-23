@@ -1,11 +1,7 @@
 'use strict';
-const fs = require('fs');
 const Datastore = require('./Datastore.js');
 const Logger = require('./Logger.js');
-const NodeUtil = require('util');
-
-const mkdir = NodeUtil.promisify(fs.mkdir);
-const write = NodeUtil.promisify(fs.writeFile);
+const { mkdir, write, exists } = require('./util/fswrapper.js');
 
 class GuildManager {
   static async load(id) {
@@ -30,7 +26,7 @@ class GuildManager {
       await write(`./core/data/${id}/latest.log`, '');
       return;
     }
-    if (!fs.existsSync(`./core/data/${id}/latest.log`)) {
+    if (!exists(`./core/data/${id}/latest.log`)) {
       await write(`./core/data/${id}/latest.log`, '');
     }
   } // Creates the assigned directories and files
@@ -41,7 +37,7 @@ class GuildManager {
   }
 
   static exists(id) {
-    return fs.existsSync('./core/data/' + id);
+    return exists('./core/data/' + id);
   } // Checks whether a guild is stored or not
 
   constructor(id, logger, configdb) {
