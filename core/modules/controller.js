@@ -161,7 +161,7 @@ function resolveUser(val, client) {
   return client.users.get(match[0]) || null;
 }
 
-async function userSetMuted(guild, userId, muted, manager) {
+/*async function userSetMuted(guild, userId, muted, manager) {
   if (!guild.members.has(userId)) return 'invalid_user';
 
   let member = guild.members.get(userId);
@@ -182,19 +182,30 @@ async function userSetMuted(guild, userId, muted, manager) {
   } catch (e) {
     return 'failure';
   }
-}
+}*/
 
 function setup(client) {
   // Daily report sent at 7:15
   jobs.dailyReport = scheduleJob('30 20 * * *', () => {
-    const owner = client.users.get(ownerID);
-
     const ping = average(analytics.pings).toFixed(3);
     const rss = Logger.logifyBytes(average(analytics.memory.rss));
     const heapTotal = Logger.logifyBytes(average(analytics.memory.heapTotal));
     const heapUsed = Logger.logifyBytes(average(analytics.memory.heapUsed));
 
-    owner.send(`**Daily Report:**\nAverage Ping: \`${ping}ms\`\nAverage Resident Set Size: \`${rss}\`\nAverage Heap Total: \`${heapTotal}\`\nAverage Heap Used: \`${heapUsed}\``);
+    if (client.status === 0) {
+      const owner = client.users.get(ownerID);
+      const msgText = `**Daily Report:**\nAverage Ping: \`${ping}ms\`\nAverage Resident Set Size: \`${rss}\`\nAverage Heap Total: \`${heapTotal}\`\nAverage Heap Used: \`${heapUsed}\``;
+      owner.send(msgText);
+    } else {
+      Logger.main.log(
+        'INFO',
+        'Unable to send daily report to owner, falling back to console',
+        `Average Ping: ${ping}`,
+        `Average Resident Set Size: ${rss}`,
+        `Average Heap Total: ${heapTotal}`,
+        `Average Heap Used: ${heapUsed}`
+      );
+    }
 
     analytics.pings = [];
     analytics.memory.rss = [];
@@ -204,6 +215,7 @@ function setup(client) {
 
   // Change client activity randomly every 20 seconds
   jobs.cycleActivity = scheduleJob('*/20 * * * * *', () => {
+    if (client.status !== 0) return;
     const msg = activities[Math.floor(Math.random() * activities.length)];
     const uptime = Logger.getUptime(client);
     const name = msg.name
@@ -248,11 +260,11 @@ function getLifetime() {
   });
 }
 
-function getDataTree() {
+/*function getDataTree() {
   function getDirStructure(path) {
     
   }
-}
+}*/
 
 
 module.exports = {
