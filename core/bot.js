@@ -52,6 +52,8 @@ client.on('ready', async () => {
     controller.firstReady = true;
 
     Logger.main.log('INFO', 'Bot Ready! (' + (new Date() - then) + 'ms)');
+
+    Logger.main.log(undefined, 'Bot Invite: <' + client.generateInvite(268823760) + '>');
   } else {
     Logger.main.log('INFO', 'Bot Ready!');
   }
