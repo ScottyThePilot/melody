@@ -35,12 +35,12 @@ class Bot {
   async init() {
     const noExist = !exists(this.paths.data);
     if (noExist) await mkdir(this.paths.data);
-    const guildsPath = path.join(this.data, 'guilds');
+    const guildsPath = path.join(this.paths.data, 'guilds');
     if (noExist || !exists(guildsPath)) await mkdir(guildsPath);
   }
 
   async loadGuild(id) {
-    const manager = await GuildManager.load(path.join(this.data, 'guilds'), id);
+    const manager = await GuildManager.load(path.join(this.paths.data, 'guilds'), id);
     this.guildManagers.set(id, manager);
   }
 
@@ -105,16 +105,10 @@ class Bot {
   }
 
   on(eventName, listener) {
-    const { ready } = this;
-    return this.client.on(
-      eventName,
-      eventName === 'ready'
-        ? listener
-        : function (...args) {
-          if (!ready) return;
-          listener.call(this, ...args);
-        }
-      );
+    const that = this;
+    return this.client.on(eventName, function (...args) {
+      if (that.ready) listener.call(this, ...args);
+    });
   }
 }
 

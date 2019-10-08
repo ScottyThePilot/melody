@@ -1,6 +1,5 @@
 'use strict';
 const Bot = require('./modules/Bot.js');
-const Command = require('./modules/Command.js');
 const config = require('./config.json');
 const botEvents = require('./botEvents.js');
 const setup = require('./setup.js');
@@ -30,13 +29,15 @@ const melody = new Bot({
   config
 });
 
-// First time setup upon receiving the 'ready' event
+// First time setup upon receiving the "ready" event
 melody.client.once('ready', async () => {
   melody.log('INFO', 'Bot Loading...');
   
   await util.wait(750);
 
   const then = new Date();
+
+  await melody.init();
 
   await util.asyncForEach(melody.client.guilds.array(), async (guild) => {
     await melody.loadGuild(guild.id);
@@ -59,8 +60,8 @@ melody.client.once('ready', async () => {
 });
 
 // Subsequent ready events only log "Bot Ready!"
-melody.client.on('ready', () => {
-  if (melody.ready) melody.log('INFO', 'Bot Ready!');
+melody.on('ready', () => {
+  melody.log('INFO', 'Bot Ready!');
 });
 
 
@@ -93,10 +94,10 @@ melody.on('message', async (message) => {
 
   const content = message.content.trim();
 
-
-  // Send CleverBot response and exit if mentioned
+  // Try to match a ping at the beginning of the message
   const match = content.match(/^<@!?([0-9]+)>/);
 
+  // Send CleverBot response and exit if the match was a ping and that ping is the bot
   if (match && match[1] === melody.client.user.id) {
     const msg = content.slice(match[0].length).trim();
 
@@ -118,7 +119,7 @@ melody.on('message', async (message) => {
   let command = args.shift().toLowerCase();
 
   // Look for command in command list
-  const found = Command.find(command);
+  const found = melody.findCommand(command);
 
   // Command not found, ignore message
   if (!found) return;

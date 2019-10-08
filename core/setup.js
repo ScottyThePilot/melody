@@ -1,5 +1,5 @@
 'use strict';
-const config = require('./config.js');
+const config = require('./config.json');
 const util = require('./modules/util/util.js');
 const { scheduleJob } = require('node-schedule');
 

@@ -32,6 +32,8 @@ class Command {
       userLevel: Command.getUserLevel(bundle)
     }, bundle);
 
+    const msgFailCatcher = util.makeCatcher(logger, 'Unable to send message');
+
     if (this.disabled) {
       logger.log(
         'USER',
@@ -39,7 +41,7 @@ class Command {
         'Reason: Command Disabled'
       );
 
-      await Command.sendMessage(newBundle.message.channel, 'That command is disabled.');
+      await newBundle.message.channel.send('That command is disabled.').catch(msgFailCatcher);
 
       // 0xf0: Rejected [Command Disabled]
       return 0xf0;
@@ -50,7 +52,7 @@ class Command {
         'Reason: Command is Dissallowed in Guilds'
       );
 
-      await Command.sendMessage(newBundle.message.channel, 'You cannot use this command in a Guild, try it in DM.');
+      await newBundle.message.channel.send('You cannot use this command in a Guild, try it in DM.').catch(msgFailCatcher);
 
       // 0xf1: Rejected [Command is Dissallowed in Guild]
       return 0xf1;
@@ -61,7 +63,7 @@ class Command {
         'Reason: Command is Dissallowed in DM'
       );
 
-      await Command.sendMessage(newBundle.message.channel, 'You cannot use this command in DM, try it in a Guild.');
+      await newBundle.message.channel.send('You cannot use this command in DM, try it in a Guild.').catch(msgFailCatcher);
 
       // 0xf2: Rejected [Command is Dissallowed in DM]
       return 0xf2;
@@ -72,7 +74,7 @@ class Command {
         'Reason: Insufficient Permissions'
       );
 
-      await Command.sendMessage(newBundle.message.channel, 'You do not have permission to do that.');
+      await newBundle.message.channel.send('You do not have permission to do that.').catch(msgFailCatcher);
 
       // 0xf3: Rejected [Insufficient Permissions]
       return 0xf3;
@@ -117,6 +119,8 @@ class Command {
   }
 }
 
+Command.pluginsDM = ['general', 'core'];
+Command.pluginsAll = ['general', 'core', 'owner'];
 Command.defaultOptions = {
   name: 'default',
   disabled: false,

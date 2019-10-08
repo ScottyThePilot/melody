@@ -12,11 +12,11 @@ module.exports = new Command({
     usage: `${config.prefix}ping`,
     example: `${config.prefix}ping`
   },
-  run: async function ({ melody, message, client }) {
+  run: async function ({ melody, message }) {
     const msgFailCatcher = util.makeCatcher(melody.logger, 'Unable to send message');
 
     const msg = await message.channel.send('Ping?').catch(msgFailCatcher);
     const l = msg.createdTimestamp - message.createdTimestamp;
-    await msg.edit(`Pong! Latency is \`${l}ms\`. API Latency is \`${client.ping.toFixed(2)}ms\``).catch(msgFailCatcher);
+    await msg.edit(`Pong! Latency is \`${l}ms\`. API Latency is \`${melody.client.ping.toFixed(2)}ms\``).catch(msgFailCatcher);
   }
 });

@@ -23,7 +23,7 @@ class GuildManager {
   } // Loads a new GuildManager
   
   static async mount(location, id) {
-    if (!GuildManager.exists(id)) await mkdir(path.join(location, id));
+    if (!GuildManager.exists(location, id)) await mkdir(path.join(location, id));
   } // Creates the assigned directory if it doesn't exist
 
   async unload() {
