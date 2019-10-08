@@ -1,8 +1,8 @@
 'use strict';
-const { Attachment } = require('discord.js');
 const Command = require('../modules/Command.js');
-const { msgFailCatcher } = require('../modules/Logger.js');
 const config = require('../config.json');
+const util = require('../modules/util/util.js');
+const { Attachment } = require('discord.js');
 
 module.exports = new Command({
   name: 'dump',
@@ -13,8 +13,8 @@ module.exports = new Command({
     usage: `${config.prefix}dump [serverID]`,
     example: `${config.prefix}dump 750539831957333711`
   },
-  run: async function (bundle) {
-    const { message, args } = bundle;
+  run: async function ({ melody, message, args }) {
+    const msgFailCatcher = util.makeCatcher(melody.logger, 'Unable to send message');
     const ownedGuilds = message.author.id === config.ownerID ? message.client.guilds
       : message.client.guilds.filter((guild) => guild.ownerID === message.author.id);
 

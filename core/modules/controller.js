@@ -2,7 +2,7 @@
 const Logger = require('./Logger.js');
 const GuildManager = require('./GuildManager.js');
 const Command = require('./Command.js');
-const Util = require('./util/Util.js');
+const { asyncForEach } = require('./util/util.js');
 const CleverChannel = require('./CleverChannel.js');
 const Datastore = require('./Datastore.js');
 const { scheduleJob } = require('node-schedule');
@@ -49,7 +49,7 @@ function average(arr) {
 async function destroyBot(client) {
   Logger.main.log('INFO', 'Shutting Down...');
 
-  await Util.asyncForEach(client.guilds.array(), async (guild) => {
+  await asyncForEach(client.guilds.array(), async (guild) => {
     await GuildManager.unload(guild.id);
     Logger.main.log('DATA', `Guild ${Logger.logifyGuild(guild)} unloaded`);
   });
@@ -62,7 +62,7 @@ async function destroyBot(client) {
 async function getAccessiblePlugins(user, client) {
   let userPlugins = Command.pluginsDM.slice(0);
 
-  await Util.asyncForEach([...GuildManager.all.values()], async (manager) => {
+  await asyncForEach([...GuildManager.all.values()], async (manager) => {
     let guild = client.guilds.get(manager.id);
 
     if (!guild.members.has(user.id)) return;
@@ -228,7 +228,7 @@ function setup(client) {
   // Check log rotation every 2 hours
   jobs.checkLogRotation = scheduleJob('* */2 * * *', async () => {
     await Logger.main.checkRotation();
-    await Util.asyncForEach([...GuildManager.all.values()], async (manager) => {
+    await asyncForEach([...GuildManager.all.values()], async (manager) => {
       await manager.logger.checkRotation();
     });
   });

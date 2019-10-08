@@ -1,9 +1,8 @@
 'use strict';
-const { RichEmbed } = require('discord.js');
 const Command = require('../modules/Command.js');
-const { msgFailCatcher } = require('../modules/Logger.js');
 const config = require('../config.json');
-const Util = require('../modules/util/Util.js');
+const util = require('../modules/util/util.js');
+const { RichEmbed } = require('discord.js');
 
 const permissions = {
   [-1]: null,
@@ -25,15 +24,16 @@ module.exports = new Command({
   },
   aliases: ['helpall', 'halp', 'h'],
   run: async function run(bundle) {
-    const { client, message, trusted, controller } = bundle;
+    const { melody, message, trusted } = bundle;
+    const msgFailCatcher = util.makeCatcher(melody.logger, 'Unable to send message');
     const args = bundle.args.map((arg) => arg.toLowerCase());
 
     const isHelpAll = bundle.command === 'helpall';
 
-    const commandListFull = [...Command.manifest.values()]
+    const commandListFull = [...melody.commands.values()]
       .sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
 
-    const plugins = isHelpAll && !trusted ? await controller.getAccessiblePlugins(message.author, client)
+    const plugins = isHelpAll && !trusted ? await melody.getAccessiblePlugins(message.author)
       : bundle.plugins;
 
     const commandList = (isHelpAll || !message.guild) && trusted ? commandListFull
@@ -75,7 +75,7 @@ module.exports = new Command({
 
         const aliases = cmd.aliases.map((a) => '\`;' + a + '\`').join(', ').trim() || 'None';
 
-        embed.setTitle(Util.capFirst(cmd.name));
+        embed.setTitle(util.capFirst(cmd.name));
         embed.setDescription(cmd.help.long);
         embed.setColor([114, 137, 218]);
         embed.addField('Usage', '\`' + cmd.help.usage + '\`');

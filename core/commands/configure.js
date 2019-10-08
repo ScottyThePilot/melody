@@ -1,7 +1,7 @@
 'use strict';
 const Command = require('../modules/Command.js');
-const { msgFailCatcher } = require('../modules/Logger.js');
 const config = require('../config.json');
+const util = require('../modules/util/util.js');
 
 const logsNotice = `Logs can be retrieved with \`${config.prefix}dump\``;
 
@@ -43,8 +43,8 @@ module.exports = new Command({
   },
   aliases: ['config', 'cfg'],
   inDM: false,
-  run: async function run(bundle) {
-    const { message, manager, args } = bundle;
+  run: async function run({ melody, message, manager, args }) {
+    const msgFailCatcher = util.makeCatcher(melody.logger, 'Unable to send message');
 
     if (!args[0]) {
       const propList = configProperties.map((p) => `\`${p[0]}\``).join(', ');
@@ -63,7 +63,7 @@ module.exports = new Command({
       } else {
         const type = configProperties.find((p) => p[0] === propName)[1];
         const verified = type === 'bool' ? verifyBool(args[1])
-          : type === 'role' ? verifyRole(args[1], message.guild.roles)
+          //: type === 'role' ? verifyRole(args[1], message.guild.roles)
           : undefined;
 
         if (!verified) {
@@ -95,6 +95,6 @@ function boolify(val) {
   return configBoolMap[val.toLowerCase()];
 }
 
-function verifyRole(val, roles) {
+/*function verifyRole(val, roles) {
   return; // @TODO
-}
+}*/

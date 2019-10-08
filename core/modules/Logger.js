@@ -1,10 +1,7 @@
 'use strict';
 const { createWriteStream } = require('fs');
 const { write, read, mkdir, stat, exists } = require('./util/fswrapper.js');
-
-function pad(val) {
-  return val < 10 ? '0' + val : val + '';
-}
+const util = require('./util/util.js');
 
 class Logger {
   constructor(path, options = {}) {
@@ -22,10 +19,10 @@ class Logger {
     }
   }
 
-  log(header, text = '', ...rest) {
+  log(header, text, ...rest) {
     const writable = this.logStream.writable;
     if (!writable) rest.push('[Not Written to LogFile]');
-    const entry = Logger.makeLogEntry(header, text, ...rest);
+    const entry = util.makeLogEntry(header, text, ...rest);
     if (this.logToConsole) console.log(entry);
     if (writable) return this.logStream.write(entry + '\n');
   }
@@ -42,7 +39,7 @@ class Logger {
     });
   }
 
-  async checkRotation() {
+  async checkRotation(logger) {
     this.logStream.cork();
     if (!exists(this.logPath)) await mkdir(this.logPath);
     
@@ -51,10 +48,10 @@ class Logger {
     if (fileStats.size >= this.sizeThreshold) {
       const contents = await read(this.path);
 
-      await write(this.logPath + '/' + Logger.savifyDate() + '.log', contents);
+      await write(this.logPath + '/' + util.savifyDate() + '.log', contents);
 
-      const entry1 = Logger.makeLogEntry('DATA', 'Log Rotated');
-      const entry2 = Logger.makeLogEntry('Begin Log');
+      const entry1 = util.makeLogEntry('DATA', 'Log Rotated');
+      const entry2 = util.makeLogEntry('Begin Log');
 
       if (this.logToConsole) {
         console.log(entry1);
@@ -62,8 +59,9 @@ class Logger {
       }
 
       await write(this.path, entry1 + '\n' + entry2 + '\n');
-
-      Logger.main.log('DATA', `Log ${this.path} Rotated into ${this.logPath} and data written`);
+      
+      if (logger)
+      logger.log('DATA', `Log ${this.path} Rotated into ${this.logPath} and data written`);
     }
 
     process.nextTick(() => this.logStream.uncork());

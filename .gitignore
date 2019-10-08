@@ -4,9 +4,4 @@ package-lock.json
 
 # Secret Data
 config.json
-dev_config.json
 data/
-dev_data/
-
-# Other
-*.lnk

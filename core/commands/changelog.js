@@ -1,8 +1,9 @@
 'use strict';
-const { RichEmbed } = require('discord.js');
 const Command = require('../modules/Command.js');
-const { msgFailCatcher } = require('../modules/Logger.js');
 const config = require('../config.json');
+const util = require('../modules/util/util.js');
+const { RichEmbed } = require('discord.js');
+
 
 const contents = require('../changeloglatest.json');
 const embed = new RichEmbed();
@@ -27,8 +28,8 @@ module.exports = new Command({
     usage: `${config.prefix}changelog`,
     example: `${config.prefix}changelog`
   },
-  run: async function (bundle) {
-    const { message } = bundle;
+  run: async function ({ melody, message }) {
+    const msgFailCatcher = util.makeCatcher(melody.logger, 'Unable to send message');
 
     message.channel.send(embed).catch(msgFailCatcher);
   }

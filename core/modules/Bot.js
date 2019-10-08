@@ -3,22 +3,27 @@ const Discord = require('discord.js');
 const Logger = require('./Logger.js');
 const GuildManager = require('./GuildManager.js');
 const Command = require('./Command.js');
+const { exists, mkdir, readdir } = require('./util/fswrapper.js');
+const util = require('./util/util.js');
 const path = require('path');
-const { mkdir } = require('./util/fswrapper.js');
 
 class Bot {
   constructor(options) {
-    options = mergeDefault(Bot.defaultOptions, options);
+    options = util.mergeDefault(Bot.defaultOptions, options);
 
     this.client = new Discord.Client(options.discord);
     this.config = options.config;
 
     if (!this.config) throw new Error('You must provide a valid config object');
 
-    this.dataDir = options.data.dir;
-    this.logger = new Logger(path.join(this.dataDir, options.data.logger), {
+    this.paths = {
+      data: options.paths.data,
+      commands: options.paths.commands
+    };
+
+    this.logger = new Logger(path.join(this.paths.data, 'main.log'), {
       logToConsole: true,
-      logPath: path.join(this.dataDir, 'logs')
+      logPath: path.join(this.paths.data, 'logs')
     });
 
     this.ready = false;
@@ -27,36 +32,99 @@ class Bot {
     this.commands = new Map();
   }
 
-  get guildDataDir() {
-    return path.join(this.dataDir, 'guilds');
+  async init() {
+    const noExist = !exists(this.paths.data);
+    if (noExist) await mkdir(this.paths.data);
+    const guildsPath = path.join(this.data, 'guilds');
+    if (noExist || !exists(guildsPath)) await mkdir(guildsPath);
   }
 
   async loadGuild(id) {
-    const manager = await GuildManager.load(this.guildDataDir, id);
+    const manager = await GuildManager.load(path.join(this.data, 'guilds'), id);
     this.guildManagers.set(id, manager);
+  }
+
+  async unloadGuild(id) {
+    await this.guildManagers.get(id).unload();
+  }
+
+  async buildCommands() {
+    if (this.commands.size > 0) throw new Error('Commands already built');
+    (await readdir(this.paths.commands)).forEach((fileName) => {
+      const command = require('../commands/' + fileName.toString());
+      if (command instanceof Command) this.commands.set(command.name, command);
+    });
+  }
+
+  async destroy() {
+    this.log('INFO', 'Shutting Down...');
+  
+    await util.asyncForEach(this.client.guilds.array(), async (guild) => {
+      await this.unloadGuild(guild.id);
+      this.log('DATA', `Guild ${util.logifyGuild(guild)} unloaded`);
+    });
+  
+    await this.logger.end();
+    
+    await this.client.destroy();
+  }
+
+  findCommand(alias) {
+    for (let [name, command] of this.commands) {
+      if (name.toLowerCase() === alias.toLowerCase() ||
+        command.aliases.includes(alias.toLowerCase()))
+        return command;
+    }
+    return null;
+  }
+
+  async getAccessiblePlugins(user) {
+    let userPlugins = Command.pluginsDM.slice(0);
+  
+    await util.asyncForEach([...this.guildManagers.values()], async (manager) => {
+      const guild = this.client.guilds.get(manager.id);
+  
+      if (!guild.members.has(user.id)) return;
+  
+      const plugins = manager.configdb.getSync('plugins');
+  
+      plugins.forEach((plugin) => {
+        if (!userPlugins.includes(plugin)) userPlugins.push(plugin);
+      });
+    });
+  
+    return userPlugins;
+  }
+
+  login() {
+    return this.client.login(this.config.token);
+  }
+
+  log(...args) {
+    return this.logger.log(...args);
+  }
+
+  on(eventName, listener) {
+    const { ready } = this;
+    return this.client.on(
+      eventName,
+      eventName === 'ready'
+        ? listener
+        : function (...args) {
+          if (!ready) return;
+          listener.call(this, ...args);
+        }
+      );
   }
 }
 
 Bot.defaultOptions = {
   discord: {},
-  data: {
-    dir: './data',
-    logger: 'main.log'
+  paths: {
+    data: './data',
+    commands: './commands'
   },
   config: null
 };
 
 module.exports = Bot;
-
-function mergeDefault(def, given) {
-  if (!given) return def;
-  for (const key in def) {
-    if (!{}.hasOwnProperty.call(given, key)) {
-      given[key] = def[key];
-    } else if (given[key] === Object(given[key])) {
-      given[key] = mergeDefault(def[key], given[key]);
-    }
-  }
-
-  return given;
-}

@@ -6,7 +6,7 @@ const Logger = require('./Logger.js');
 
 class GuildManager {
   static async load(location, id) {
-    await this.mount(id);
+    await this.mount(location, id);
 
     // Logger will create the log file and/or folder if either don't exist
     const logger = new Logger(path.join(location, id, 'latest.log'), {

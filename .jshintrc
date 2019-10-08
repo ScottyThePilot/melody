@@ -1,0 +1,19 @@
+{
+  "-W014": true,
+  "esversion": 8,
+  "camelcase": true,
+  "curly": false,
+  "eqeqeq": true,
+  "freeze": true,
+  "indent": 2,
+  "newcap": true,
+  "quotmark": "single",
+  "maxdepth": 4,
+  "eqnull": true,
+  "funcscope": true,
+  "node": true,
+  "strict": true,
+  "white": true,
+  "undef": true,
+  "unused": true
+}

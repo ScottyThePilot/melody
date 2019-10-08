@@ -12,12 +12,10 @@ module.exports = new Command({
     usage: `${config.prefix}restart`,
     example: `${config.prefix}restart`
   },
-  run: async function (bundle) {
-    const { client, message, controller } = bundle;
-
+  run: async function ({ melody, message }) {
     await message.react(String.fromCharCode(0x2705)).catch();
 
-    await controller.destroyBot(client);
+    await melody.destroy();
 
     // Exit with 0 to signal that the process should restart
     process.exit(0);

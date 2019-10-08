@@ -1,6 +1,6 @@
 'use strict';
 
-const MUTE_RESPONSES = [
+module.exports.MUTE_RESPONSES = [
   'I\'m afraid I can\'t let you do that. Send messages slower next time.',
   'Looks like you\'re sending messages a little too quickly.',
   'Please slow down, you\'re sending messages awful quickly.',
@@ -15,9 +15,4 @@ const MUTE_RESPONSES = [
   'Enhance your calm.'
 ];
 
-const MUTE_NOTICE = 'You were automatically muted for spamming. If you believe this is a bug, please contact this bot\'s owner, Scotty#4263';
-
-module.exports = {
-  MUTE_RESPONSES,
-  MUTE_NOTICE
-};
+module.exports.MUTE_NOTICE = 'You were automatically muted for spamming. If you believe this is a bug, please contact this bot\'s owner, Scotty#4263';

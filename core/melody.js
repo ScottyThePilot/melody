@@ -1,84 +1,91 @@
 'use strict';
-const Discord = require('discord.js');
-const Logger = require('./modules/Logger.js');
-const GuildManager = require('./modules/GuildManager.js');
+const Bot = require('./modules/Bot.js');
 const Command = require('./modules/Command.js');
-const Util = require('./modules/util/Util.js');
-const controller = require('./modules/controller.js');
-const NodeUtil = require('util');
-
 const config = require('./config.json');
-const client = new Discord.Client({
-  disableEveryone: true,
-  restTimeOffset: 750,
-  disabledEvents: ['VOICE_STATE_UPDATE', 'VOICE_SERVER_UPDATE', 'TYPING_START', 'PRESENCE_UPDATE']
-});
-const wait = NodeUtil.promisify(setTimeout);
+const botEvents = require('./botEvents.js');
+const setup = require('./setup.js');
+const util = require('./modules/util/util.js');
 
-Logger.main = new Logger('./core/data/main.log', {
-  logToConsole: true,
-  logPath: './core/data/logs'
-});
-
-
+// Crash when a promise rejection goes unhandled
 process.on('unhandledRejection', (reason) => {
   throw reason;
 });
 
 
-client.on('ready', async () => {
-  if (!controller.firstReady) {
-    Logger.main.log('INFO', 'Bot Loading...');
-    
-    await wait(750);
+const melody = new Bot({
+  discord: {
+    disableEveryone: true,
+    restTimeOffset: 750,
+    disabledEvents: [
+      'VOICE_STATE_UPDATE',
+      'VOICE_SERVER_UPDATE',
+      'TYPING_START',
+      'PRESENCE_UPDATE'
+    ]
+  },
+  paths: {
+    data: './core/data',
+    commands: './core/commands'
+  },
+  config
+});
 
-    let then = new Date();
+// First time setup upon receiving the 'ready' event
+melody.client.once('ready', async () => {
+  melody.log('INFO', 'Bot Loading...');
+  
+  await util.wait(750);
 
-    await Util.asyncForEach(client.guilds.array(), async (guild) => {
-      await GuildManager.load(guild.id);
-      Logger.main.log('DATA', `Guild ${Logger.logifyGuild(guild)} loaded`);
-    });
+  const then = new Date();
 
-    await Command.buildManifest();
+  await util.asyncForEach(melody.client.guilds.array(), async (guild) => {
+    await melody.loadGuild(guild.id);
+    melody.log('DATA', `Guild ${util.logifyGuild(guild)} loaded`);
+  });
 
-    Logger.main.log('DATA', `${Command.manifest.size} Commands loaded`);
+  await melody.buildCommands();
 
-    await client.user.setActivity('waiting...');
+  melody.log('DATA', `${melody.commands.size} Commands loaded`);
 
-    controller.setup(client);
+  await melody.client.user.setActivity('waiting...');
 
-    Logger.main.log('INFO', `Tracking ${client.guilds.size} Guilds with ${client.users.size} Users`);
+  await setup(melody);
 
-    controller.firstReady = true;
+  melody.log('INFO', `Tracking ${melody.client.guilds.size} Guilds with ${melody.client.users.size} Users`);
 
-    Logger.main.log('INFO', 'Bot Ready! (' + (new Date() - then) + 'ms)');
-  } else {
-    Logger.main.log('INFO', 'Bot Ready!');
-  }
+  melody.ready = true;
+
+  melody.log('INFO', 'Bot Ready! (' + (new Date() - then) + 'ms)');
+});
+
+// Subsequent ready events only log "Bot Ready!"
+melody.client.on('ready', () => {
+  if (melody.ready) melody.log('INFO', 'Bot Ready!');
 });
 
 
-client.on('guildCreate', async (guild) => {
-  Logger.main.log('INFO', `Guild Found: ${Logger.logifyGuild(guild)}`);
-  await GuildManager.load(guild.id);
-  Logger.main.log('DATA', `Guild ${Logger.logifyGuild(guild)} loaded`);
+melody.on('guildCreate', async (guild) => {
+  melody.log('INFO', `Guild Found: ${util.logifyGuild(guild)}`);
+  await melody.loadGuild(guild.id);
+  melody.log('DATA', `Guild ${util.logifyGuild(guild)} loaded`);
 });
 
-client.on('guildDelete', async (guild) => {
-  Logger.main.log('INFO', `Guild Lost: ${Logger.logifyGuild(guild)}`);
-  await GuildManager.unload(guild.id);
-  Logger.main.log('DATA', `Guild ${Logger.logifyGuild(guild)} unloaded`);
+melody.on('guildDelete', async (guild) => {
+  melody.log('INFO', `Guild Lost: ${util.logifyGuild(guild)}`);
+  await melody.unloadGuild(guild.id);
+  melody.log('DATA', `Guild ${util.logifyGuild(guild)} unloaded`);
 });
 
 
-client.on('message', async (message) => {
+melody.on('message', async (message) => {
   let guild = message.guild;
-
+  
   // Log message and continue
-  if (controller.firstReady && guild) {
-    let manager = GuildManager.all.get(guild.id);
-    if (manager.configdb.getSync('logMessages'))
-      controller.onMessage(message, manager);
+  if (melody.ready && guild) {
+    let manager = melody.guildManagers.get(guild.id);
+    if (manager.configdb.getSync('logMessages')) {
+      botEvents.onMessage(message, manager);
+    }
   }
 
   // Exit if bot
@@ -86,17 +93,25 @@ client.on('message', async (message) => {
 
   const content = message.content.trim();
 
+
   // Send CleverBot response and exit if mentioned
   const match = content.match(/^<@!?([0-9]+)>/);
-  if (match && match[1] === client.user.id) {
+
+  if (match && match[1] === melody.client.user.id) {
     const msg = content.slice(match[0].length).trim();
-    const response = await controller.getCleverBotResponse(msg, message.channel.id);
+
+    const response = await melody.cleverbot.getResponse(msg, message.channel.id).catch((err) => {
+      melody.log('WARN', 'Error while Communicating with CleverBot API: ' + err.message);
+      return 'There was an error while Communicating with the CleverBot API.';
+    });
+
     if (!response || !response.trim().length) return;
-    await message.channel.send(response, { reply: message.author }).catch(Logger.msgFailCatcher);
+
+    await message.channel.send(response, { reply: message.author }).catch(util.msgFailCatcher);
     return;
   }
 
-  // Exit if message doesn't start with prefix
+  // Doesn't start with prefix, ignore message
   if (!content.startsWith(config.prefix)) return;
 
   let args = content.slice(config.prefix.length).split(/\s+/g);
@@ -105,95 +120,103 @@ client.on('message', async (message) => {
   // Look for command in command list
   const found = Command.find(command);
 
+  // Command not found, ignore message
   if (!found) return;
 
+  // User is blacklisted, ignore message
+  if (melody.blacklist.db.getSync().includes(message.author.id)) return;
+
   const bundle = {
-    args: args,
-    command: command,
-    client: client,
-    message: message,
-    manager: message.guild ? GuildManager.all.get(message.guild.id) : null,
-    controller: controller
+    args,
+    command,
+    melody,
+    message,
+    manager: message.guild
+      ? melody.guildManagers.get(message.guild.id)
+      : null
   };
 
   // Attempt command
-  await found.attempt(bundle);
+  await found.attempt(bundle, melody.logger);
 });
 
 
-client.on('guildMemberAdd', async (member) => {
-  if (controller.firstReady)
-    controller.onGuildMemberAdd(member, GuildManager.all.get(member.guild.id));
+melody.on('guildMemberAdd', async (member) => {
+  botEvents.onGuildMemberAdd(member, melody.guildManagers.get(member.guild.id));
 });
 
-client.on('guildMemberRemove', async (member) => {
-  if (controller.firstReady)
-    controller.onGuildMemberRemove(member, GuildManager.all.get(member.guild.id));
-})
+melody.on('guildMemberRemove', async (member) => {
+  botEvents.onGuildMemberRemove(member, melody.guildManagers.get(member.guild.id));
+});
 
-client.on('messageUpdate', async (oldMessage, newMessage) => {
-  if (oldMessage.author.bot) return;
+melody.on('messageUpdate', async (oldMessage, newMessage) => {
   let guild = oldMessage.guild;
-  if (controller.firstReady && guild) {
-    let manager = GuildManager.all.get(guild.id);
-    if (manager.configdb.getSync('logMessageChanges'))
-      controller.onMessageUpdate(oldMessage, newMessage, manager);
+  if (guild) {
+    let manager = melody.guildManagers.get(guild.id);
+    if (manager.configdb.getSync('logMessageChanges')) {
+      botEvents.onMessageUpdate(oldMessage, newMessage, manager);
+    }
   }
 });
 
-client.on('messageDelete', async (message) => {
+melody.on('messageDelete', async (message) => {
   let guild = message.guild;
-  if (controller.firstReady && guild) {
-    let manager = GuildManager.all.get(guild.id);
-    if (manager.configdb.getSync('logMessageChanges'))
-      controller.onMessageDelete(message, manager);
+  if (guild) {
+    let manager = melody.guildManagers.get(guild.id);
+    if (manager.configdb.getSync('logMessageChanges')) {
+      botEvents.onMessageDelete(message, manager);
+    }
   }
 });
 
-client.on('messageDeleteBulk', async (messages) => {
+melody.on('messageDeleteBulk', async (messages) => {
   let guild = messages.first().guild;
-  if (controller.firstReady, guild) {
-    let manager = GuildManager.all.get(guild.id);
-    if (manager.configdb.getSync('logMessageChanges'))
-      controller.onMessageDeleteBulk(messages, manager);
+  if (guild) {
+    let manager = melody.guildManagers.get(guild.id);
+    if (manager.configdb.getSync('logMessageChanges')) {
+      botEvents.onMessageDeleteBulk(messages, manager);
+    }
   }
 });
 
 
-client.on('error', (err) => {
-  Logger.main.log('ERR', Logger.logifyError(err));
+melody.client.on('error', (err) => {
+  melody.log('ERR', util.logifyError(err));
 });
 
-client.on('rateLimit', (err) => {
+melody.client.on('rateLimit', (err) => {
   let message = `RateLimit ${err.method.toUpperCase()}: ${err.timeDifference}ms (${err.path})`;
-  Logger.main.log('WARN', message);
+  melody.log('WARN', message);
 });
 
-client.on('warn', (warn) => {
-  Logger.main.log('WARN', warn);
+melody.client.on('warn', (warn) => {
+  melody.log('WARN', warn);
 });
 
-client.on('debug', (info) => {
+melody.client.on('debug', (info) => {
   if (info.startsWith('[ws] [connection] Sending a heartbeat')) return;
   if (info.startsWith('[ws] [connection] Heartbeat acknowledged, latency of')) return;
   if (info.startsWith('READY')) info = 'READY';
   if (info.startsWith('Authenticated using token')) info = 'Authenticated';
-  Logger.main.log('DEBUG', 'DiscordDebugInfo: ' + info);
+  melody.log('DEBUG', 'DiscordDebugInfo: ' + info);
 });
 
 
-client.on('resume', () => {
-  Logger.main.log('INFO', 'WebSocket resumed');
+melody.client.on('resume', () => {
+  melody.log('INFO', 'WebSocket resumed');
 });
 
-client.on('reconnecting', () => {
-  Logger.main.log('INFO', 'WebSocket reconnecting...');
+melody.client.on('reconnecting', () => {
+  melody.log('INFO', 'WebSocket reconnecting...');
 });
 
-client.on('disconnect', (event) => {
-  Logger.main.log('WARN', `WebSocket disconnected (${event.code})`, event.reason);
+melody.client.on('disconnect', (event) => {
+  melody.log('INFO', `WebSocket disconnected (${event.code})`, event.reason);
   process.exit(0);
 });
 
 
-client.login(config.token);
+melody.login().catch(() => {
+  melody.log('INFO', 'Unable to log in');
+  process.exit(0);
+});
