@@ -9,7 +9,7 @@ function log(header, text = '', ...rest) {
 function launch() {
   log('PARENT', 'Launching Bot...');
 
-  const subprocess = fork('./core/bot.js');
+  const subprocess = fork('./core/melody.js');
 
   subprocess.on('message', (message) => {
     if (message.type === 'request') {
