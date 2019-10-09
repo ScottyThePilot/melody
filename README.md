@@ -18,3 +18,7 @@ For a while, I had very much been in the need of a way to scheduled tasks. I kne
 * Bi-hourly checks on logs to make sure they're not exceeding their maximum file size
 
 Completed on: 9/18/2019
+
+## How does it work?
+
+`index.js` serves to keep the bot alive by forking off a child node process (which is the bot), restarting it when it exits with 0, and exiting when the child process exits with 1. This version of Melody works around a `Bot` class. `Bot` instances contain a `Discord.Client`, a `Logger`, a `GuildManager` for each guild, and `Command`s for each command. This instance bundles everything important into one object so only a single variable has to be passed around for full access to the bot. Upon receiving the `'ready'` event from the Discord API, the bot initializes its data directories, loads each `GuildManager` instance, builds all of the commands from the commands directory, and sets up scheduled tasks. From there it listens to input and reacts accordingly.
