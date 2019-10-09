@@ -22,3 +22,42 @@ Completed on: 9/18/2019
 ## How does it work?
 
 `index.js` serves to keep the bot alive by forking off a child node process (which is the bot), restarting it when it exits with 0, and exiting when the child process exits with 1. This version of Melody works around a `Bot` class. `Bot` instances contain a `Discord.Client`, a `Logger`, a `GuildManager` for each guild, and `Command`s for each command. This instance bundles everything important into one object so only a single variable has to be passed around for full access to the bot. Upon receiving the `'ready'` event from the Discord API, the bot initializes its data directories, loads each `GuildManager` instance, builds all of the commands from the commands directory, and sets up scheduled tasks. From there it listens to input and reacts accordingly.
+
+## File Structure and Config
+
+This diagram only shows the important files needed for the bot to work. Some files and folders are omitted to reduce size.
+```
+melody_v3/
+├─core/
+│ ├─commands/
+│ │ └─[...]
+│ ├─data/                 [Not included]
+│ │ ├─guilds/
+│ │ │ └─[...]
+│ │ ├─blacklist.json
+│ │ ├─logs/
+│ │ └─main.log
+│ ├─modules/
+│ │ └─[...]
+│ ├─subfunctions/
+│ │ └─[...]
+│ ├─botEvents.js
+│ ├─changeloglatest.json
+│ ├─config.json           [Not included]
+│ ├─melody.js
+│ └─setup.js
+├─index.js
+└─start.bat
+```
+
+Here's an example of what config.js might look like
+```json
+{
+  "version": ["Stable", "1.0.0"],
+  "prefix": "!",
+  "token": "your-token-goes-here",
+  "trustedUsers": [
+    "a-discord-id-of-someone-you-trust"
+  ]
+}
+```
