@@ -1,15 +1,12 @@
+'use strict';
 const { fork } = require('child_process');
-const Logger = require('./core/modules/Logger.js');
+const { logEntryToConsole: log } = require('./core/modules/util/util.js');
 const startTime = new Date();
-
-function log(header, text = '', ...rest) {
-  console.log(Logger.makeLogEntry(header, text, ...rest));
-}
 
 function launch() {
   log('PARENT', 'Launching Bot...');
 
-  const subprocess = fork('./core/bot.js');
+  const subprocess = fork('./core/melody.js');
 
   subprocess.on('message', (message) => {
     if (message.type === 'request') {

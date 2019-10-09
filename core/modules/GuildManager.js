@@ -1,43 +1,37 @@
 'use strict';
+const path = require('path');
+const { mkdir, exists } = require('./util/fswrapper.js');
 const Datastore = require('./Datastore.js');
 const Logger = require('./Logger.js');
-const { mkdir, write, exists } = require('./util/fswrapper.js');
 
 class GuildManager {
-  static async load(id) {
-    await this.mount(id);
-    const logger = new Logger(`./core/data/${id}/latest.log`, {
-      logPath: `./core/data/${id}/logs`
+  static async load(location, id) {
+    await this.mount(location, id);
+
+    // Logger will create the log file and/or folder if either don't exist
+    const logger = new Logger(path.join(location, id, 'latest.log'), {
+      logPath: path.join(location, id, 'logs')
     });
-    const configdb = new Datastore(`./core/data/${id}/guildConfig.json`, {
+
+    // Datastore will create the db file if it doesn't exist
+    const configdb = new Datastore(path.join(location, id, 'guildConfig.json'), {
       defaultData: this.defaultConfig,
       persistence: true
     });
-    const saved = new this(id, logger, configdb);
-    GuildManager.all.set(id, saved);
     
-    return saved;
-  }
+    return new GuildManager(id, logger, configdb);
+  } // Loads a new GuildManager
   
-  static async mount(id) {
-    if (!GuildManager.exists(id)) {
-      await mkdir(`./core/data/${id}`);
-      await mkdir(`./core/data/${id}/logs`);
-      await write(`./core/data/${id}/latest.log`, '');
-      return;
-    }
-    if (!exists(`./core/data/${id}/latest.log`)) {
-      await write(`./core/data/${id}/latest.log`, '');
-    }
-  } // Creates the assigned directories and files
+  static async mount(location, id) {
+    if (!GuildManager.exists(location, id)) await mkdir(path.join(location, id));
+  } // Creates the assigned directory if it doesn't exist
 
-  static async unload(id) {
-    await GuildManager.all.get(id).logger.end();
-    this.all.delete(id);
-  }
+  async unload() {
+    await this.logger.end();
+  } // Unloads the GuildManager so it can be safely removed
 
-  static exists(id) {
-    return exists('./core/data/' + id);
+  static exists(location, id) {
+    return exists(path.join(location, id));
   } // Checks whether a guild is stored or not
 
   constructor(id, logger, configdb) {
@@ -52,17 +46,10 @@ class GuildManager {
   }
 }
 
-GuildManager.all = new Map();
-
 GuildManager.defaultConfig = {
   plugins: ['core', 'general'],
-  trackInvites: false,
-  preserveRoles: false,
   logMessages: false,
-  logMessageChanges: false,
-  autoMod: false,
-  antiSpam: false,
-  mutedRole: null
+  logMessageChanges: false
 };
 
 module.exports = GuildManager;

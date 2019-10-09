@@ -1,4 +1,4 @@
-/* jshint esversion: 8 */
+/* jshint esversion: 8, -W014 */
 'use strict';
 const { write, read, exists } = require('./util/fswrapper.js');
 
@@ -118,7 +118,6 @@ class ActionBatch {
         );
       }
 
-      resolve(data);
       return data;
     });
   }
@@ -290,8 +289,7 @@ class Datastore {
   batch(obj) {
     if (typeof obj === 'function') 
       return this.sequencer.push(
-        () => ActionBatch.batchFunction(this, obj),
-        resolve  
+        () => ActionBatch.batchFunction(this, obj)
       );
     return new ActionBatch(obj);
   }

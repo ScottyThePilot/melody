@@ -1,4 +1,4 @@
-// md5 hash function extracted from the official CleverBot website
+/* jshint ignore:start */
 'use strict';
 
 var c = function(n, p) {

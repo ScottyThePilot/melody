@@ -12,14 +12,12 @@ module.exports = new Command({
     usage: `${config.prefix}stop`,
     example: `${config.prefix}stop`
   },
-  run: async function (bundle) {
-    const { client, message, controller } = bundle;
-
+  run: async function ({ melody, message }) {
     await message.react(String.fromCharCode(0x2705)).catch();
 
-    await controller.destroyBot(client);
+    await melody.destroy();
 
-    // Exit with 0 to signal that the process should not restart
+    // Exit with 1 to signal that the process should not restart
     process.exit(1);
   }
 });

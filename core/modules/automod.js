@@ -35,8 +35,8 @@ function isMessageSpam(message, manager) {
     const delaysAvg = userContext
       .map((e, i) => userContext[i - 1] - e)
       .slice(1)
-      .reduce((a, c) => a + c)
-      / (userContext.length - 1);
+      .reduce((a, c) => a + c) /
+      (userContext.length - 1);
     
     // Calculates the final score of how quickly the user is sending messages
     const heat = c(userContext.length) * r(delaysAvg);
