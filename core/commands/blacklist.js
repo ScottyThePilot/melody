@@ -38,7 +38,7 @@ module.exports = new Command({
           const result = await melody.blacklist.add(user);
           if (result) {
             melody.log('INFO', `User ${util.logifyUser(user)} added to the blacklist`);
-            await message.channel.send(`Added ${util.logifyUser(user)} to the blacklist.`).catch(msgFailCatcher);
+            await message.channel.send(`Added \`${util.logifyUser(user)}\` to the blacklist.`).catch(msgFailCatcher);
           } else {
             await message.channel.send(`User ${util.logifyUser(user)} is already on the blacklist.`).catch(msgFailCatcher);
           }
@@ -47,9 +47,9 @@ module.exports = new Command({
         const result = await melody.blacklist.remove(user);
         if (result) {
           melody.log('INFO', `User ${util.logifyUser(user)} removed from the blacklist`);
-          await message.channel.send(`Removed ${util.logifyUser(user)} from the blacklist.`).catch(msgFailCatcher);
+          await message.channel.send(`Removed \`${util.logifyUser(user)}\` from the blacklist.`).catch(msgFailCatcher);
         } else {
-          await message.channel.send(`User ${util.logifyUser(user)} is already on the blacklist.`).catch(msgFailCatcher);
+          await message.channel.send(`User \`${util.logifyUser(user)}\` is already on the blacklist.`).catch(msgFailCatcher);
         }
       }
     }

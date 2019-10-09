@@ -57,6 +57,8 @@ melody.client.once('ready', async () => {
   melody.ready = true;
 
   melody.log('INFO', 'Bot Ready! (' + (new Date() - then) + 'ms)');
+
+  melody.log(undefined, `Bot Invite: ${await melody.client.generateInvite(268823760)}`);
 });
 
 // Subsequent ready events only log "Bot Ready!"
@@ -79,15 +81,15 @@ melody.on('guildDelete', async (guild) => {
 
 
 melody.on('message', async (message) => {
-  let guild = message.guild;
-  
   // Log message and continue
-  if (melody.ready && guild) {
-    let manager = melody.guildManagers.get(guild.id);
+  if (message.guild) {
+    let manager = melody.guildManagers.get(message.guild.id);
     if (manager.configdb.getSync('logMessages')) {
       botEvents.onMessage(message, manager);
     }
   }
+
+  melody.analytics.messages ++;
 
   // Exit if bot
   if (message.author.bot) return;
@@ -101,6 +103,8 @@ melody.on('message', async (message) => {
   if (match && match[1] === melody.client.user.id) {
     const msg = content.slice(match[0].length).trim();
 
+    const msgFailCatcher = util.makeCatcher(melody.logger, 'Unable to send message');
+
     const response = await melody.cleverbot.getResponse(msg, message.channel.id).catch((err) => {
       melody.log('WARN', 'Error while Communicating with CleverBot API: ' + err.message);
       return 'There was an error while Communicating with the CleverBot API.';
@@ -108,7 +112,7 @@ melody.on('message', async (message) => {
 
     if (!response || !response.trim().length) return;
 
-    await message.channel.send(response, { reply: message.author }).catch(util.msgFailCatcher);
+    await message.channel.send(response, { reply: message.author }).catch(msgFailCatcher);
     return;
   }
 
@@ -138,7 +142,9 @@ melody.on('message', async (message) => {
   };
 
   // Attempt command
-  await found.attempt(bundle, melody.logger);
+  const result = await found.attempt(bundle, melody.logger);
+
+  if (result === 0xd0) melody.analytics.commands ++;
 });
 
 

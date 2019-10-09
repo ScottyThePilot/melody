@@ -37,10 +37,13 @@ class Bot {
     if (noExist) await mkdir(this.paths.data);
     const guildsPath = path.join(this.paths.data, 'guilds');
     if (noExist || !exists(guildsPath)) await mkdir(guildsPath);
+    await this.logger.checkRotation();
+    this.logger.log('Begin Log');
   }
 
   async loadGuild(id) {
     const manager = await GuildManager.load(path.join(this.paths.data, 'guilds'), id);
+    if (manager.logger.rotation) manager.logger.checkRotation(this.logger);
     this.guildManagers.set(id, manager);
   }
 

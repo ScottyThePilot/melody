@@ -45,7 +45,7 @@ module.exports = new Command({
       } else if (infoGroup === 'managers') {
         
       } else if (infoGroup === 'blacklist') {
-        const blacklist = await melody.blacklist.db.get('*');
+        const blacklist = await melody.blacklist.db.get();
         const joined = blacklist.join('\n').length > 1500 ? blacklist.join('\n').slice(0, 1500) + '...' : blacklist.join('\n');
         const list = '\`\`\`\n' + (blacklist.length === 0 ? 'There are no users on the blacklist.' : joined) + '\n\`\`\`';
         await message.channel.send(`Here is a list of blacklisted IDs:\n${list}`).catch(msgFailCatcher);

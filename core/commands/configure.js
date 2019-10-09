@@ -56,7 +56,7 @@ module.exports = new Command({
       if (!propName) {
         await message.channel.send('That is not a valid config property.').catch(msgFailCatcher);
       } else if (!args[1]) {
-        const currentVal = await manager.configdb.get(propName);
+        const currentVal = manager.configdb.getSync(propName);
         const info = configProperties.find((p) => p[0] === propName)[2];
 
         await message.channel.send(`The current value of \`${propName}\` is \`${currentVal}\`.\n${info}`).catch(msgFailCatcher);

@@ -1,5 +1,6 @@
 'use strict';
 const { createWriteStream } = require('fs');
+const path = require('path');
 const { write, read, mkdir, stat, exists } = require('./util/fswrapper.js');
 const util = require('./util/util.js');
 
@@ -11,12 +12,6 @@ class Logger {
     this.rotation = Boolean(this.logPath);
     this.logStream = createWriteStream(this.path, { flags: 'a' });
     this.sizeThreshold = options.sizeThreshold || Logger.defaultSizeThreshold;
-    
-    if (this.rotation) {
-      this.checkRotation();
-    } else {
-      this.log('Begin Log');
-    }
   }
 
   log(header, text, ...rest) {
@@ -29,13 +24,7 @@ class Logger {
 
   end() {
     return new Promise((resolve, reject) => {
-      this.logStream.end((err) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve();
-        }
-      });
+      this.logStream.end((err) => err ? reject(err) : resolve());
     });
   }
 
@@ -48,20 +37,15 @@ class Logger {
     if (fileStats.size >= this.sizeThreshold) {
       const contents = await read(this.path);
 
-      await write(this.logPath + '/' + util.savifyDate() + '.log', contents);
+      await write(path.join(this.logPath, util.savifyDate() + '.log'), contents);
 
-      const entry1 = util.makeLogEntry('DATA', 'Log Rotated');
-      const entry2 = util.makeLogEntry('Begin Log');
+      const entry = util.makeLogEntry('DATA', 'Log Rotated');
 
-      if (this.logToConsole) {
-        console.log(entry1);
-        console.log(entry2);
-      }
+      if (this.logToConsole) console.log(entry);
 
-      await write(this.path, entry1 + '\n' + entry2 + '\n');
+      await write(this.path, entry + '\n');
       
-      if (logger)
-      logger.log('DATA', `Log ${this.path} Rotated into ${this.logPath} and data written`);
+      if (logger) logger.log('DATA', `Log ${this.path} Rotated into ${this.logPath}`);
     }
 
     process.nextTick(() => this.logStream.uncork());

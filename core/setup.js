@@ -8,7 +8,8 @@ const activities = [
   { type: 'WATCHING', name: 'over {user_count} users' },
   { type: 'PLAYING', name: 'use ;help' },
   //{ type: 'PLAYING', name: '{global_uptime} days without crashing' },
-  //{ type: 'PLAYING', name: 'after {message_count} messages' },
+  { type: 'PLAYING', name: 'after {message_count} messages' },
+  { type: 'PLAYING', name: 'after {command_count} commands' },
   { type: 'PLAYING', name: 'for {uptime}' },
   { type: 'PLAYING', name: `in version ${config.version[1]} ${config.version[0]}` },
   { type: 'PLAYING', name: 'Minecraft 2' },
@@ -45,9 +46,9 @@ module.exports = async function setup(melody) {
 // Daily report sent at 8:30 each day
 function dailyReportJob(melody) {
   const ping = util.average(melody.analytics.pings).toFixed(3) + 'ms';
-  const rss = util.logifyBytes(util.average(melody.analytics.memory.rss));
-  const heapTotal = util.logifyBytes(util.average(melody.analytics.memory.heapTotal));
-  const heapUsed = util.logifyBytes(util.average(melody.analytics.memory.heapUsed));
+  const rss = util.formatBytes(util.average(melody.analytics.memory.rss));
+  const heapTotal = util.formatBytes(util.average(melody.analytics.memory.heapTotal));
+  const heapUsed = util.formatBytes(util.average(melody.analytics.memory.heapUsed));
 
   if (melody.client.status === 0) {
     const owner = melody.client.users.get(config.ownerID);
@@ -77,7 +78,9 @@ function cycleActivityJob(melody) {
   const name = msg.name
     .replace('{server_count}', melody.client.guilds.size)
     .replace('{user_count}', melody.client.users.size)
-    .replace('{uptime}', uptime);
+    .replace('{uptime}', uptime)
+    .replace('{message_count}', melody.analytics.messages)
+    .replace('{command_count}', melody.analytics.commands);
   melody.client.user.setActivity(name, { type: msg.type });
 }
 
@@ -85,7 +88,7 @@ function cycleActivityJob(melody) {
 async function checkLogRotationJob(melody) {
   await melody.logger.checkRotation();
   await util.asyncForEach([...melody.guildManagers.values()], async (manager) => {
-    await manager.logger.checkRotation();
+    await manager.logger.checkRotation(melody.logger);
   });
 }
 
