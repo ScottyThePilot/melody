@@ -6,7 +6,7 @@ const { scheduleJob } = require('node-schedule');
 const activities = [
   { type: 'WATCHING', name: 'over {server_count} servers' },
   { type: 'WATCHING', name: 'over {user_count} users' },
-  { type: 'PLAYING', name: 'use ;help' },
+  { type: 'PLAYING', name: `use ${config.prefix}help` },
   //{ type: 'PLAYING', name: '{global_uptime} days without crashing' },
   { type: 'PLAYING', name: 'after {message_count} messages' },
   { type: 'PLAYING', name: 'after {command_count} commands' },

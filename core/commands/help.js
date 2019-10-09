@@ -73,7 +73,7 @@ module.exports = new Command({
       if (cmd) {
         const embed = new RichEmbed();
 
-        const aliases = cmd.aliases.map((a) => '\`;' + a + '\`').join(', ').trim() || 'None';
+        const aliases = cmd.aliases.map((a) => '\`' + config.prefix + a + '\`').join(', ').trim() || 'None';
 
         embed.setTitle(util.capFirst(cmd.name));
         embed.setDescription(cmd.help.long);
