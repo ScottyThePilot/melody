@@ -6,8 +6,14 @@ const util = require('../modules/util/util.js');
 const logsNotice = `Logs can be retrieved with \`${config.prefix}dump\``;
 
 const configProperties = [
-  ['logMessages', 'bool', `If \`logMessages\` is true, the bot will log all sent messages. ${logsNotice}`],
-  ['logMessageChanges', 'bool', `If \`logMessageChanges\` is true, the bot will log message edits and deletions. ${logsNotice}`]
+  {
+    prop: 'logMessages',
+    desc: `If \`logMessages\` is true, the bot will log all sent messages. ${logsNotice}`
+  },
+  {
+    name: 'logMessageChanges',
+    desc: `If \`logMessageChanges\` is true, the bot will log message edits and deletions. ${logsNotice}`
+  }
 ];
 
 const configBoolMap = {

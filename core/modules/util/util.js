@@ -173,8 +173,41 @@ function resolveUser(val, client) {
   return client.users.get(match[0]) || null;
 }
 
+function resolveRole(val, guild) {
+  if (!val || typeof val !== 'string' || !val.trim().length) return null;
+  if (guild.roles.has(val.trim())) return guild.roles.get(val.trim());
+  const match = val.trim().match(/[0-9]+/);
+  if (!match) return null;
+  return guild.roles.get(match[0]) || null;
+}
+
 function userOwnsAGuild(user, client) {
   return client.guilds.some((guild) => guild.owner.id === user.id);
+}
+
+function fuzzysearch(needle, haystack) {
+  var hlen = haystack.length;
+  var nlen = needle.length;
+  if (nlen > hlen) {
+    return false;
+  }
+  if (nlen === hlen) {
+    return needle === haystack;
+  }
+  outer: for (var i = 0, j = 0; i < nlen; i ++) {
+    var nch = needle.charCodeAt(i);
+    while (j < hlen) {
+      if (haystack.charCodeAt(j ++) === nch) {
+        continue outer;
+      }
+    }
+    return false;
+  }
+  return true;
+}
+
+function normalizeString() {
+  
 }
 
 
