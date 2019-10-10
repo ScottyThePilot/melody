@@ -58,6 +58,7 @@ function dailyReportJob(melody) {
 
   melody.log(
     'INFO',
+    'Daily Report',
     `Average Ping: ${ping}`,
     `Average Resident Set Size: ${rss}`,
     `Average Heap Total: ${heapTotal}`,
