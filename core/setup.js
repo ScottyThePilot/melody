@@ -2,6 +2,8 @@
 const config = require('./config.json');
 const util = require('./modules/util/util.js');
 const { scheduleJob } = require('node-schedule');
+const Blacklist = require('./subfunctions/Blacklist.js');
+const CleverBotAgent = require('./subfunctions/CleverBotAgent.js');
 
 const activities = [
   { type: 'WATCHING', name: 'over {server_count} servers' },
@@ -20,8 +22,8 @@ const activities = [
 
 module.exports = async function setup(melody) {
   // Subfunctions
-  melody.blacklist = require('./subfunctions/blacklist.js');
-  melody.cleverbot = require('./subfunctions/cleverbot.js');
+  melody.blacklist = new Blacklist(melody.paths.data);
+  melody.cleverbot = new CleverBotAgent(30);
 
   // Scheduled Jobs
   melody.analytics = {
