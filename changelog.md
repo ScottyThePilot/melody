@@ -1,6 +1,13 @@
 # Changelog
 
-## 0.9.2.04 - 2019-9-23
+## 0.9.3 - 10/10/2019
+### Changed
+* An entire central re-write has been done, and Melody's system structure is now much different. (and hopefully more efficient)
+### Fixed
+* Fixed an issue where the bot's default prefix (`;`) was hardcoded into some strings.
+* More tiny bugs and quirks than I can remember.
+
+## 0.9.2.04 - 9/23/2019
 Automod/anti-spam functionality is currently in the works.
 ### Changed
 * Database system has been near-completely re-written, *again*. Testing over the last few days has squashed many bugs, but some may still exist.
@@ -10,13 +17,13 @@ Automod/anti-spam functionality is currently in the works.
 * Fixed an issue where the bot prefix wasn't displayed correctly in the `help` command.
 * Corrected the `restart` command's help overview
 
-## 0.9.2.03 - 2019-9-19
+## 0.9.2.03 - 9/19/2019
 ### Added
 * New command: `blacklist`. This allows me to put users on a blacklist for the bot to ignore. Note: the bot will only ignore commands from blacklisted users.
 ### Fixed
 * Fixed an issue where normal users were marked as bots in message logs.
 
-## 0.9.2.02 - 2019-9-17
+## 0.9.2.02 - 9/17/2019
 The `flush` command has been canceled due to fear that I'll rmdir my entire drive on accident.
 Please contact me if you would like your server's logs wiped.
 ### Added
@@ -25,13 +32,13 @@ Please contact me if you would like your server's logs wiped.
 ### Fixed
 * Too many dumb little tiny bugs for me to remember
 
-## 0.9.2.01 - 2019-9-3
+## 0.9.2.01 - 9/3/2019
 ### Changed
 * Changelog reports generated with the `changelog` command are organized better.
 ### Fixed
 * The `changelog` command how has a proper usage and example in the `help` menu.
 
-## 0.9.2 - 2019-8-30
+## 0.9.2 - 8/30/2019
 This is the version I started doing changelogs on. Previous changelogs may not be available.
 ### Added
 * New command: `changelog`. This will send you the latest changelog entry.
