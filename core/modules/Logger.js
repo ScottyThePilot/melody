@@ -52,6 +52,6 @@ class Logger {
   }
 }
 
-Logger.defaultSizeThreshold = 1048576; // File threshold in bytes
+Logger.defaultSizeThreshold = 524288; // File threshold in bytes
 
 module.exports = Logger;

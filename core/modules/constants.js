@@ -1,6 +1,6 @@
 'use strict';
 
-module.exports.MUTE_RESPONSES = [
+const MUTE_RESPONSES = [
   'I\'m afraid I can\'t let you do that. Send messages slower next time.',
   'Looks like you\'re sending messages a little too quickly.',
   'Please slow down, you\'re sending messages awful quickly.',
@@ -15,37 +15,24 @@ module.exports.MUTE_RESPONSES = [
   'Enhance your calm.'
 ];
 
-module.exports.MUTE_NOTICE = 'You were automatically muted for spamming. If you believe this is a bug, please contact this bot\'s owner, Scotty#4263';
+const MUTE_NOTICE = 'You were automatically muted for spamming. If you believe this is a bug, please contact this bot\'s owner, Scotty#4263';
 
-module.exports.NORM_MAP = {
-  [0]: [],
-  [1]: [],
-  [2]: [],
-  [3]: [],
-  [4]: [],
-  [5]: [],
-  [6]: [],
-  [7]: [],
-  [8]: [],
-  [9]: [],
-  a: [0x0430, 0x00e0, 0x00e1, 0x1ea1, 0x0105],
-  c: [0x0441, 0x0188, 0x010b],
-  d: [0x0501, 0x0257],
-  e: [0x0435, 0x1eb9, 0x0117, 0x0117, 0x00e9, 0x00e8],
-  g: [0x0121],
-  h: [0x04bb],
-  i: [0x0456, 0x00ed, 0x00ec, 0x00ef],
-  j: [0x0458, 0x029d],
-  k: [0x03ba],
-  l: [0x04cf, 0x1e37],
-  n: [0x0578],
-  o: [0x043e, 0x03bf, 0x0585, 0x022f, 0x1ecd, 0x1ecf, 0x01a1, 0x00f6, 0x00f3, 0x00f2],
-  p: [0x0440],
-  q: [0x0566],
-  s: [0x0282],
-  u: [0x03c5, 0x057d, 0x00fc, 0x00fa, 0x00f9],
-  v: [0x03bd, 0x0475],
-  x: [0x0445, 0x04b3],
-  y: [0x0443, 0x00fd],
-  z: [0x0290, 0x017c]
+const CFG_INVALID_SUBCOMMAND = `Please specify a valid subcommand. Valid subcommands are: \`list\`, \`get\` and \`set\`. Use \`{0}configure <subcommand>\` for more information about a subcommand.`;
+
+const CFG_LOGS_NOTICE = `Logs can be retrieved with \`{0}dump\``;
+const CFG_MUTE_NOTICE = `In order for automated muting to work, a \`mutedRole\` must be specified.`;
+
+const CFG_PROP_DESCRIPTIONS = {
+  logMessages: `If \`logMessages\` is true, the bot will log all sent messages. ${CFG_LOGS_NOTICE}`,
+  logMessageChanges:  `If \`logMessageChanges\` is true, the bot will log message edits and deletions. ${CFG_LOGS_NOTICE}`,
+  mutedRole: `If \`mutedRole\` is specified, the \`{0}mute\` command can be used to mute users. ${CFG_MUTE_NOTICE}`
+};
+
+module.exports = {
+  MUTE_RESPONSES,
+  MUTE_NOTICE,
+  CFG_INVALID_SUBCOMMAND,
+  CFG_LOGS_NOTICE,
+  CFG_MUTE_NOTICE,
+  CFG_PROP_DESCRIPTIONS
 };

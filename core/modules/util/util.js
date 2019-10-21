@@ -1,5 +1,6 @@
 'use strict';
 const moment = require('moment');
+const charmap = require('./charmap.json');
 
 function shuffle(array) {
   if (!Array.isArray(array)) throw new TypeError('Expected an array');
@@ -42,6 +43,12 @@ function format(str, ...replacers) {
   });
 }
 
+function listify(arr, joiner = 'and') {
+  const j = ' ' + joiner + ' ';
+  if (arr.length <= 2) return arr.join(j);
+  return arr.slice(0, -1).join(', ') + j + arr[arr.length - 1];
+}
+
 function capFirst(str) {
   return ''.charAt.call(str, 0).toUpperCase() + ''.slice.call(str, 1).toLowerCase();
 }
@@ -64,7 +71,7 @@ function savifyDate(date) {
   return logifyDate(date).slice(1, 24).replace(/[^0-9]+/g, '_'); 
 }
 
-function makeLogEntry(header, text = '', ...rest) {
+function makeLogEntry(header, text = '', ...rest) { // jshint ignore:line
   const h = header ? `[${('' + header).toUpperCase()}] ` : '';
   const r = rest.length ? ':\n' + rest.map(e => '  ' + e).join('\n') : '';
   const data = text.trim() + r.trim();
@@ -206,8 +213,18 @@ function fuzzysearch(needle, haystack) {
   return true;
 }
 
-function normalizeString() {
-  
+function decancer(str) {
+  if (str === void 0 || str === null) return str;
+  return Array.from(str.toString().normalize()).map((char) => {
+    let p = char.codePointAt(0);
+    const alphaNumeric = 
+      (p >= 48 && p <= 57) || 
+      (p >= 65 && p <= 90) || 
+      (p >= 97 && p <= 122);
+    if (alphaNumeric) return char.toLowerCase();
+    if (charmap.hasOwnProperty(p)) return charmap[p];
+    return '';
+  }).join('');
 }
 
 
@@ -215,10 +232,14 @@ module.exports = {
   shuffle,
   mergeDefault,
   average,
+
   format,
+  listify,
   capFirst,
+
   asyncForEach,
   wait,
+
   logifyDate,
   savifyDate,
   makeLogEntry,
@@ -229,11 +250,18 @@ module.exports = {
   logify,
   stylizeAttachment,
   stylizeMetaData,
+
   formatTime,
   formatBytes,
   escape,
   cleanContent,
+
   makeCatcher,
+
   resolveUser,
-  userOwnsAGuild
+  resolveRole,
+
+  userOwnsAGuild,
+  fuzzysearch,
+  decancer
 };

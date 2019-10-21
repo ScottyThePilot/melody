@@ -21,10 +21,7 @@ class Bot {
       commands: options.paths.commands
     };
 
-    this.logger = new Logger(path.join(this.paths.data, 'main.log'), {
-      logToConsole: true,
-      logPath: path.join(this.paths.data, 'logs')
-    });
+    this.logger = null;
 
     this.ready = false;
 
@@ -35,8 +32,15 @@ class Bot {
   async init() {
     const noExist = !exists(this.paths.data);
     if (noExist) await mkdir(this.paths.data);
+
+    this.logger = new Logger(path.join(this.paths.data, 'main.log'), {
+      logToConsole: true,
+      logPath: path.join(this.paths.data, 'logs')
+    });
+
     const guildsPath = path.join(this.paths.data, 'guilds');
     if (noExist || !exists(guildsPath)) await mkdir(guildsPath);
+
     await this.logger.checkRotation();
     this.logger.log('Begin Log');
   }

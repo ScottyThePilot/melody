@@ -37,8 +37,6 @@ melody.client.once('ready', async () => {
 
   const then = new Date();
 
-  await melody.init();
-
   await util.asyncForEach(melody.client.guilds.array(), async (guild) => {
     await melody.loadGuild(guild.id);
     melody.log('DATA', `Guild ${util.logifyGuild(guild)} loaded`);
@@ -222,8 +220,9 @@ melody.client.on('disconnect', (event) => {
   process.exit(0);
 });
 
-
-melody.login().catch(() => {
-  melody.log('INFO', 'Unable to log in');
-  process.exit(0);
+melody.init().then(() => {
+  melody.login().catch(() => {
+    melody.log('INFO', 'Unable to log in');
+    process.exit(0);
+  });
 });

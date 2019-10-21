@@ -5,7 +5,8 @@ const Datastore = require('../modules/Datastore.js');
 class Blacklist {
   constructor(location) {
     this.db = new Datastore(path.join(location, 'blacklist.json'), {
-      defaultData: []
+      defaultData: [],
+      persistence: true
     });
   }
 
