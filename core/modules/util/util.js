@@ -227,6 +227,21 @@ function decancer(str) {
   }).join('');
 }
 
+function getLifetime() {
+  process.send({
+    head: 'info.lifetime',
+    type: 'request'
+  });
+
+  return new Promise(function (resolve) {
+    process.on('message', function handler(message) {
+      if (message.head === 'info.lifetime' && message.type === 'response') {
+        resolve(message.data);
+      }
+    });
+  });
+}
+
 
 module.exports = {
   shuffle,
@@ -263,5 +278,7 @@ module.exports = {
 
   userOwnsAGuild,
   fuzzysearch,
-  decancer
+  decancer,
+
+  getLifetime
 };

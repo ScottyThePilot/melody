@@ -12,7 +12,7 @@ class CleverBotAgent {
       this.channels.set(channelID, new CleverChannel(this.historyLength));
     }
     const channel = this.channels.get(channelID);
-    return await channel.send(msg);
+    return await channel.queue(msg);
   }
 
   get size() {

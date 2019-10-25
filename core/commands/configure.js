@@ -72,7 +72,7 @@ module.exports = new Command({
     if (!args[0]) {
       await message.channel.send(invalidSubcommandMessage).catch(msgFailCatcher);
     } else if (args[0].toLowerCase() === 'list') {
-      await message.channel.send(`Valid config properties are:\n${propList}`).catch(msgFailCatcher);
+      await message.channel.send(`Valid config properties are:\n${propList}.`).catch(msgFailCatcher);
     } else if (args[0].toLowerCase() === 'get') {
       const propName = getConfigProp(args[1]);
       const prop = configProperties[propName];
@@ -84,7 +84,7 @@ module.exports = new Command({
       } else {
         const value = prop.get(melody, manager);
 
-        await message.channel.send(`The value of \`${propName}\` is currently \`${value}\`.\n${prop.desc}.`).catch(msgFailCatcher);
+        await message.channel.send(`The value of \`${propName}\` is currently \`${value}\`.\n${prop.desc}`).catch(msgFailCatcher);
       }
     } else if (args[0].toLowerCase() === 'set') {
       const propName = getConfigProp(args[1]);
