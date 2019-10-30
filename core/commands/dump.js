@@ -19,17 +19,23 @@ module.exports = new Command({
       : message.client.guilds.filter((guild) => guild.ownerID === message.author.id);
 
     if (message.author.id === config.ownerID && (args[0] || '').startsWith('activity')) {
+      message.author.dmChannel.startTyping();
+
       await message.author.send(`Core Bot Logs:`, {
         file: new Attachment(melody.logger.path)
       }).catch((error) => {
         console.log(error);
         message.author.send(`Unable to attach file. \`Error: ${error.code}\``).catch(msgFailCatcher);
       });
+      
+      message.author.dmChannel.stopTyping();
     } else if (ownedGuilds.size < 1) {
       await message.author.send('There are no logs to dump as you do not own any servers.');
     } else if (ownedGuilds.size === 1) {
       const guild = ownedGuilds.first();
       const manager = melody.guildManagers.get(guild.id);
+
+      message.author.dmChannel.startTyping();
 
       await message.author.send(`Message logs for ${guild.name}:`, {
         file: new Attachment(manager.logger.path, `guild${guild.id}.log`)
@@ -46,12 +52,16 @@ module.exports = new Command({
         const guild = ownedGuilds.get(args[0]);
         const manager = melody.guildManagers.get(guild.id);
 
+        message.author.dmChannel.startTyping();
+
         await message.author.send(`Message logs for ${guild.name}:`, {
           file: new Attachment(manager.logger.path, `guild${guild.id}.log`)
         }).catch((error) => {
           console.log(error);
           message.author.send(`Unable to attach file. \`Error: ${error.code}\``).catch(msgFailCatcher);
         });
+        
+        message.author.dmChannel.stopTyping();
       } else {
         await message.author.send('I can\'t find that guild.').catch(msgFailCatcher);
       }

@@ -103,10 +103,14 @@ melody.on('message', async (message) => {
 
     const msgFailCatcher = util.makeCatcher(melody.logger, 'Unable to send message');
 
+    message.channel.startTyping();
+
     const response = await melody.cleverbot.getResponse(msg, message.channel.id).catch((err) => {
       melody.log('WARN', 'Error while Communicating with CleverBot API: ' + err);
       return 'There was an error while Communicating with the CleverBot API.';
     });
+
+    message.channel.stopTyping();
 
     if (!response || !response.trim().length) return;
 
