@@ -5,8 +5,8 @@ const { write, read, mkdir, stat, exists } = require('./util/fswrapper.js');
 const util = require('./util/util.js');
 
 class Logger {
-  constructor(path, options = {}) {
-    this.path = path;
+  constructor(p, options = {}) {
+    this.path = p;
     this.logToConsole = {}.hasOwnProperty.call(options, 'logToConsole') ? options.logToConsole : false;
     this.logPath = {}.hasOwnProperty.call(options, 'logPath') ? options.logPath : null;
     this.rotation = Boolean(this.logPath);

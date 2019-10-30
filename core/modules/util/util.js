@@ -106,8 +106,8 @@ function stylizeAttachment(attachment) {
 
 function stylizeMetaData(message) {
   let c = message.embeds.length;
-  let out = !c ? [] : [`[${c} Embed${c <= 1 ? '' : 's'}]`];
-  return [out, ...message.attachments.array().map(stylizeAttachment)];
+  let out = !c ? [] : [`[${c} Embed${c === 1 ? '' : 's'}]`];
+  return [...out, ...message.attachments.array().map(stylizeAttachment)];
 }
 
 function formatTime(uptime, short = false) {
