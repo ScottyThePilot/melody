@@ -34,6 +34,12 @@ class Queue extends EventEmitter {
     this.emit('push');
   }
 
+  pushPromise(item) {
+    return new Promise((resolve, reject) => {
+      this.push(() => item().then(resolve).catch(reject));
+    });
+  }
+
   async go() {
     const item = this.next;
 

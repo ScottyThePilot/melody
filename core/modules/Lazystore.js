@@ -4,58 +4,57 @@ const { get, set, has } = require('./util/mut.js');
 const { mergeDefault } = require('./util/util.js');
 
 class Lazystore {
-  constructor(path) {
+  constructor(path, options) {
     this.path = path;
     this.options = mergeDefault(Lazystore.defaultOptions, options);
     this.ready = false;
     this.state = null;
     this.synced = false;
-
-    this.init();
   }
 
   async init() {
     if (this.ready) throw new Error('Already Initialized');
 
-    if (exists(this.path)) {
-      const parsed = tryParseJSON(await read(this.path), () => {
-        if (this.options.wipeIfCorrupt) {
-          write(stringifyJSON(this.options.defaultData, this.options.compact));
-          return deepClone(this.options.defaultData);
-        }
-        throw new Error('Unable to parse JSON');
-      });
-    } else {
-
-    }
+    this.state = await this.resolveState();
 
     this.ready = true;
     this.synced = true;
   }
 
   get(path) {
-    //
+    const out = get(this.state, path);
     this.touch();
+    return out;
   }
 
   set(path, value) {
-    //
+    set(this.state, path, value);
     this.touch();
   }
 
   has(path) {
-    //
+    const out = has(this.state, path);
     this.touch();
+    return out;
   }
 
   touch() {
-    //
     this.synced = false;
   }
 
-  async write() {
-    //
+  async write(force) {
+    if (this.synced && !force) return false;
+
+    await write(
+      this.path,
+      stringifyJSON(
+        this.state,
+        this.options.compact
+      )
+    );
+
     this.synced = true;
+    return true;
   }
 
   async resolveState() {
@@ -68,7 +67,14 @@ class Lazystore {
           throw new Error('Unable to parse JSON');
       }
     }
-    await write(stringifyJSON(this.options.defaultData, this.options.compact));
+
+    await write(
+      this.path, 
+      stringifyJSON(
+        this.options.defaultData,
+        this.options.compact
+      )
+    );
     return deepClone(this.options.defaultData);
   }
 }
@@ -80,14 +86,6 @@ Lazystore.defaultOptions = {
 };
 
 module.exports = Lazystore;
-
-function tryParseJSON(str, def) {
-  try {
-    return JSON.parse(str);
-  } catch (e) {
-    return typeof def === 'function' ? def() : def;
-  }
-}
 
 function stringifyJSON(obj, compact) {
   return JSON.stringify(obj, null, compact ? 0 : 2);

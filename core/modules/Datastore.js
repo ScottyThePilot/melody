@@ -34,7 +34,7 @@ class Datastore {
     if (this.ready) throw new Error('Already Initialized');
 
     if (!exists(this.path)) {
-      await this.queue.push(async () => {
+      await this.queue.pushPromise(async () => {
         await write(
           this.path,
           stringifyJSON(this.options.defaultData, this.options.compact)
@@ -43,7 +43,7 @@ class Datastore {
     }
 
     if (this.options.persistence) {
-      await this.queue.push(async () => {
+      await this.queue.pushPromise(async () => {
         let data = await this.resolveDataWrite(true);
         this.persistentState = get(data);
       });
@@ -58,7 +58,7 @@ class Datastore {
    * @param {String|Array} path The string path to the property
    */
   get(path) {
-    return this.queue.push(async () => {
+    return this.queue.pushPromise(async () => {
       let data = await this.resolveDataWrite();
       return get(data, path);
     });
@@ -77,7 +77,7 @@ class Datastore {
    * @param {*} value The value to set
    */
   set(path, value) {
-    return this.queue.push(async () => {
+    return this.queue.pushPromise(async () => {
       let data = await this.resolveData();
       set(data, path, value);
 
@@ -97,7 +97,7 @@ class Datastore {
    * @returns {Boolean}
    */
   has(path) {
-    return this.queue.push(async () => {
+    return this.queue.pushPromise(async () => {
       let data = await this.resolveDataWrite();
       return has(data, path);
     });
@@ -115,7 +115,7 @@ class Datastore {
    *   the file's data. This function takes one argument, `data`
    */
   edit(callback) {
-    return this.queue.push(async () => {
+    return this.queue.pushPromise(async () => {
       let data = await this.resolveData();
       callback(data);
 
