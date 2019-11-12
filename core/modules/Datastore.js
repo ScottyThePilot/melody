@@ -1,57 +1,7 @@
 /* jshint esversion: 8, -W014 */
 'use strict';
 const { write, read, exists } = require('./util/fswrapper.js');
-
-/**
- * A class to manage the execution of async functions or
- * Promise-generating functions. functions given to it
- * will be executed one at a time.
- * @private
- */
-class Sequencer {
-  constructor() {
-    this.working = false;
-    this.current = Promise.resolve();
-    this.items = [];
-  }
-
-  /**
-   * Adds a function to the queue to be executed.
-   * @param fn {Function<Promise>} The function to be added
-   */
-  push(fn) {
-    return new Promise((resolve, reject) => {
-      fn.resolve = resolve;
-      fn.reject = reject;
-      this.items.push(fn);
-      if (!this.working) {
-        this.working = true;
-        this.next();
-      }
-    });
-  }
-
-  /**
-   * Used internally to move from function to function
-   * @private
-   */
-  next() {
-    if (this.items.length) {
-      this.working = true;
-      let next = this.items.shift();
-      let current = wait(next());
-      this.current = current;
-      current.then((out) => {
-        next.resolve(out);
-        this.next();
-      }).catch((reason) => {
-        if (next.reject(reason)) this.next();
-      });
-    } else {
-      this.working = false;
-    }
-  }
-}
+const Queue = require('./Queue.js');
 
 class ActionBatch {
   constructor(datastore, actions = []) {
@@ -168,7 +118,7 @@ class Datastore {
     this.path = path;
     this.options = mergeDefault(Datastore.defaultOptions, options);
     this.ready = false;
-    this.sequencer = new Sequencer();
+    this.queue = new Queue();
 
     if (this.options.persistence)
       this.persistentState = null;
@@ -186,7 +136,7 @@ class Datastore {
     if (this.ready) throw new Error('Already Initialized');
 
     if (!exists(this.path)) {
-      await this.sequencer.push(async () => {
+      await this.queue.push(async () => {
         await write(
           this.path,
           stringifyJSON(this.options.defaultData, this.options.compact)
@@ -195,7 +145,7 @@ class Datastore {
     }
 
     if (this.options.persistence) {
-      await this.sequencer.push(async () => {
+      await this.queue.push(async () => {
         let data = await this.resolveDataWrite(true);
         this.persistentState = get(data);
       });
@@ -210,7 +160,7 @@ class Datastore {
    * @param {String|Array} path The string path to the property
    */
   get(path) {
-    return this.sequencer.push(async () => {
+    return this.queue.push(async () => {
       let data = await this.resolveDataWrite();
       return get(data, path);
     });
@@ -229,7 +179,7 @@ class Datastore {
    * @param {*} value The value to set
    */
   set(path, value) {
-    return this.sequencer.push(async () => {
+    return this.queue.push(async () => {
       let data = await this.resolveData();
       set(data, path, value);
 
@@ -249,7 +199,7 @@ class Datastore {
    * @returns {Boolean}
    */
   has(path) {
-    return this.sequencer.push(async () => {
+    return this.queue.push(async () => {
       let data = await this.resolveDataWrite();
       return has(data, path);
     });
@@ -267,7 +217,7 @@ class Datastore {
    *   the file's data. This function takes one argument, `data`
    */
   edit(callback) {
-    return this.sequencer.push(async () => {
+    return this.queue.push(async () => {
       let data = await this.resolveData();
       callback(data);
 
@@ -288,7 +238,7 @@ class Datastore {
    */
   batch(obj) {
     if (typeof obj === 'function') 
-      return this.sequencer.push(
+      return this.queue.push(
         () => ActionBatch.batchFunction(this, obj)
       );
     return new ActionBatch(obj);
