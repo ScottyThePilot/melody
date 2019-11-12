@@ -1,110 +1,8 @@
-/* jshint esversion: 8, -W014 */
 'use strict';
 const { write, read, exists } = require('./util/fswrapper.js');
+const { get, set, has } = require('./util/mut.js');
+const { mergeDefault } = require('./util/util.js');
 const Queue = require('./Queue.js');
-
-class ActionBatch {
-  constructor(datastore, actions = []) {
-    this.datastore = datastore;
-    this.actions = actions;
-    this.done = false;
-  }
-
-  get(path) {
-    if (this.done) throw new Error();
-    this.actions.push({ type: 'get', path });
-    return this;
-  }
-
-  set(path, value) {
-    if (this.done) throw new Error();
-    this.actions.push({ type: 'set', path, value });
-    return this;
-  }
-
-  has(path) {
-    if (this.done) throw new Error();
-    this.actions.push({ type: 'has', path });
-    return this;
-  }
-
-  edit(callback) {
-    if (this.done) throw new Error();
-    this.actions.push({ type: 'edit', callback });
-    return this;
-  }
-
-  async go() {
-    return this.datastore.sequencer.push(async () => {
-      const ds = this.datastore;
-      let data = await ds.resolveData(Symbol.for('wipe'));
-      let shouldWrite = data === Symbol.for('wipe');
-
-      if (shouldWrite) data = deepClone(ds.options.defaultData);
-
-      const operations = {
-        get(action) {
-          return get(data, action.path);
-        },
-        set(action) {
-          shouldWrite = true;
-          return set(data, action.path, action.value);
-        },
-        has(action) {
-          return has(data, action.path);
-        },
-        edit(action) {
-          shouldWrite = true;
-          return action.callback(data);
-        }
-      };
-
-      this.actions.forEach((action) => operations[action.type](action));
-
-      if (shouldWrite) {
-        await write(
-          ds.path,
-          stringifyJSON(data, ds.options.compact)
-        );
-      }
-
-      return data;
-    });
-  }
-
-  static async batchFunction(ds, fn) {
-    let data = await ds.resolveData(Symbol.for('wipe'));
-    let shouldWrite = data === Symbol.for('wipe');
-
-    if (shouldWrite) data = deepClone(ds.options.defaultData);
-
-    await fn({
-      get(path) {
-        return get(data, path);
-      },
-      set(path, value) {
-        shouldWrite = true;
-        return set(data, path, value);
-      },
-      has(path) {
-        return has(data, path);
-      },
-      edit(callback) {
-        shouldWrite = true;
-        return callback(data);
-      }
-    });
-
-    if (shouldWrite) {
-      await write(
-        ds.path,
-        stringifyJSON(data, ds.options.compact)
-      );
-    }
-
-    return data;
-  }
-}
 
 const noPersistenceError = 'Persistence is not enabled';
 
@@ -231,20 +129,6 @@ class Datastore {
   }
 
   /**
-   * Allows you to execute multiple operations on a datastore without 
-   * extra read and write operations.
-   * @param {Array|Function} obj 
-   * @returns {ActionBatch}
-   */
-  batch(obj) {
-    if (typeof obj === 'function') 
-      return this.queue.push(
-        () => ActionBatch.batchFunction(this, obj)
-      );
-    return new ActionBatch(obj);
-  }
-
-  /**
    * Retrieves data from the file, overwriting it if it is corrupt.
    * @private
    */
@@ -290,29 +174,11 @@ Datastore.defaultOptions = {
 
 module.exports = Datastore;
 
-function mergeDefault(def, given) {
-  if (!given) return def;
-  for (const key in def) {
-    if (!{}.hasOwnProperty.call(given, key)) {
-      given[key] = def[key];
-    } else if (given[key] === Object(given[key])) {
-      given[key] = mergeDefault(def[key], given[key]);
-    }
-  }
-
-  return given;
-}
-
-function wait(val) {
-  return val instanceof Promise ? val : Promise.resolve(val);
-}
-
 function tryParseJSON(str, def) {
   try {
     return JSON.parse(str);
   } catch (e) {
-    if (typeof def === 'function') def();
-    return def;
+    return typeof def === 'function' ? def() : def;
   }
 }
 
@@ -333,67 +199,4 @@ function deepClone(obj) {
   }
 
   return obj;
-}
-
-function validate(obj, path) {
-  if (obj === null || obj === undefined) throw new Error('Invalid Object: ' + obj);
-  if (path === undefined || !(Array.isArray(path) ? path : '' + path).length)
-    return null;
-  const a = Array.isArray(path)
-    ? path
-    : path
-      .replace(/\[(\w+)\]/g, '.$1')
-      .replace(/^\./, '')
-      .split('.');
-  if (a.some(key => !/^(?:[0-9]|[a-zA-Z_$][a-zA-Z_$0-9\-]*)$/.test(key)))
-    throw new Error('Invalid Path');
-  return a;
-}
-
-function get(obj, path) {
-  const a = validate(obj, path);
-  if (a === null) return obj;
-
-  for (let key of a) {
-    if (key in obj) {
-      obj = obj[key];
-    } else {
-      return;
-    }
-  }
-
-  return obj;
-}
-
-function set(obj, path, value) {
-  const a = validate(obj, path);
-  if (a === null) return;
-
-  while (a.length > 1) {
-    let key = a.shift();
-    let v = obj[key];
-    obj = obj[key] =
-      typeof v === 'object' && v !== null
-        ? v
-        : isNaN(a[0])
-          ? {}
-          : [];
-  }
-
-  obj[a[0]] = value;
-}
-
-function has(obj, path) {
-  const a = validate(obj, path);
-  if (a === null) return true;
-
-  for (let key of a) {
-    if (key in obj) {
-      obj = obj[key];
-    } else {
-      return false;
-    }
-  }
-
-  return true;
 }
