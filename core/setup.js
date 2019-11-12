@@ -1,6 +1,7 @@
 'use strict';
 const config = require('./config.json');
 const util = require('./modules/util/util.js');
+const path = require('path');
 const { scheduleJob } = require('node-schedule');
 const Blacklist = require('./subfunctions/Blacklist.js');
 const CleverBotAgent = require('./subfunctions/CleverBotAgent.js');
@@ -22,7 +23,7 @@ const activities = [
 
 module.exports = async function setup(melody) {
   // Subfunctions
-  melody.blacklist = new Blacklist(melody.paths.data);
+  melody.blacklist = new Blacklist(path.join(melody.paths.data, 'blacklist.json'));
   melody.cleverbot = new CleverBotAgent(30);
 
   // Scheduled Jobs
