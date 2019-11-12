@@ -1,7 +1,7 @@
 'use strict';
 const Bot = require('./modules/Bot.js');
 const config = require('./config.json');
-const botEvents = require('./botEvents.js');
+const events = require('./events.js');
 const setup = require('./setup.js');
 const util = require('./modules/util/util.js');
 
@@ -9,6 +9,7 @@ const util = require('./modules/util/util.js');
 process.on('unhandledRejection', (reason) => {
   throw reason;
 });
+
 
 
 const melody = new Bot({
@@ -65,6 +66,7 @@ melody.on('ready', () => {
 });
 
 
+
 melody.on('guildCreate', async (guild) => {
   melody.log('INFO', `Guild Found: ${util.logifyGuild(guild)}`);
   await melody.loadGuild(guild.id);
@@ -78,12 +80,13 @@ melody.on('guildDelete', async (guild) => {
 });
 
 
+
 melody.on('message', async (message) => {
   // Log message and continue
   if (message.guild) {
     let manager = melody.guildManagers.get(message.guild.id);
     if (manager.configdb.getSync('logMessages')) {
-      botEvents.onMessage(message, manager);
+      events.onMessage(message, manager);
     }
   }
 
@@ -150,12 +153,13 @@ melody.on('message', async (message) => {
 });
 
 
+
 melody.on('guildMemberAdd', async (member) => {
-  botEvents.onGuildMemberAdd(member, melody.guildManagers.get(member.guild.id));
+  events.onGuildMemberAdd(member, melody.guildManagers.get(member.guild.id));
 });
 
 melody.on('guildMemberRemove', async (member) => {
-  botEvents.onGuildMemberRemove(member, melody.guildManagers.get(member.guild.id));
+  events.onGuildMemberRemove(member, melody.guildManagers.get(member.guild.id));
 });
 
 melody.on('messageUpdate', async (oldMessage, newMessage) => {
@@ -163,7 +167,7 @@ melody.on('messageUpdate', async (oldMessage, newMessage) => {
   if (guild) {
     let manager = melody.guildManagers.get(guild.id);
     if (manager.configdb.getSync('logMessageChanges')) {
-      botEvents.onMessageUpdate(oldMessage, newMessage, manager);
+      events.onMessageUpdate(oldMessage, newMessage, manager);
     }
   }
 });
@@ -173,7 +177,7 @@ melody.on('messageDelete', async (message) => {
   if (guild) {
     let manager = melody.guildManagers.get(guild.id);
     if (manager.configdb.getSync('logMessageChanges')) {
-      botEvents.onMessageDelete(message, manager);
+      events.onMessageDelete(message, manager);
     }
   }
 });
@@ -183,10 +187,11 @@ melody.on('messageDeleteBulk', async (messages) => {
   if (guild) {
     let manager = melody.guildManagers.get(guild.id);
     if (manager.configdb.getSync('logMessageChanges')) {
-      botEvents.onMessageDeleteBulk(messages, manager);
+      events.onMessageDeleteBulk(messages, manager);
     }
   }
 });
+
 
 
 melody.client.on('error', (err) => {
@@ -202,13 +207,14 @@ melody.client.on('warn', (warn) => {
   melody.log('WARN', warn);
 });
 
-melody.client.on('debug', (info) => {
+/*melody.client.on('debug', (info) => {
   if (info.startsWith('[ws] [connection] Sending a heartbeat')) return;
   if (info.startsWith('[ws] [connection] Heartbeat acknowledged, latency of')) return;
   if (info.startsWith('READY')) info = 'READY';
   if (info.startsWith('Authenticated using token')) info = 'Authenticated';
   melody.log('DEBUG', 'DiscordDebugInfo: ' + info);
-});
+});*/
+
 
 
 melody.client.on('resume', () => {
@@ -221,12 +227,16 @@ melody.client.on('reconnecting', () => {
 
 melody.client.on('disconnect', (event) => {
   melody.log('INFO', `WebSocket disconnected (${event.code})`, event.reason);
-  process.exit(0);
+  melody.destroy().then(() => {
+    process.exit(0);
+  });
 });
 
 melody.init().then(() => {
   melody.login().catch(() => {
     melody.log('INFO', 'Unable to log in');
-    process.exit(0);
+    melody.logger.end().then(() => {
+      process.exit(0);
+    });
   });
 });

@@ -56,7 +56,7 @@ function dailyReportJob(melody) {
   if (melody.client.status === 0) {
     const owner = melody.client.users.get(config.ownerID);
     const msgText = `**Daily Report:**\nAverage Ping: \`${ping}\`\nAverage Resident Set Size: \`${rss}\`\nAverage Heap Total: \`${heapTotal}\`\nAverage Heap Used: \`${heapUsed}\``;
-    owner.send(msgText);
+    owner.send(msgText).catch();
   }
 
   melody.log(
