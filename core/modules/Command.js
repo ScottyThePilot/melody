@@ -1,7 +1,7 @@
 'use strict';
 const config = require('../config.json');
 const util = require('./util/util.js');
-
+const Result = require('./Result.js');
 
 class Command {
   constructor(options) {
@@ -22,8 +22,7 @@ class Command {
     let plugins = bundle.manager ? bundle.manager.configdb.getSync('plugins') : Command.pluginsDM;
 
     // Exit silently if this command's plugin is not enabled in the given server
-    // 0xe0: Ignored: [Command not on plugin list]
-    if (!plugins.includes(this.plugin) && this.plugin !== 'owner') return 0xe0;
+    if (!plugins.includes(this.plugin) && this.plugin !== 'owner') return new Result.Err('no_command');
 
     // Clone bundle and insert userLevel
     let newBundle = Object.assign({
@@ -43,8 +42,7 @@ class Command {
 
       await newBundle.message.channel.send('That command is disabled.').catch(msgFailCatcher);
 
-      // 0xf0: Rejected [Command Disabled]
-      return 0xf0;
+      return new Result.Err('disabled');
     } else if (!this.inGuild && newBundle.message.guild) {
       logger.log(
         'USER',
@@ -54,8 +52,7 @@ class Command {
 
       await newBundle.message.channel.send('You cannot use this command in a Guild, try it in DM.').catch(msgFailCatcher);
 
-      // 0xf1: Rejected [Command is Dissallowed in Guild]
-      return 0xf1;
+      return new Result.Err('no_guild');
     } else if (!this.inDM && !newBundle.message.guild) {
       logger.log(
         'USER',
@@ -65,8 +62,7 @@ class Command {
 
       await newBundle.message.channel.send('You cannot use this command in DM, try it in a Guild.').catch(msgFailCatcher);
 
-      // 0xf2: Rejected [Command is Dissallowed in DM]
-      return 0xf2;
+      return new Result.Err('no_dm');
     } else if (this.level > newBundle.userLevel) {
       logger.log(
         'USER',
@@ -76,15 +72,13 @@ class Command {
 
       await newBundle.message.channel.send('You do not have permission to do that.').catch(msgFailCatcher);
 
-      // 0xf3: Rejected [Insufficient Permissions]
-      return 0xf3;
+      return new Result.Err('no_perm');
     } else {
       logger.log('USER', `Running Command ${this.name} for user ${util.logifyUser(newBundle.message.author)}`);
 
       await this.run(newBundle);
 
-      // 0xd0: Accepted
-      return 0xd0;
+      return new Result.Ok();
     }
   }
 

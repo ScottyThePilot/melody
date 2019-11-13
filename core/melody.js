@@ -149,7 +149,7 @@ melody.on('message', async (message) => {
   // Attempt command
   const result = await found.attempt(bundle, melody.logger);
 
-  if (result === 0xd0) melody.analytics.commands ++;
+  if (result.ok) melody.analytics.commands ++;
 });
 
 
