@@ -108,7 +108,7 @@ melody.on('message', async (message) => {
 
     message.channel.startTyping();
 
-    const response = await melody.cleverbot.getResponse(msg, message.channel.id).catch((err) => {
+    const response = await melody.cleverBot.getResponse(msg, message.channel.id).catch((err) => {
       melody.log('WARN', 'Error while Communicating with CleverBot API: ' + err);
       return 'There was an error while Communicating with the CleverBot API.';
     });

@@ -5,6 +5,7 @@ const path = require('path');
 const { scheduleJob } = require('node-schedule');
 const Blacklist = require('./subfunctions/Blacklist.js');
 const CleverBotAgent = require('./subfunctions/CleverBotAgent.js');
+const ConnectFourAgent = require('./subfunctions/ConnectFourAgent.js');
 
 const activities = [
   { type: 'WATCHING', name: 'over {server_count} servers' },
@@ -22,9 +23,15 @@ const activities = [
 ];
 
 module.exports = async function setup(melody) {
+  const blacklistPath = path.join(melody.paths.data, 'blacklist.json');
+  const connectFourPath = path.join(melody.paths.data, 'connect_four.json');
+
   // Subfunctions
-  melody.blacklist = new Blacklist(path.join(melody.paths.data, 'blacklist.json'));
-  melody.cleverbot = new CleverBotAgent(30);
+  melody.blacklist = new Blacklist(blacklistPath);
+  melody.cleverBot = new CleverBotAgent(30);
+  melody.connectFour = new ConnectFourAgent(connectFourPath);
+
+  const cfInit = melody.connectFour.init();
 
   // Scheduled Jobs
   melody.analytics = {
@@ -44,6 +51,8 @@ module.exports = async function setup(melody) {
     checkLogRotation: scheduleJob('* */2 * * *', () => checkLogRotationJob(melody)),
     collectAnalytics: scheduleJob('*/10 * * * *', () => collectAnalyticsJob(melody))
   };
+
+  await cfInit;
 };
 
 // Daily report sent at 8:30 each day

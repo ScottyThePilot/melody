@@ -114,7 +114,7 @@ class Command {
 }
 
 Command.pluginsDM = ['general', 'core'];
-Command.pluginsAll = ['general', 'core', 'owner'];
+Command.pluginsAll = ['general', 'core', 'owner', 'fun'];
 Command.defaultOptions = {
   name: 'default',
   disabled: false,
