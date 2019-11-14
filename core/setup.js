@@ -31,8 +31,6 @@ module.exports = async function setup(melody) {
   melody.cleverBot = new CleverBotAgent(30);
   melody.connectFour = new ConnectFourAgent(connectFourPath);
 
-  const cfInit = melody.connectFour.init();
-
   // Scheduled Jobs
   melody.analytics = {
     messages: 0,
@@ -51,8 +49,6 @@ module.exports = async function setup(melody) {
     checkLogRotation: scheduleJob('* */2 * * *', () => checkLogRotationJob(melody)),
     collectAnalytics: scheduleJob('*/10 * * * *', () => collectAnalyticsJob(melody))
   };
-
-  await cfInit;
 };
 
 // Daily report sent at 8:30 each day

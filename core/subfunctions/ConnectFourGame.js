@@ -2,10 +2,6 @@
 const Result = require('../modules/Result.js');
 
 class ConnectFourGame {
-  static create(playerA, playerB) {
-    return new ConnectFourGame(playerA, playerB, fill(42), 2, new Date());
-  }
-
   constructor(playerA, playerB, state = fill(42), turn = 2, lastActive = new Date()) {
     this.playerA = playerA;
     this.playerB = playerB;
@@ -56,10 +52,6 @@ class ConnectFourGame {
   toJSON() {
     const state = encode(this.state.join(''));
     return { ...this, state };
-  }
-
-  static blankState() {
-    return fill(42);
   }
 
   static from(raw) {

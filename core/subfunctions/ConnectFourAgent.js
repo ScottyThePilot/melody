@@ -1,34 +1,37 @@
 'use strict';
 const Lazystore = require('../modules/Lazystore.js');
+const Queue = require('../modules/Queue.js');
 const ConnectFourGame = require('./ConnectFourGame.js');
 
-class ConnectFourAgent extends Lazystore {
+class ConnectFourAgent {
   constructor(location) {
-    super(location, {
+    this.lb = new Lazystore(location, {
       defaultData: []
+    });
+    this.queue = new Queue();
+    
+    this.queue.push(() => {
+      return this.lb.init().then(() => {
+        for (let i = 0; i < this.lb.state.length; i ++)
+          this.lb.state[i] = ConnectFourGame.from(this.lb.state[i]);
+      });
     });
   }
 
-  
+  createGame(playerA, playerB) {
+    this.lb.state.push(new ConnectFourGame(playerA, playerB));
+    this.lb.touch();
+  }
 
-  async init() {
-    await super.init();
-    for (let i = 0; i < this.state.length; i ++)
-      this.state[i] = ConnectFourGame.from(this.state[i]);
+  write() {
+    return this.queue.pushPromise(() => this.lb.write());
+  }
+
+  find(player) {
+    for (let game of this.lb.state)
+      if (game.hasPlayer(player)) return game;
+    return null;
   }
 }
 
-ConnectFourAgent.prototype.get = undefined;
-ConnectFourAgent.prototype.set = undefined;
-ConnectFourAgent.prototype.has = undefined;
-
 module.exports = ConnectFourAgent;
-
-/*
-user1 challenges user2
-  if user2 has a pending challenge for user1
-    create a game between user1 and user2
-    user2 goes first
-  else
-    add a pending challenge
-*/

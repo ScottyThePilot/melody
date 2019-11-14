@@ -1,6 +1,6 @@
 {
   "-W014": true,
-  "esversion": 8,
+  "esversion": 9,
   "camelcase": true,
   "curly": false,
   "eqeqeq": true,
