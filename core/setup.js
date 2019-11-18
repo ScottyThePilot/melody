@@ -3,6 +3,7 @@ const config = require('./config.json');
 const util = require('./modules/util/util.js');
 const path = require('path');
 const { scheduleJob } = require('node-schedule');
+const Communicator = require('./structures/Communicator.js');
 const Blacklist = require('./subfunctions/Blacklist.js');
 const CleverBotAgent = require('./subfunctions/CleverBotAgent.js');
 const ConnectFourAgent = require('./subfunctions/ConnectFourAgent.js');
@@ -30,6 +31,7 @@ module.exports = async function setup(melody) {
   melody.blacklist = new Blacklist(blacklistPath);
   melody.cleverBot = new CleverBotAgent(30);
   melody.connectFour = new ConnectFourAgent(connectFourPath);
+  melody.comm = new Communicator(process);
 
   // Scheduled Jobs
   melody.analytics = {
