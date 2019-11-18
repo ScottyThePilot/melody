@@ -82,7 +82,7 @@ module.exports = new Command({
         embed.addField('Example', '\`' + cmd.help.example + '\`', true);
         embed.addField('Aliases', aliases);
         embed.addField('Plugin', '\`' + cmd.plugin.toUpperCase() + '\`');
-        embed.addField('Permissions', permissions[cmd.level] || this.permissions || 'Custom');
+        embed.addField('Permissions', cmd.help.perms || permissions[cmd.level] || 'Custom');
 
         await message.channel.send(embed).catch(msgFailCatcher);
       } else {
