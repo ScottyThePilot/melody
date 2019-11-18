@@ -113,13 +113,21 @@ class Command {
   }
 }
 
-Command.pluginsDM = ['general', 'core'];
-Command.pluginsAll = ['general', 'core', 'owner', 'fun'];
+Command.pluginDefaults = {
+  core: true,
+  owner: true,
+  moderation: true,
+  fun: true
+};
+
+Command.pluginsAll = ['core', 'owner', 'moderation', 'fun'];
+Command.pluginsDM = ['core', 'moderation', 'fun'];
+
 Command.defaultOptions = {
   name: 'default',
   disabled: false,
   level: 0,
-  plugin: 'general',
+  plugin: 'core',
   help: {
     short: '',
     long: '',

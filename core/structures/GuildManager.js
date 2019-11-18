@@ -2,6 +2,7 @@
 const path = require('path');
 const { mkdir, exists } = require('../modules/fswrapper.js');
 const Datastore = require('./Datastore.js');
+const Command = require('./Command.js');
 const Logger = require('./Logger.js');
 
 class GuildManager {
@@ -47,7 +48,7 @@ class GuildManager {
 }
 
 GuildManager.defaultConfig = {
-  plugins: ['core', 'general'],
+  plugins: Command.pluginDefaults,
   logMessages: false,
   logMessageChanges: false
 };

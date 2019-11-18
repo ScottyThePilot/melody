@@ -192,27 +192,6 @@ function userOwnsAGuild(user, client) {
   return client.guilds.some((guild) => guild.owner.id === user.id);
 }
 
-function fuzzysearch(needle, haystack) {
-  var hlen = haystack.length;
-  var nlen = needle.length;
-  if (nlen > hlen) {
-    return false;
-  }
-  if (nlen === hlen) {
-    return needle === haystack;
-  }
-  outer: for (var i = 0, j = 0; i < nlen; i ++) {
-    var nch = needle.charCodeAt(i);
-    while (j < hlen) {
-      if (haystack.charCodeAt(j ++) === nch) {
-        continue outer;
-      }
-    }
-    return false;
-  }
-  return true;
-}
-
 function decancer(str) {
   if (str === void 0 || str === null) return str;
   return Array.from(str.toString().normalize()).map((char) => {
@@ -225,21 +204,6 @@ function decancer(str) {
     if (charmap.hasOwnProperty(p)) return charmap[p];
     return '';
   }).join('');
-}
-
-function getLifetime() {
-  process.send({
-    head: 'info.lifetime',
-    type: 'request'
-  });
-
-  return new Promise(function (resolve) {
-    process.on('message', function handler(message) {
-      if (message.head === 'info.lifetime' && message.type === 'response') {
-        resolve(message.data);
-      }
-    });
-  });
 }
 
 
@@ -277,8 +241,5 @@ module.exports = {
   resolveRole,
 
   userOwnsAGuild,
-  fuzzysearch,
-  decancer,
-
-  getLifetime
+  decancer
 };
