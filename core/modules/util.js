@@ -1,6 +1,6 @@
 'use strict';
 const moment = require('moment');
-const charmap = require('./charmap.json');
+const charmap = require('../static/charmap.json');
 
 function shuffle(array) {
   if (!Array.isArray(array)) throw new TypeError('Expected an array');

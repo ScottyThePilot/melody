@@ -1,7 +1,7 @@
 'use strict';
-const { write, read, exists } = require('./util/fswrapper.js');
-const { get, set, has } = require('./util/mut.js');
-const { mergeDefault } = require('./util/util.js');
+const { write, read, exists } = require('../modules/fswrapper.js');
+const { get, set, has } = require('../modules/mut.js');
+const { mergeDefault } = require('../modules/util.js');
 
 class Lazystore {
   constructor(path, options) {

@@ -4,7 +4,7 @@
 
 const https = require('https');
 const Queue = require('./Queue.js');
-const md5 = require('./util/cbmd5.js');
+const md5 = require('../modules/cbmd5.js');
 
 class CleverChannel {
   constructor(historyLength = 30) {

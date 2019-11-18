@@ -1,8 +1,8 @@
 'use strict';
 const { createWriteStream } = require('fs');
 const path = require('path');
-const { write, read, mkdir, stat, exists } = require('./util/fswrapper.js');
-const util = require('./util/util.js');
+const { write, read, mkdir, stat, exists } = require('../modules/fswrapper.js');
+const util = require('../modules/util.js');
 
 class Logger {
   constructor(p, options = {}) {

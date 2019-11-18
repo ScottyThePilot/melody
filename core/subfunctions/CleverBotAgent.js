@@ -1,5 +1,5 @@
 'use strict';
-const CleverChannel = require('../modules/CleverChannel.js');
+const CleverChannel = require('../structures/CleverChannel.js');
 
 class CleverBotAgent {
   constructor(historyLength) {

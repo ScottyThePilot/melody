@@ -1,8 +1,8 @@
 'use strict';
-const Command = require('../modules/Command.js');
+const Command = require('../structures/Command.js');
 const config = require('../config.json');
-const util = require('../modules/util/util.js');
-const Result = require('../modules/Result.js');
+const util = require('../modules/util.js');
+const Result = require('../structures/Result.js');
 
 const {
   CFG_INVALID_SUBCOMMAND,

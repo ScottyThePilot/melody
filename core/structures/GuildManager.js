@@ -1,6 +1,6 @@
 'use strict';
 const path = require('path');
-const { mkdir, exists } = require('./util/fswrapper.js');
+const { mkdir, exists } = require('../modules/fswrapper.js');
 const Datastore = require('./Datastore.js');
 const Logger = require('./Logger.js');
 

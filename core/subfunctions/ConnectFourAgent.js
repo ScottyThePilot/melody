@@ -1,6 +1,6 @@
 'use strict';
-const Lazystore = require('../modules/Lazystore.js');
-const Queue = require('../modules/Queue.js');
+const Lazystore = require('../structures/Lazystore.js');
+const Queue = require('../structures/Queue.js');
 const ConnectFourGame = require('./ConnectFourGame.js');
 
 class ConnectFourAgent {

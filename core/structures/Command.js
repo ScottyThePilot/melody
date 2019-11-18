@@ -1,6 +1,6 @@
 'use strict';
 const config = require('../config.json');
-const util = require('./util/util.js');
+const util = require('../modules/util.js');
 const Result = require('./Result.js');
 
 class Command {

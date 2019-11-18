@@ -1,7 +1,7 @@
 'use strict';
-const Command = require('../modules/Command.js');
+const Command = require('../structures/Command.js');
 const config = require('../config.json');
-const util = require('../modules/util/util.js');
+const util = require('../modules/util.js');
 
 const challengeMessage = 'has challenged you to a game of connect four. Click the appropriate reaction below to accept or dismiss.';
 

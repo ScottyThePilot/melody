@@ -3,8 +3,8 @@ const Discord = require('discord.js');
 const Logger = require('./Logger.js');
 const GuildManager = require('./GuildManager.js');
 const Command = require('./Command.js');
-const { exists, mkdir, readdir } = require('./util/fswrapper.js');
-const util = require('./util/util.js');
+const { exists, mkdir, readdir } = require('../modules/fswrapper.js');
+const util = require('../modules/util.js');
 const path = require('path');
 
 class Bot {

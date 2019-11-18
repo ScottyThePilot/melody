@@ -1,5 +1,5 @@
 'use strict';
-const Datastore = require('../modules/Datastore.js');
+const Datastore = require('../structures/Datastore.js');
 
 class Blacklist {
   constructor(location) {

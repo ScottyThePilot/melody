@@ -1,5 +1,5 @@
 'use strict';
-const Result = require('../modules/Result.js');
+const Result = require('../structures/Result.js');
 
 class ConnectFourGame {
   constructor(playerA, playerB, state = fill(42), turn = 2, lastActive = new Date()) {
