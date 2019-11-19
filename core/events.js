@@ -1,5 +1,5 @@
 'use strict';
-const util = require('./modules/util/util.js');
+const util = require('./modules/util.js');
 
 function onGuildMemberAdd(member, manager) {
   manager.log('LOGGER', `User ${util.logifyUser(member)} added to guild`);

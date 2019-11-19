@@ -24,7 +24,7 @@ module.exports = new Command({
   run: async function ({ melody, message, args, command }) {
     const msgFailCatcher = util.makeCatcher(melody.logger, 'Unable to send message');
 
-    const user = util.resolveUser(args[0], melody.client);
+    const user = util.resolveUserKnown(melody.client, args[0]);
 
     if (!user) {
       await message.channel.send('Please specify a valid user to blacklist or unblacklist.').catch(msgFailCatcher);

@@ -58,7 +58,7 @@ class Bot {
   async buildCommands() {
     if (this.commands.size > 0) throw new Error('Commands already built');
     (await readdir(this.paths.commands)).forEach((fileName) => {
-      const command = require(path.join('../', this.paths.commands, fileName.toString()));
+      const command = require(path.join('../../', this.paths.commands, fileName.toString()));
       if (command instanceof Command) this.commands.set(command.name, command);
     });
   }

@@ -1,6 +1,6 @@
 'use strict';
 const config = require('./config.json');
-const util = require('./modules/util/util.js');
+const util = require('./modules/util.js');
 const path = require('path');
 const { scheduleJob } = require('node-schedule');
 const Communicator = require('./structures/Communicator.js');
@@ -49,7 +49,8 @@ module.exports = async function setup(melody) {
     dailyReport: scheduleJob('30 20 * * *', () => dailyReportJob(melody)),
     cycleActivity: scheduleJob('*/20 * * * * *', () => cycleActivityJob(melody)),
     checkLogRotation: scheduleJob('* */2 * * *', () => checkLogRotationJob(melody)),
-    collectAnalytics: scheduleJob('*/10 * * * *', () => collectAnalyticsJob(melody))
+    collectAnalytics: scheduleJob('*/10 * * * *', () => collectAnalyticsJob(melody)),
+    work: [] // Jobs that have been created
   };
 };
 

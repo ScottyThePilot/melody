@@ -110,6 +110,7 @@ module.exports = new Command({
 });
 
 function getConfigProp(name) {
+  if (!name) return null;
   const clean = name.replace(/[^a-zA-Z]/g, '').toLowerCase();
   for (let key in configProperties) {
     if (key.toLowerCase() === clean) return key;
@@ -147,7 +148,7 @@ function getBoolProp(prop) {
 async function setMutedRole(melody, manager, value) {
   const disable = configNoneList.includes(value.toLowerCase());
   const guild = melody.client.guilds.get(manager.id);
-  const resolved = util.resolveRole(value, guild);
+  const resolved = util.resolveGuildRole(guild, value);
   const valid = disable || resolved !== null;
 
   if (!valid) return new Result.Err('I could not find a valid role with that ID/name.');
@@ -162,5 +163,5 @@ async function setMutedRole(melody, manager, value) {
 function getMutedRole(melody, manager) {
   const value = manager.configdb.getSync('mutedRole');
   const guild = melody.client.guilds.get(manager.id);
-  return formatRole(util.resolveRole(value, guild));
+  return formatRole(util.resolveGuildRole(guild, value));
 }

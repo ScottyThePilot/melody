@@ -2,6 +2,17 @@
 const moment = require('moment');
 const charmap = require('../static/charmap.json');
 
+const rxYear = /\d(?=\s*y(?:ear|r)?s?)/ig;
+const rxWeek = /\d(?=\s*w(?:eek|k)?s?)/ig;
+const rxDay = /\d(?=\s*d(?:ay|y)?s?)/ig;
+const rxHour = /\d(?=\s*h(?:our|r)?s?)/ig;
+const rxMinute = /\d(?=\s*m(?:inute|in)?s?)/ig;
+
+function regexMatch(rx, str) {
+  const match = RegExp.prototype.match.call(rx, str);
+  return match ? match[0] : null;
+}
+
 function shuffle(array) {
   if (!Array.isArray(array)) throw new TypeError('Expected an array');
   var arr = array.slice(0);
@@ -172,20 +183,44 @@ function makeCatcher(logger, msg) {
   return () => logger.log('WARN', msg);
 }
 
-function resolveUser(val, client) {
-  if (!val || typeof val !== 'string' || !val.trim().length) return null;
-  if (client.users.has(val.trim())) return client.users.get(val.trim());
-  const match = val.trim().match(/[0-9]+/);
-  if (!match) return null;
-  return client.users.get(match[0]) || null;
+function resolveUserKnown(client, resolvable) {
+  resolvable = typeof resolvable === 'string' ? resolvable.trim() : null;
+  if (!resolvable) return null;
+  const tagMatch = regexMatch(/.{2,32}#[0-9]{4}/, resolvable);
+  if (tagMatch) {
+    const found = client.users.find((user) => user.tag === tagMatch);
+    if (found) return found;
+  }
+  const idMatch = regexMatch(/[0-9]+/, resolvable);
+  return client.users.get(idMatch) || null;
 }
 
-function resolveRole(val, guild) {
-  if (!val || typeof val !== 'string' || !val.trim().length) return null;
-  if (guild.roles.has(val.trim())) return guild.roles.get(val.trim());
-  const match = val.trim().match(/[0-9]+/);
-  if (!match) return null;
-  return guild.roles.get(match[0]) || null;
+function resolveGuildMember(guild, resolvable) {
+  const found = resolveUserKnown(guild.client, resolvable);
+  if (!found) return null;
+  return guild.members.get(found.id) || null;
+}
+
+function resolveGuildRole(guild, resolvable) {
+  resolvable = typeof resolvable === 'string' ? resolvable.trim() : null;
+  if (!resolvable) return null;
+  const idMatch = regexMatch(/[0-9]+/, resolvable);
+  return guild.roles.get(idMatch) || null;
+}
+
+function parseFuture(str) {
+  if (!str || typeof str !== 'string') return null;
+  try {
+    let time = moment();
+    str.replace(rxYear, (v) => void time.add(+v, 'years'));
+    str.replace(rxWeek, (v) => void time.add(+v, 'weeks'));
+    str.replace(rxDay, (v) => void time.add(+v, 'days'));
+    str.replace(rxHour, (v) => void time.add(+v, 'hours'));
+    str.replace(rxMinute, (v) => void time.add(+v, 'minutes'));
+    return time.toDate();
+  } catch (e) {
+    return null;
+  }
 }
 
 function userOwnsAGuild(user, client) {
@@ -208,6 +243,7 @@ function decancer(str) {
 
 
 module.exports = {
+  regexMatch,
   shuffle,
   mergeDefault,
   average,
@@ -237,8 +273,11 @@ module.exports = {
 
   makeCatcher,
 
-  resolveUser,
-  resolveRole,
+  resolveUserKnown,
+  resolveGuildMember,
+  resolveGuildRole,
+
+  parseFuture,
 
   userOwnsAGuild,
   decancer

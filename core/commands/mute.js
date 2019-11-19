@@ -1,31 +1,27 @@
-'use strict'; /*
+'use strict';
 const Command = require('../structures/Command.js');
 const config = require('../config.json');
 const util = require('../modules/util.js');
 
 module.exports = new Command({
   name: 'mute',
-  level: 3,
+  level: 0,
   plugin: 'moderation',
   help: {
-    short: 'Blacklists a user.',
-    long: 'Puts a user on the bot\'s blacklist, making the bot ignore them. If the second argument is omitted, it defaults to \`\'add\'\`',
-    usage: `${config.prefix}blacklist <@mention|user id> [\'add\'|\'remove\']`,
-    example: `${config.prefix}blacklist @Scotty#4263 add`
+    short: 'Mutes a user.',
+    long: `Gives a user the current server\'s muted role. Make sure to set up your server\'s muted role with \`${config.prefix}configure set mutedRole <role id>\`.`,
+    usage: `${config.prefix}mute <@mention|user id> [duration]`,
+    example: `${config.prefix}mute @User#0000 1 day`
   },
-  aliases: ['unblacklist'],
-  run: async function ({ melody, message, args }) {
-    
+  inDM: false,
+  aliases: ['unmute'],
+  run: async function ({ melody, message, args, command }) {
+    const msgFailCatcher = util.makeCatcher(melody.logger, 'Unable to send message');
+
+    if (command === 'mute') {
+
+    } else {
+      
+    }
   }
 });
-
-
-function findRoleByName(roles, name, count = 5) {
-  let clean = ('' + name).trim();
-  let targetName = util.decancer(clean);
-  return [...roles.values()].filter((role) => {
-    let roleName = util.decancer(role.name);
-    return clean === role.name.trim() ||
-      util.fuzzysearch(targetName, roleName);
-  }).slice(0, count);
-}*/

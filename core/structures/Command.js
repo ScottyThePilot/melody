@@ -19,7 +19,7 @@ class Command {
 
   async attempt(bundle, logger) {
     let isTrusted = [config.ownerID, ...config.trustedUsers].includes(bundle.message.author.id);
-    let plugins = bundle.manager ? bundle.manager.configdb.getSync('plugins') : Command.pluginsDM;
+    let plugins = bundle.manager ? Command.getPlugins(bundle.manager.configdb.getSync('plugins')) : Command.pluginsDM;
 
     // Exit silently if this command's plugin is not enabled in the given server
     if (!plugins.includes(this.plugin) && this.plugin !== 'owner') return new Result.Err('no_command');
@@ -110,6 +110,14 @@ class Command {
     // 10: Bot Owner
 
     return userLevel;
+  }
+
+  static getPlugins(pluginMap) {
+    let plugins = [];
+    for (let plugin in pluginMap) {
+      if (pluginMap[plugin]) plugins.push(plugin);
+    }
+    return plugins;
   }
 }
 

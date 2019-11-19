@@ -1,9 +1,9 @@
 'use strict';
-const Bot = require('./modules/Bot.js');
+const Bot = require('./structures/Bot.js');
 const config = require('./config.json');
 const events = require('./events.js');
 const setup = require('./setup.js');
-const util = require('./modules/util/util.js');
+const util = require('./modules/util.js');
 
 // Crash when a promise rejection goes unhandled
 process.on('unhandledRejection', (reason) => {

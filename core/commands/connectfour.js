@@ -1,4 +1,4 @@
-'use strict';
+'use strict';/*
 const Command = require('../structures/Command.js');
 const config = require('../config.json');
 const util = require('../modules/util.js');
@@ -44,13 +44,8 @@ module.exports = new Command({
 });
 
 function where(userResolvable, client, message) {
-  const user = util.resolveUser(userResolvable, client);
+  const user = util.resolveUserKnown(client, userResolvable);
   const here = user ? message.guild && message.guild.users.has(user.id) : false;
   return { user, here };
 }
-
-/* sending a challenge
-if in dm or player not in server
-  send challenge to other player's dm
-else 
 */
