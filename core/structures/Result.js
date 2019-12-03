@@ -8,6 +8,21 @@ class Result {
   get err() {
     return this instanceof Result.Err;
   }
+
+  map(fn) {
+    if (this.ok) return fn(this.value);
+    return this;
+  }
+
+  unwrapElse(def) {
+    if (this.ok) return this.value;
+    return def;
+  }
+
+  unwrap(error) {
+    if (this.ok) return this.value;
+    throw new Error(this.error || error);
+  }
 }
 
 Result.Ok = class Ok extends Result {
