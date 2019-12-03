@@ -15,7 +15,7 @@ class Communicator extends EventEmitter {
 
   send(head, message) {
     if (!message) throw new Error('Invalid message');
-    message.head = head
+    message.head = head;
     this.process.send(message);
   }
 }
