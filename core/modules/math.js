@@ -153,7 +153,7 @@ function evaluateTokens(tokens) {
       const t = tokens[i];
       if (!includes(g, t)) continue;
       const a = operation(t, tokens[i - 1], tokens[i + 1]);
-      tokens.splice((i --) - 1, 3, a);
+      tokens.splice(i -- - 1, 3, a);
     }
   }
 

@@ -15,8 +15,8 @@ function regexMatch(rx, str) {
 
 function shuffle(array) {
   if (!Array.isArray(array)) throw new TypeError('Expected an array');
-  var arr = array.slice(0);
-  var currentIndex = arr.length, temporaryValue, randomIndex;
+  let arr = array.slice(0);
+  let currentIndex = arr.length, temporaryValue, randomIndex;
 
   while (0 !== currentIndex) {
     randomIndex = Math.floor(Math.random() * currentIndex);
@@ -103,7 +103,7 @@ function logifyGuild(guild) {
 }
 
 function logifyError(err) {
-  var info = err.code && err.path ? err.code + ' ' + err.path : err.code || err.path;
+  let info = err.code && err.path ? err.code + ' ' + err.path : err.code || err.path;
   return `${err.name || 'Error'}: ${err.message}` + (info ? ` (${info})` : '');
 }
 
@@ -232,9 +232,9 @@ function decancer(str) {
   return Array.from(str.toString().normalize()).map((char) => {
     let p = char.codePointAt(0);
     const alphaNumeric = 
-      (p >= 48 && p <= 57) || 
-      (p >= 65 && p <= 90) || 
-      (p >= 97 && p <= 122);
+      p >= 48 && p <= 57 || 
+      p >= 65 && p <= 90 || 
+      p >= 97 && p <= 122;
     if (alphaNumeric) return char.toLowerCase();
     if (charmap.hasOwnProperty(p)) return charmap[p];
     return '';
