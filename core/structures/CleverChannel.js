@@ -7,17 +7,18 @@ const Queue = require('./Queue.js');
 const md5 = require('../modules/cbmd5.js');
 
 class CleverChannel {
-  constructor(historyLength = 30) {
+  constructor(historyLength = 30, queueSizeLimit = 10) {
+    if (queueSizeLimit < 0) queueSizeLimit = Infinity;
+    this.historyLength = historyLength;
+    this.queueSizeLimit = queueSizeLimit;
     this.msgHistory = [];
     this.msgQueue = new Queue();
-    this.historyLength = historyLength;
   }
 
   saveToHistory(msg) {
     this.msgHistory.unshift(msg);
-    while (this.msgHistory.length > this.historyLength) {
+    if (this.msgHistory.length > this.historyLength)
       this.msgHistory.pop();
-    }
   }
 
   clearHistory() {
@@ -36,12 +37,10 @@ class CleverChannel {
     return postbody;
   }
 
-  queue(msg) {
-    return new Promise((resolve, reject) => {
-      this.msgQueue.push(() => {
-        return this.send(msg).then(resolve).catch(reject);
-      });
-    });
+  async queue(msg) {
+    if (this.msgQueue.size >= this.queueSizeLimit) return false;
+    await this.msgQueue.pushPromise(() => this.send(msg));
+    return true;
   }
 
   send(msg) {

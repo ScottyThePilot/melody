@@ -24,6 +24,10 @@ class Queue extends EventEmitter {
     });
   }
 
+  get size() {
+    return this.items.length;
+  }
+
   get next() {
     return this.items[0];
   }
