@@ -19,5 +19,13 @@ module.exports = new Command({
   inDM: false,
   run: async function ({ melody, message }) {
     const msgFailCatcher = util.makeCatcher(melody.logger, 'Unable to send message');
+
+    const hasPermission = message.member.hasPermission('BAN_MEMBERS');
+
+    if (!hasPermission) {
+
+    } else {
+      
+    }
   }
 });
