@@ -65,11 +65,12 @@ class Bot {
 
   async destroy() {
     this.log('INFO', 'Shutting Down...');
-  
-    await util.asyncForEach(this.client.guilds.array(), async (guild) => {
+
+
+    for (let guild of this.client.guilds.values()) {
       await this.unloadGuild(guild.id);
       this.log('DATA', `Guild ${util.logifyGuild(guild)} unloaded`);
-    });
+    }
   
     await this.logger.end();
     
@@ -85,10 +86,10 @@ class Bot {
     return null;
   }
 
-  async getAccessiblePlugins(user) {
+  getAccessiblePlugins(user) {
     let userPlugins = Command.pluginsDM.slice(0);
-  
-    await util.asyncForEach([...this.guildManagers.values()], async (manager) => {
+    
+    for (let manager of this.guildManagers.values()) {
       const guild = this.client.guilds.get(manager.id);
   
       if (!guild.members.has(user.id)) return;
@@ -98,7 +99,7 @@ class Bot {
       plugins.forEach((plugin) => {
         if (!userPlugins.includes(plugin)) userPlugins.push(plugin);
       });
-    });
+    }
   
     return userPlugins;
   }
