@@ -6,7 +6,8 @@ const Result = require('../structures/Result.js');
 
 const {
   CFG_INVALID_SUBCOMMAND,
-  CFG_PROP_DESCRIPTIONS: descriptions
+  CFG_PROP_DESCRIPTIONS: descriptions,
+  BOOLEAN_KEYWORDS: configBoolMap
 } = require('../modules/constants.js');
 
 const invalidSubcommandMessage = util.format(CFG_INVALID_SUBCOMMAND, config.prefix);
@@ -30,27 +31,6 @@ const configProperties = {
 };
 
 const propList = util.listify(Object.keys(configProperties).map((p) => `\`${p}\``));
-
-const configBoolMap = {
-  'true': true,
-  't': true,
-  'false': false,
-  'f': false,
-  'enable': true,
-  'enabled': true,
-  'e': true,
-  'disable': false,
-  'disabled': false,
-  'd': false,
-  'on': true,
-  'off': false,
-  'yes': true,
-  'y': true,
-  'no': false,
-  'n': false,
-  '0': false,
-  '1': true
-};
 
 const configNoneList = ['none', 'null', 'disable', 'disabled'];
 

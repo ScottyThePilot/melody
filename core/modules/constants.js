@@ -28,9 +28,31 @@ const CFG_PROP_DESCRIPTIONS = {
   mutedRole: `If \`mutedRole\` is specified, the \`{0}mute\` command can be used to mute users. ${CFG_MUTE_NOTICE}`
 };
 
+const BOOLEAN_KEYWORDS = {
+  'true': true,
+  't': true,
+  'false': false,
+  'f': false,
+  'enable': true,
+  'enabled': true,
+  'e': true,
+  'disable': false,
+  'disabled': false,
+  'd': false,
+  'on': true,
+  'off': false,
+  'yes': true,
+  'y': true,
+  'no': false,
+  'n': false,
+  '0': false,
+  '1': true
+};
+
 module.exports = {
   MUTE_RESPONSES,
   MUTE_NOTICE,
+  BOOLEAN_KEYWORDS,
   CFG_INVALID_SUBCOMMAND,
   CFG_LOGS_NOTICE,
   CFG_MUTE_NOTICE,
