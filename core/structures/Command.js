@@ -1,7 +1,17 @@
 'use strict';
+const { RichEmbed } = require('discord.js');
 const config = require('../config.json');
 const util = require('../modules/util.js');
 const Result = require('./Result.js');
+
+const permissions = {
+  [-1]: null,
+  [0]: 'Everyone',
+  [1]: 'Server administrators',
+  [2]: 'Server owners',
+  [3]: 'Trusted users',
+  [10]: 'Bot owner'
+};
 
 class Command {
   constructor(options) {
@@ -15,6 +25,7 @@ class Command {
     this.inDM = o.inDM;
     this.inGuild = o.inGuild;
     this.run = o.run;
+    this.embed = Command.getHelpEmbed(this);
   }
 
   async attempt(bundle, logger) {
@@ -80,6 +91,21 @@ class Command {
 
       return new Result.Ok();
     }
+  }
+
+  static getHelpEmbed(command) {
+    const embed = new RichEmbed();
+
+    const aliases = command.aliases.map((a) => `\`${config.prefix}${a}\``).join(', ') || 'None';
+
+    embed.setTitle(util.capFirst(command.name));
+    embed.setDescription(command.help.long);
+    embed.setColor([114, 137, 218]);
+    embed.addField('Usage', '\`' + command.help.usage + '\`');
+    embed.addField('Example', '\`' + command.help.example + '\`', true);
+    embed.addField('Aliases', aliases);
+    embed.addField('Plugin', '\`' + command.plugin.toUpperCase() + '\`');
+    embed.addField('Permissions', command.help.perms || permissions[command.level] || 'Custom');
   }
 
   static getUserLevel(bundle) {
