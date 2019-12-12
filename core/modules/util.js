@@ -64,12 +64,6 @@ function capFirst(str) {
   return ''.charAt.call(str, 0).toUpperCase() + ''.slice.call(str, 1).toLowerCase();
 }
 
-async function asyncForEach(array, callback) {
-  for (let i = 0; i < array.length; i ++) {
-    await callback(array[i], i, array);
-  }
-}
-
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -251,8 +245,6 @@ module.exports = {
   format,
   listify,
   capFirst,
-
-  asyncForEach,
   wait,
 
   logifyDate,

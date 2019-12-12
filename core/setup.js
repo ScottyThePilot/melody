@@ -99,9 +99,9 @@ function cycleActivityJob(melody) {
 // Check log rotation every 2 hours
 async function checkLogRotationJob(melody) {
   await melody.logger.checkRotation();
-  await util.asyncForEach([...melody.guildManagers.values()], async (manager) => {
+  for (let manager of melody.guildManagers.values()) {
     await manager.logger.checkRotation(melody.logger);
-  });
+  }
 }
 
 // Collect analytics data every 10 minutes

@@ -38,10 +38,10 @@ melody.client.once('ready', async () => {
 
   const then = new Date();
 
-  await util.asyncForEach(melody.client.guilds.array(), async (guild) => {
+  for (let guild of melody.client.guilds.values()) {
     await melody.loadGuild(guild.id);
     melody.log('DATA', `Guild ${util.logifyGuild(guild)} loaded`);
-  });
+  }
 
   await melody.buildCommands();
 
