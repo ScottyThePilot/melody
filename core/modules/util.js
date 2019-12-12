@@ -133,6 +133,16 @@ function formatBytes(bytes) {
     : (bytes / 1073741824).toFixed(3) + 'gb';
 }
 
+function formatBigNumber(num) {
+  let [whole, dec] = num.toString().split('.');
+  let out = [];
+  while (whole.length) {
+    out.unshift(whole.slice(-3));
+    whole = whole.slice(0, -3);
+  }
+  return out.join(',') + (dec === undefined ? '' : '.' + dec);
+}
+
 function escape(str) {
   return ('' + str).replace(/["'\\\n\r\u2028\u2029]/g, function (ch) {
     switch (ch) {
@@ -260,6 +270,7 @@ module.exports = {
 
   formatTime,
   formatBytes,
+  formatBigNumber,
   escape,
   cleanContent,
 

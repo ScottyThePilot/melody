@@ -12,6 +12,8 @@ function rand(min, max) {
   return Math.trunc(min + Math.random() * (max - min));
 }
 
+const applyingUpdate = () => `Applying update ${rand(5, 20)} of ${util.formatBigNumber(rand(2000, 3e7))}`;
+
 const activities = [
   { type: 'WATCHING', name: 'over {server_count} servers' },
   { type: 'WATCHING', name: 'over {user_count} users' },
@@ -21,7 +23,7 @@ const activities = [
   { type: 'PLAYING', name: 'for {uptime}' },
   { type: 'PLAYING', name: `in version ${config.version[1]} ${config.version[0]}` },
   { type: 'PLAYING', name: 'Minecraft 2' },
-  { type: 'PLAYING', get name() { return `Applying update ${rand(5, 20)} of ${rand(2000, 3e7)}`; } },
+  { type: 'PLAYING', get name() { return applyingUpdate(); } },
   { type: 'WATCHING', name: 'anime' },
   { type: 'WATCHING', name: 'Scotty\'s lazy ass' },
   { type: 'LISTENING', name: 'existential dread' }
