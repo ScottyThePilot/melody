@@ -38,9 +38,8 @@ class CleverChannel {
   }
 
   async queue(msg) {
-    if (this.msgQueue.size >= this.queueSizeLimit) return false;
-    await this.msgQueue.pushPromise(() => this.send(msg));
-    return true;
+    if (this.msgQueue.size >= this.queueSizeLimit) return null;
+    return await this.msgQueue.pushPromise(() => this.send(msg));
   }
 
   send(msg) {
