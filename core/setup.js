@@ -8,16 +8,20 @@ const Blacklist = require('./subfunctions/Blacklist.js');
 const CleverBotAgent = require('./subfunctions/CleverBotAgent.js');
 const ConnectFourAgent = require('./subfunctions/ConnectFourAgent.js');
 
+function rand(min, max) {
+  return Math.trunc(min + Math.random() * (max - min));
+}
+
 const activities = [
   { type: 'WATCHING', name: 'over {server_count} servers' },
   { type: 'WATCHING', name: 'over {user_count} users' },
   { type: 'PLAYING', name: `use ${config.prefix}help` },
-  //{ type: 'PLAYING', name: '{global_uptime} days without crashing' },
   { type: 'PLAYING', name: 'after {message_count} messages' },
   { type: 'PLAYING', name: 'after {command_count} commands' },
   { type: 'PLAYING', name: 'for {uptime}' },
   { type: 'PLAYING', name: `in version ${config.version[1]} ${config.version[0]}` },
   { type: 'PLAYING', name: 'Minecraft 2' },
+  { type: 'PLAYING', get name() { return `Applying update ${rand(5, 20)} of ${rand(2000, 3e7)}`; } },
   { type: 'WATCHING', name: 'anime' },
   { type: 'WATCHING', name: 'Scotty\'s lazy ass' },
   { type: 'LISTENING', name: 'existential dread' }

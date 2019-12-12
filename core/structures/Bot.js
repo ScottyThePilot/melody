@@ -29,6 +29,11 @@ class Bot {
     this.commands = new Map();
   }
 
+  get mention() {
+    if (!this.ready) return null;
+    return new RegExp(`^<@!?${this.client.user.id}>\\s*`);
+  }
+
   async init() {
     const noExist = !exists(this.paths.data);
     if (noExist) await mkdir(this.paths.data);

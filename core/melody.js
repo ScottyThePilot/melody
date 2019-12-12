@@ -97,32 +97,9 @@ melody.on('message', async (message) => {
 
   const content = message.content.trim();
 
-  // Try to match a ping at the beginning of the message
-  const match = content.match(/^<@!?([0-9]+)>/);
-
-  // Send CleverBot response and exit if the match was a ping and that ping is the bot
-  if (match && match[1] === melody.client.user.id) {
-    const msg = content.slice(match[0].length).trim();
-
-    const msgFailCatcher = util.makeCatcher(melody.logger, 'Unable to send message');
-
-    message.channel.startTyping();
-
-    const response = await melody.cleverBot.getResponse(msg, message.channel.id).catch((err) => {
-      melody.log('WARN', 'Error while Communicating with CleverBot API: ' + err);
-      return 'There was an error while Communicating with the CleverBot API.';
-    });
-
-    message.channel.stopTyping();
-
-    if (!response || !response.trim().length) return;
-
-    await message.channel.send(response, { reply: message.author }).catch(msgFailCatcher);
-    return;
-  }
-
   // Doesn't start with prefix, ignore message
-  if (!content.startsWith(config.prefix)) return;
+  if (!content.startsWith(config.prefix))
+    return await events.onMessageNoCommand(melody, message);
 
   let args = content.slice(config.prefix.length).split(/\s+/g);
   let command = args.shift().toLowerCase();

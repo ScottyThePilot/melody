@@ -6,6 +6,7 @@ const Command = require('./Command.js');
 const Logger = require('./Logger.js');
 
 class GuildManager {
+  // Loads a new GuildManager
   static async load(location, id) {
     await this.mount(location, id);
 
@@ -19,27 +20,49 @@ class GuildManager {
       defaultData: this.defaultConfig,
       persistence: true
     });
+
+    // Try to fill in empty settings to replace missing config properties
+    await this.repairConfigDB(configdb);
     
     return new GuildManager(id, logger, configdb);
-  } // Loads a new GuildManager
-  
+  }
+
+  // Creates the assigned directory if it doesn't exist
   static async mount(location, id) {
     if (!GuildManager.exists(location, id)) await mkdir(path.join(location, id));
-  } // Creates the assigned directory if it doesn't exist
+  }
 
+  // Unloads the GuildManager so it can be safely removed
   async unload() {
     await this.logger.end();
-  } // Unloads the GuildManager so it can be safely removed
+  }
 
+  // Checks whether a guild is stored or not
   static exists(location, id) {
     return exists(path.join(location, id));
-  } // Checks whether a guild is stored or not
+  }
 
   constructor(id, logger, configdb) {
     this.id = id;
     this.logger = logger;
     this.configdb = configdb;
-    this.autoModContext = new Map();
+    //this.autoModContext = new Map();
+  }
+
+  static isIncompleteState(state) {
+    for (let prop in this.defaultConfig)
+      if (!state.hasOwnProperty(prop)) return true;
+    return false;
+  }
+
+  static async repairConfigDB(configdb) {
+    if (!this.isIncompleteState(await configdb.get())) return;
+    await configdb.edit((state) => {
+      console.log('Repairing State');
+      for (let prop in this.defaultConfig)
+        if (!state.hasOwnProperty(prop))
+          state[prop] = this.defaultConfig[prop];
+    });
   }
 
   log(...args) {
@@ -50,7 +73,9 @@ class GuildManager {
 GuildManager.defaultConfig = {
   plugins: Command.pluginDefaults,
   logMessages: false,
-  logMessageChanges: false
+  logMessageChanges: false,
+  mutedRole: null,
+  cleverBotZones: []
 };
 
 module.exports = GuildManager;
