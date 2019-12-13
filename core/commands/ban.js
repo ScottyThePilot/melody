@@ -23,7 +23,7 @@ module.exports = new Command({
     const hasPermission = message.member.hasPermission('BAN_MEMBERS');
 
     if (!hasPermission) {
-
+      await message.channel.send('You do not have permission to do that.').catch(msgFailCatcher);
     } else {
       
     }

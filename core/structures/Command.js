@@ -145,6 +145,24 @@ class Command {
     }
     return plugins;
   }
+
+  static async inquire(message, question, responses) {
+    const block = responses.map((r, i) => `${i}: ${e}`).join('\n');
+    const inquiryContents = `${question}\nRespond with the appropriate number:\n\`\`\`${block}\`\`\``;
+    const inquiry = await message.channel.send(inquiryContents).catch();
+    const filter = (m) => /^\d+$/.test(m.content.trim());
+    try {
+      const collected = await channel.awaitMessages(filter, {
+        max: 1,
+        time: 15000,
+        errors: ['time']
+      });
+      return [inquiry, +collected.first().contents.trim()];
+    } catch (err) {
+      await inquiry.edit('No response detected.');
+      return [inquiry, null];
+    }
+  }
 }
 
 Command.pluginDefaults = {
