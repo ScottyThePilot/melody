@@ -4,6 +4,7 @@ const { mkdir, exists } = require('../modules/fswrapper.js');
 const Datastore = require('./Datastore.js');
 const Command = require('./Command.js');
 const Logger = require('./Logger.js');
+const AutomodContext = require('../subfunctions/AutomodContext.js');
 
 class GuildManager {
   // Loads a new GuildManager
@@ -23,8 +24,10 @@ class GuildManager {
 
     // Try to fill in empty settings to replace missing config properties
     await this.repairConfigDB(configdb);
+
+    const automodContext = new AutomodContext(configdb);
     
-    return new GuildManager(id, logger, configdb);
+    return new GuildManager(id, logger, configdb, automodContext);
   }
 
   // Creates the assigned directory if it doesn't exist
@@ -42,11 +45,11 @@ class GuildManager {
     return exists(path.join(location, id));
   }
 
-  constructor(id, logger, configdb) {
+  constructor(id, logger, configdb, automodContext) {
     this.id = id;
     this.logger = logger;
     this.configdb = configdb;
-    //this.autoModContext = new Map();
+    this.automodContext = automodContext;
   }
 
   static isIncompleteState(state) {
@@ -58,7 +61,6 @@ class GuildManager {
   static async repairConfigDB(configdb) {
     if (!this.isIncompleteState(await configdb.get())) return;
     await configdb.edit((state) => {
-      console.log('Repairing State');
       for (let prop in this.defaultConfig)
         if (!state.hasOwnProperty(prop))
           state[prop] = this.defaultConfig[prop];
@@ -75,7 +77,9 @@ GuildManager.defaultConfig = {
   logMessages: false,
   logMessageChanges: false,
   mutedRole: null,
-  cleverBotZones: []
+  cleverBotZones: [],
+  automod: false,
+  automodThreshold: 3.5
 };
 
 module.exports = GuildManager;
