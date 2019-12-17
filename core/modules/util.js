@@ -190,13 +190,26 @@ function makeCatcher(logger, msg) {
 function resolveUserKnown(client, resolvable) {
   resolvable = typeof resolvable === 'string' ? resolvable.trim() : null;
   if (!resolvable) return null;
-  const tagMatch = regexMatch(/.{2,32}#[0-9]{4}/, resolvable);
+  const tagMatch = regexMatch(/^.{2,32}#[0-9]{4}/, resolvable);
   if (tagMatch) {
     const found = client.users.find((user) => user.tag === tagMatch);
     if (found) return found;
   }
   const idMatch = regexMatch(/[0-9]+/, resolvable);
   return client.users.get(idMatch) || null;
+}
+
+function resolveUserAdvanced(client, resolvable) {
+  resolvable = typeof resolvable === 'string' ? resolvable.trim() : null;
+  if (!resolvable) return null;
+  const tagMatch = regexMatch(/^.{2,32}#[0-9]{4}$/, resolvable);
+  if (tagMatch) {
+    const found = client.users.find((user) => user.tag === tagMatch);
+    if (found) return { match: tagMatch, result: found };
+  }
+  const idMatch = regexMatch(/^[0-9]+$|(?<=^<@!?)[0-9]+(?=>$)/, resolvable);
+  if (idMatch) return { match: idMatch, result: client.users.get(idMatch) };
+  return null;
 }
 
 function resolveGuildMember(guild, resolvable) {
@@ -277,6 +290,7 @@ module.exports = {
   makeCatcher,
 
   resolveUserKnown,
+  resolveUserAdvanced,
   resolveGuildMember,
   resolveGuildRole,
 
