@@ -53,5 +53,7 @@ function getCandidates(members, resolvable) {
       );
       return [member, rating];
     })
-    .sort((m1, m2) => m1[1] - m2[1]);
+    .sort((m1, m2) => {
+      return m1[1] - m2[1];
+    });
 }
