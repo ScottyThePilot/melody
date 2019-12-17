@@ -146,21 +146,32 @@ class Command {
     return plugins;
   }
 
-  static async inquire(message, question, responses) {
-    const block = responses.map((r, i) => `${i}: ${e}`).join('\n');
-    const inquiryContents = `${question}\nRespond with the appropriate number:\n\`\`\`${block}\`\`\``;
-    const inquiry = await message.channel.send(inquiryContents).catch();
+  static async inquire(message, question, choices) {
+    const block = '0: Close Menu\n' + choices.map((c, i) => `${i + 1}: ${c}`).join('\n');
+    const inquiryContents = `${question}\nRespond with the appropriate number:\n\`\`\`\n${block}\n\`\`\``;
+
+    const inquiry = await message.channel.send(inquiryContents);
+
     const filter = (m) => /^\d+$/.test(m.content.trim());
+    const msg = message.channel.awaitMessages(filter, {
+      max: 1,
+      time: 15000,
+      errors: ['time']
+    });
+
     try {
-      const collected = await channel.awaitMessages(filter, {
-        max: 1,
-        time: 15000,
-        errors: ['time']
-      });
-      return [inquiry, +collected.first().contents.trim()];
+      await msg;
     } catch (err) {
-      await inquiry.edit('No response detected.');
-      return [inquiry, null];
+      return [null, null];
+    } finally {
+      const choice = +(await msg).first().contents;
+
+      if (choice === 0) {
+        await inquiry.edit('Menu Closed').catch();
+        return [inquiry, null];
+      }
+
+      return [inquiry, choice - 1];
     }
   }
 }

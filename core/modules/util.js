@@ -9,7 +9,7 @@ const rxHour = /\d(?=\s*h(?:our|r)?s?)/ig;
 const rxMinute = /\d(?=\s*m(?:inute|in)?s?)/ig;
 
 function regexMatch(rx, str) {
-  const match = RegExp.prototype.match.call(rx, str);
+  const match = String.prototype.match.call(rx, str);
   return match ? match[0] : null;
 }
 
@@ -49,7 +49,7 @@ function average(arr) {
 
 function format(str, ...replacers) {
   if (typeof str !== 'string') throw new TypeError('Expected a string');
-  return str.replace(/{(\d+)}/g, function(match, number) {
+  return str.replace(/{(\d+)}/g, (match, number) => {
     return typeof replacers[number] !== 'undefined' ? replacers[number] : match;
   });
 }
@@ -144,7 +144,7 @@ function formatBigNumber(num) {
 }
 
 function escape(str) {
-  return ('' + str).replace(/["'\\\n\r\u2028\u2029]/g, function (ch) {
+  return ('' + str).replace(/["'\\\n\r\u2028\u2029]/g, (ch) => {
     switch (ch) {
       case '\"': return '\\\"';
       case '\'': return '\\\'';
