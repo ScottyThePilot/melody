@@ -113,8 +113,11 @@ melody.on('message', async (message) => {
   // User is blacklisted, ignore message
   if (melody.blacklist.db.getSync().includes(message.author.id)) return;
 
+  const argsText = content.slice(config.prefix.length + command.length).trim();
+
   const bundle = {
     args,
+    argsText,
     command,
     melody,
     message,
