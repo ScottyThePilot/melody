@@ -4,8 +4,6 @@ const config = require('../config.json');
 const util = require('../modules/util.js');
 const leven = require('leven');
 
-const rxMention = /<@!?([0-9]+)>/;
-
 module.exports = new Command({
   name: 'mute',
   level: 0,

@@ -69,7 +69,7 @@ class UserContext {
   }
 
   static confidence(timestamps) {
-    return 1 / timestamps.length + 1;
+    return 9 / timestamps.length ** 2 + 1;
   }
 }
 
