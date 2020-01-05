@@ -14,24 +14,7 @@ This diagram only shows the important files needed for the bot to work. Some fil
 The data folder does not have to be included, as it is generated automatically by the bot if it doesn't already exist.
 ```
 melody_v3/
-├─core/
-│ ├─commands/
-│ │ └─[...]
-│ ├─data/                 [Not included]
-│ │ ├─guilds/
-│ │ │ └─[...]
-│ │ ├─blacklist.json
-│ │ ├─logs/
-│ │ └─main.log
-│ ├─modules/
-│ │ └─[...]
-│ ├─subfunctions/
-│ │ └─[...]
-│ ├─botEvents.js
-│ ├─changeloglatest.json
-│ ├─config.json           [Not included]
-│ ├─melody.js
-│ └─setup.js
+├─src/
 ├─index.js
 └─start.bat
 ```
@@ -39,9 +22,10 @@ melody_v3/
 Here's an example of what config.js might look like
 ```json
 {
-  "version": ["Stable", "1.0.0"],
+  "version": "1.0.0",
   "prefix": "!",
   "token": "your-token-goes-here",
+  "owner": "your-discord-id-here",
   "trustedUsers": [
     "a-discord-id-of-someone-you-trust"
   ]
