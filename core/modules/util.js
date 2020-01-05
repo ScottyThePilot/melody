@@ -1,10 +1,22 @@
 'use strict';
 const moment = require('moment');
+const charmap = require('../static/charmap.json');
+
+const rxYear = /\d(?=\s*y(?:ear|r)?s?)/ig;
+const rxWeek = /\d(?=\s*w(?:eek|k)?s?)/ig;
+const rxDay = /\d(?=\s*d(?:ay|y)?s?)/ig;
+const rxHour = /\d(?=\s*h(?:our|r)?s?)/ig;
+const rxMinute = /\d(?=\s*m(?:inute|in)?s?)/ig;
+
+function regexMatch(rx, str) {
+  const match = String.prototype.match.call(rx, str);
+  return match ? match[0] : null;
+}
 
 function shuffle(array) {
   if (!Array.isArray(array)) throw new TypeError('Expected an array');
-  var arr = array.slice(0);
-  var currentIndex = arr.length, temporaryValue, randomIndex;
+  let arr = array.slice(0);
+  let currentIndex = arr.length, temporaryValue, randomIndex;
 
   while (0 !== currentIndex) {
     randomIndex = Math.floor(Math.random() * currentIndex);
@@ -37,19 +49,19 @@ function average(arr) {
 
 function format(str, ...replacers) {
   if (typeof str !== 'string') throw new TypeError('Expected a string');
-  return str.replace(/{(\d+)}/g, function(match, number) {
+  return str.replace(/{(\d+)}/g, (match, number) => {
     return typeof replacers[number] !== 'undefined' ? replacers[number] : match;
   });
 }
 
-function capFirst(str) {
-  return ''.charAt.call(str, 0).toUpperCase() + ''.slice.call(str, 1).toLowerCase();
+function listify(arr, joiner = 'and') {
+  const j = ' ' + joiner + ' ';
+  if (arr.length <= 2) return arr.join(j);
+  return arr.slice(0, -1).join(', ') + j + arr[arr.length - 1];
 }
 
-async function asyncForEach(array, callback) {
-  for (let i = 0; i < array.length; i ++) {
-    await callback(array[i], i, array);
-  }
+function capFirst(str) {
+  return ''.charAt.call(str, 0).toUpperCase() + ''.slice.call(str, 1).toLowerCase();
 }
 
 function wait(ms) {
@@ -64,7 +76,7 @@ function savifyDate(date) {
   return logifyDate(date).slice(1, 24).replace(/[^0-9]+/g, '_'); 
 }
 
-function makeLogEntry(header, text = '', ...rest) {
+function makeLogEntry(header, text = '', ...rest) { // jshint ignore:line
   const h = header ? `[${('' + header).toUpperCase()}] ` : '';
   const r = rest.length ? ':\n' + rest.map(e => '  ' + e).join('\n') : '';
   const data = text.trim() + r.trim();
@@ -85,7 +97,7 @@ function logifyGuild(guild) {
 }
 
 function logifyError(err) {
-  var info = err.code && err.path ? err.code + ' ' + err.path : err.code || err.path;
+  let info = err.code && err.path ? err.code + ' ' + err.path : err.code || err.path;
   return `${err.name || 'Error'}: ${err.message}` + (info ? ` (${info})` : '');
 }
 
@@ -99,8 +111,8 @@ function stylizeAttachment(attachment) {
 
 function stylizeMetaData(message) {
   let c = message.embeds.length;
-  let out = !c ? [] : [`[${c} Embed${c <= 1 ? '' : 's'}]`];
-  return [out, ...message.attachments.array().map(stylizeAttachment)];
+  let out = !c ? [] : [`[${c} Embed${c === 1 ? '' : 's'}]`];
+  return [...out, ...message.attachments.array().map(stylizeAttachment)];
 }
 
 function formatTime(uptime, short = false) {
@@ -121,8 +133,18 @@ function formatBytes(bytes) {
     : (bytes / 1073741824).toFixed(3) + 'gb';
 }
 
+function formatBigNumber(num) {
+  let [whole, dec] = num.toString().split('.');
+  let out = [];
+  while (whole.length) {
+    out.unshift(whole.slice(-3));
+    whole = whole.slice(0, -3);
+  }
+  return out.join(',') + (dec === undefined ? '' : '.' + dec);
+}
+
 function escape(str) {
-  return ('' + str).replace(/["'\\\n\r\u2028\u2029]/g, function (ch) {
+  return ('' + str).replace(/["'\\\n\r\u2028\u2029]/g, (ch) => {
     switch (ch) {
       case '\"': return '\\\"';
       case '\'': return '\\\'';
@@ -165,27 +187,89 @@ function makeCatcher(logger, msg) {
   return () => logger.log('WARN', msg);
 }
 
-function resolveUser(val, client) {
-  if (!val || typeof val !== 'string' || !val.trim().length) return null;
-  if (client.users.has(val.trim())) return client.users.get(val.trim());
-  const match = val.trim().match(/[0-9]+/);
-  if (!match) return null;
-  return client.users.get(match[0]) || null;
+function resolveUserKnown(client, resolvable) {
+  resolvable = typeof resolvable === 'string' ? resolvable.trim() : null;
+  if (!resolvable) return null;
+  const tagMatch = regexMatch(/^.{2,32}#[0-9]{4}/, resolvable);
+  if (tagMatch) {
+    const found = client.users.find((user) => user.tag === tagMatch);
+    if (found) return found;
+  }
+  const idMatch = regexMatch(/[0-9]+/, resolvable);
+  return client.users.get(idMatch) || null;
+}
+
+function resolveUserAdvanced(client, resolvable) {
+  resolvable = typeof resolvable === 'string' ? resolvable.trim() : null;
+  if (!resolvable) return null;
+  const tagMatch = regexMatch(/^.{2,32}#[0-9]{4}$/, resolvable);
+  if (tagMatch) {
+    const found = client.users.find((user) => user.tag === tagMatch);
+    if (found) return { match: tagMatch, result: found };
+  }
+  const idMatch = regexMatch(/^[0-9]+$|(?<=^<@!?)[0-9]+(?=>$)/, resolvable);
+  if (idMatch) return { match: idMatch, result: client.users.get(idMatch) };
+  return null;
+}
+
+function resolveGuildMember(guild, resolvable) {
+  const found = resolveUserKnown(guild.client, resolvable);
+  if (!found) return null;
+  return guild.members.get(found.id) || null;
+}
+
+function resolveGuildRole(guild, resolvable) {
+  resolvable = typeof resolvable === 'string' ? resolvable.trim() : null;
+  if (!resolvable) return null;
+  const idMatch = regexMatch(/[0-9]+/, resolvable);
+  return guild.roles.get(idMatch) || null;
+}
+
+function parseFuture(str) {
+  if (!str || typeof str !== 'string') return null;
+  try {
+    let time = moment();
+    str.replace(rxYear, (v) => void time.add(+v, 'years'));
+    str.replace(rxWeek, (v) => void time.add(+v, 'weeks'));
+    str.replace(rxDay, (v) => void time.add(+v, 'days'));
+    str.replace(rxHour, (v) => void time.add(+v, 'hours'));
+    str.replace(rxMinute, (v) => void time.add(+v, 'minutes'));
+    return time.toDate();
+  } catch (e) {
+    return null;
+  }
 }
 
 function userOwnsAGuild(user, client) {
   return client.guilds.some((guild) => guild.owner.id === user.id);
 }
 
+function decancer(str) {
+  if (str === void 0 || str === null) return str;
+  return Array.from(str.toString().normalize()).map((char) => {
+    let p = char.codePointAt(0);
+    const alphaNumeric = 
+      p >= 48 && p <= 57 || 
+      p >= 65 && p <= 90 || 
+      p >= 97 && p <= 122;
+    if (alphaNumeric) return char.toLowerCase();
+    if (charmap.hasOwnProperty(p)) return charmap[p];
+    return '';
+  }).join('');
+}
+
 
 module.exports = {
+  regexMatch,
   shuffle,
   mergeDefault,
   average,
+
   format,
+  listify,
   capFirst,
-  asyncForEach,
   wait,
+
   logifyDate,
   savifyDate,
   makeLogEntry,
@@ -196,11 +280,22 @@ module.exports = {
   logify,
   stylizeAttachment,
   stylizeMetaData,
+
   formatTime,
   formatBytes,
+  formatBigNumber,
   escape,
   cleanContent,
+
   makeCatcher,
-  resolveUser,
-  userOwnsAGuild
+
+  resolveUserKnown,
+  resolveUserAdvanced,
+  resolveGuildMember,
+  resolveGuildRole,
+
+  parseFuture,
+
+  userOwnsAGuild,
+  decancer
 };

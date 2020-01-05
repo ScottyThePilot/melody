@@ -1,17 +1,8 @@
 'use strict';
-const Command = require('../modules/Command.js');
+const Command = require('../structures/Command.js');
 const config = require('../config.json');
-const util = require('../modules/util/util.js');
+const util = require('../modules/util.js');
 const { RichEmbed } = require('discord.js');
-
-const permissions = {
-  [-1]: null,
-  [0]: 'Everyone',
-  [1]: 'Server administrators',
-  [2]: 'Server owners',
-  [3]: 'Trusted users',
-  [10]: 'Bot owner'
-};
 
 module.exports = new Command({
   name: 'help',
@@ -71,22 +62,9 @@ module.exports = new Command({
       });
 
       if (cmd) {
-        const embed = new RichEmbed();
-
-        const aliases = cmd.aliases.map((a) => '\`' + config.prefix + a + '\`').join(', ').trim() || 'None';
-
-        embed.setTitle(util.capFirst(cmd.name));
-        embed.setDescription(cmd.help.long);
-        embed.setColor([114, 137, 218]);
-        embed.addField('Usage', '\`' + cmd.help.usage + '\`');
-        embed.addField('Example', '\`' + cmd.help.example + '\`', true);
-        embed.addField('Aliases', aliases);
-        embed.addField('Plugin', '\`' + cmd.plugin.toUpperCase() + '\`');
-        embed.addField('Permissions', permissions[cmd.level] || this.permissions || 'Custom');
-
-        await message.channel.send(embed).catch(msgFailCatcher);
+        await message.channel.send(cmd.embed).catch(msgFailCatcher);
       } else {
-        await message.channel.send('I can\'t find that command here.');
+        await message.channel.send('I can\'t find that command here.').catch(msgFailCatcher);
       }
     }
   }

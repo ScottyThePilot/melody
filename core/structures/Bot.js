@@ -3,8 +3,8 @@ const Discord = require('discord.js');
 const Logger = require('./Logger.js');
 const GuildManager = require('./GuildManager.js');
 const Command = require('./Command.js');
-const { exists, mkdir, readdir } = require('./util/fswrapper.js');
-const util = require('./util/util.js');
+const { exists, mkdir, readdir } = require('../modules/fswrapper.js');
+const util = require('../modules/util.js');
 const path = require('path');
 
 class Bot {
@@ -21,10 +21,7 @@ class Bot {
       commands: options.paths.commands
     };
 
-    this.logger = new Logger(path.join(this.paths.data, 'main.log'), {
-      logToConsole: true,
-      logPath: path.join(this.paths.data, 'logs')
-    });
+    this.logger = null;
 
     this.ready = false;
 
@@ -32,11 +29,23 @@ class Bot {
     this.commands = new Map();
   }
 
+  get mention() {
+    if (!this.ready) return null;
+    return new RegExp(`^<@!?${this.client.user.id}>\\s*`);
+  }
+
   async init() {
     const noExist = !exists(this.paths.data);
     if (noExist) await mkdir(this.paths.data);
+
+    this.logger = new Logger(path.join(this.paths.data, 'main.log'), {
+      logToConsole: true,
+      logPath: path.join(this.paths.data, 'logs')
+    });
+
     const guildsPath = path.join(this.paths.data, 'guilds');
     if (noExist || !exists(guildsPath)) await mkdir(guildsPath);
+
     await this.logger.checkRotation();
     this.logger.log('Begin Log');
   }
@@ -54,18 +63,19 @@ class Bot {
   async buildCommands() {
     if (this.commands.size > 0) throw new Error('Commands already built');
     (await readdir(this.paths.commands)).forEach((fileName) => {
-      const command = require('../commands/' + fileName.toString());
+      const command = require(path.join('../../', this.paths.commands, fileName.toString()));
       if (command instanceof Command) this.commands.set(command.name, command);
     });
   }
 
   async destroy() {
     this.log('INFO', 'Shutting Down...');
-  
-    await util.asyncForEach(this.client.guilds.array(), async (guild) => {
+
+
+    for (let guild of this.client.guilds.values()) {
       await this.unloadGuild(guild.id);
       this.log('DATA', `Guild ${util.logifyGuild(guild)} unloaded`);
-    });
+    }
   
     await this.logger.end();
     
@@ -81,10 +91,10 @@ class Bot {
     return null;
   }
 
-  async getAccessiblePlugins(user) {
+  getAccessiblePlugins(user) {
     let userPlugins = Command.pluginsDM.slice(0);
-  
-    await util.asyncForEach([...this.guildManagers.values()], async (manager) => {
+    
+    for (let manager of this.guildManagers.values()) {
       const guild = this.client.guilds.get(manager.id);
   
       if (!guild.members.has(user.id)) return;
@@ -94,7 +104,7 @@ class Bot {
       plugins.forEach((plugin) => {
         if (!userPlugins.includes(plugin)) userPlugins.push(plugin);
       });
-    });
+    }
   
     return userPlugins;
   }

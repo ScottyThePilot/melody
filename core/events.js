@@ -1,5 +1,5 @@
 'use strict';
-const util = require('./modules/util/util.js');
+const util = require('./modules/util.js');
 
 function onGuildMemberAdd(member, manager) {
   manager.log('LOGGER', `User ${util.logifyUser(member)} added to guild`);
@@ -39,11 +39,46 @@ function onMessage(message, manager) {
   manager.log('LOGGER', `Message by user ${util.logifyUser(message.author)} sent in channel ${util.logify(message.channel)}`, content, ...meta);
 }
 
+async function onMessageNoCommand(melody, message) {
+  const content = message.content.trim();
+  const manager = message.guild ? melody.guildManagers.get(message.guild.id) : null;
+
+  const isPing = melody.mention.test(content);
+  const isZone = manager
+    ? manager.configdb
+        .getSync('cleverBotZones')
+        .includes(message.channel.id)
+    : false;
+
+  // Send CleverBot response and exit if the match was a ping and that ping is the bot
+  if (isPing || isZone) {
+    let msg = isPing ? content.slice(content.match(melody.mention)[0].length).trim() : content;
+    if (isPing && msg.startsWith(',')) msg = msg.slice(1).trim();
+
+    const msgFailCatcher = util.makeCatcher(melody.logger, 'Unable to send message');
+
+    message.channel.startTyping();
+
+    const response = await melody.cleverBot.getResponse(msg, message.channel.id).catch((err) => {
+      melody.log('WARN', 'Error while communicating with CleverBot API', err);
+      return 'There was an error while communicating with the CleverBot API.';
+    });
+
+    message.channel.stopTyping();
+
+    if (!response || !response.trim().length) return;
+
+    await message.channel.send(`<@${message.author.id}>, ${response}`).catch(msgFailCatcher);
+    return;
+  }
+}
+
 module.exports = {
   onGuildMemberAdd,
   onGuildMemberRemove,
   onMessageUpdate,
   onMessageDelete,
   onMessageDeleteBulk,
-  onMessage
+  onMessage,
+  onMessageNoCommand
 };

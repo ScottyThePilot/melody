@@ -1,25 +1,23 @@
 'use strict';
 const { fork } = require('child_process');
-const { logEntryToConsole: log } = require('./core/modules/util/util.js');
+const { logEntryToConsole: log } = require('./core/modules/util.js');
+const Communicator = require('./core/structures/Communicator.js');
+
 const startTime = new Date();
 
 function launch() {
   log('PARENT', 'Launching Bot...');
 
   const subprocess = fork('./core/melody.js');
+  const comm = new Communicator(subprocess);
 
-  subprocess.on('message', (message) => {
-    if (message.type === 'request') {
-      // Child inquires about the lifetime of the parent process
-      if (message.head === 'info.lifetime') {
-        const lifetime = new Date() - startTime;
-        subprocess.send({
-          head: 'info.lifetime',
-          type: 'response',
-          data: lifetime
-        });
-      }
-    }
+  comm.on('info.lifetime', (message) => {
+    if (message.type !== 'request') return;
+    const data = new Date() - startTime;
+    comm.send('info.lifetime', {
+      type: 'response',
+      data
+    });
   });
 
   subprocess.on('exit', (code) => {

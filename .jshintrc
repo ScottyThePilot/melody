@@ -1,19 +1,22 @@
 {
-  "-W014": true,
-  "esversion": 8,
-  "camelcase": true,
+  "node": true,
+
   "curly": false,
-  "eqeqeq": true,
+	"eqeqeq": true,
+  "esversion": 9,
   "freeze": true,
   "indent": 2,
-  "newcap": true,
+  "maxdepth": 5,
+  "noarg": true,
+  "nonbsp": true,
+  "nonew": true,
   "quotmark": "single",
-  "maxdepth": 4,
-  "eqnull": true,
-  "funcscope": true,
-  "node": true,
+  "singleGroups": true,
   "strict": true,
-  "white": true,
   "undef": true,
-  "unused": true
+  "unused": true,
+  "varstmt": true,
+
+  "laxbreak": true,
+  "loopfunc": true
 }

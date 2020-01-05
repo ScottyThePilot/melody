@@ -1,27 +1,43 @@
 'use strict';
 const config = require('./config.json');
-const util = require('./modules/util/util.js');
+const util = require('./modules/util.js');
+const path = require('path');
 const { scheduleJob } = require('node-schedule');
+const Communicator = require('./structures/Communicator.js');
+const Blacklist = require('./subfunctions/Blacklist.js');
+const CleverBotAgent = require('./subfunctions/CleverBotAgent.js');
+const ConnectFourAgent = require('./subfunctions/ConnectFourAgent.js');
+
+function rand(min, max) {
+  return Math.trunc(min + Math.random() * (max - min));
+}
+
+const applyingUpdate = () => `Applying update ${rand(5, 20)} of ${util.formatBigNumber(rand(2000, 3e7))}`;
 
 const activities = [
   { type: 'WATCHING', name: 'over {server_count} servers' },
   { type: 'WATCHING', name: 'over {user_count} users' },
   { type: 'PLAYING', name: `use ${config.prefix}help` },
-  //{ type: 'PLAYING', name: '{global_uptime} days without crashing' },
   { type: 'PLAYING', name: 'after {message_count} messages' },
   { type: 'PLAYING', name: 'after {command_count} commands' },
   { type: 'PLAYING', name: 'for {uptime}' },
   { type: 'PLAYING', name: `in version ${config.version[1]} ${config.version[0]}` },
   { type: 'PLAYING', name: 'Minecraft 2' },
+  { type: 'PLAYING', get name() { return applyingUpdate(); } },
   { type: 'WATCHING', name: 'anime' },
   { type: 'WATCHING', name: 'Scotty\'s lazy ass' },
   { type: 'LISTENING', name: 'existential dread' }
 ];
 
 module.exports = async function setup(melody) {
+  const blacklistPath = path.join(melody.paths.data, 'blacklist.json');
+  const connectFourPath = path.join(melody.paths.data, 'connect_four.json');
+
   // Subfunctions
-  melody.blacklist = require('./subfunctions/blacklist.js');
-  melody.cleverbot = require('./subfunctions/cleverbot.js');
+  melody.blacklist = new Blacklist(blacklistPath);
+  melody.cleverBot = new CleverBotAgent(30);
+  melody.connectFour = new ConnectFourAgent(connectFourPath);
+  melody.comm = new Communicator(process);
 
   // Scheduled Jobs
   melody.analytics = {
@@ -39,7 +55,8 @@ module.exports = async function setup(melody) {
     dailyReport: scheduleJob('30 20 * * *', () => dailyReportJob(melody)),
     cycleActivity: scheduleJob('*/20 * * * * *', () => cycleActivityJob(melody)),
     checkLogRotation: scheduleJob('* */2 * * *', () => checkLogRotationJob(melody)),
-    collectAnalytics: scheduleJob('*/10 * * * *', () => collectAnalyticsJob(melody))
+    collectAnalytics: scheduleJob('*/10 * * * *', () => collectAnalyticsJob(melody)),
+    work: [] // Jobs that have been created
   };
 };
 
@@ -53,11 +70,12 @@ function dailyReportJob(melody) {
   if (melody.client.status === 0) {
     const owner = melody.client.users.get(config.ownerID);
     const msgText = `**Daily Report:**\nAverage Ping: \`${ping}\`\nAverage Resident Set Size: \`${rss}\`\nAverage Heap Total: \`${heapTotal}\`\nAverage Heap Used: \`${heapUsed}\``;
-    owner.send(msgText);
+    owner.send(msgText).catch();
   }
 
   melody.log(
     'INFO',
+    'Daily Report',
     `Average Ping: ${ping}`,
     `Average Resident Set Size: ${rss}`,
     `Average Heap Total: ${heapTotal}`,
@@ -87,9 +105,9 @@ function cycleActivityJob(melody) {
 // Check log rotation every 2 hours
 async function checkLogRotationJob(melody) {
   await melody.logger.checkRotation();
-  await util.asyncForEach([...melody.guildManagers.values()], async (manager) => {
+  for (let manager of melody.guildManagers.values()) {
     await manager.logger.checkRotation(melody.logger);
-  });
+  }
 }
 
 // Collect analytics data every 10 minutes

@@ -1,12 +1,12 @@
 'use strict';
 const { createWriteStream } = require('fs');
 const path = require('path');
-const { write, read, mkdir, stat, exists } = require('./util/fswrapper.js');
-const util = require('./util/util.js');
+const { write, read, mkdir, stat, exists } = require('../modules/fswrapper.js');
+const util = require('../modules/util.js');
 
 class Logger {
-  constructor(path, options = {}) {
-    this.path = path;
+  constructor(p, options = {}) {
+    this.path = p;
     this.logToConsole = {}.hasOwnProperty.call(options, 'logToConsole') ? options.logToConsole : false;
     this.logPath = {}.hasOwnProperty.call(options, 'logPath') ? options.logPath : null;
     this.rotation = Boolean(this.logPath);
@@ -52,6 +52,6 @@ class Logger {
   }
 }
 
-Logger.defaultSizeThreshold = 1048576; // File threshold in bytes
+Logger.defaultSizeThreshold = 524288; // File threshold in bytes
 
 module.exports = Logger;
