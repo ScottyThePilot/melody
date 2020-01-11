@@ -11,7 +11,7 @@ class Logger {
    */
   constructor(p, opts) {
     /** @type {LoggerOptions} */
-    const options = mergeDefault(opts, Logger.defaultOptions);
+    const options = mergeDefault(Logger.defaultOptions, opts);
 
     /** @type {string} */
     this.path = p;

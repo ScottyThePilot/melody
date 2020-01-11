@@ -1,5 +1,5 @@
 'use strict';
-const { mergeDefault } = require('./utils.js');
+const { mergeDefault } = require('../modules/utils/object.js');
 
 class Command {
   /**

@@ -1,5 +1,5 @@
 'use strict';
-const { write, read } = require('../modules/fswrapper.js');
+const { write, read } = require('../modules/utils/fs.js');
 const { mergeDefault, get, set, has } = require('../modules/utils/object.js');
 
 class Lazystore {

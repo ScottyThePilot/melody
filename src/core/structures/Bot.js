@@ -15,7 +15,7 @@ class Bot extends EventEmitter {
    */
   constructor(opts) {
     super();
-    const options = mergeDefault(opts, Bot.defaultOptions);
+    const options = mergeDefault(Bot.defaultOptions, opts);
 
     if (!options.config) throw new Error('No config object provided');
 
@@ -47,35 +47,45 @@ class Bot extends EventEmitter {
   }
 
   async init(callbacks) {
-    const { preInit, postInit } = mergeDefault(callbacks, {
+    const { preInit, postInit } = mergeDefault({
       preInit: null,
       postInit: null
-    });
+    }, callbacks);
 
+    console.log('preinit?');
     if (preInit) await preInit.call(this);
 
-    await this.client.login(this.token);
+    console.log('logging in?');
+    console.log('logged in');
 
-    this.client.once('ready', async () => {
-      if (postInit) await postInit.call(this);
+    const initializing = new Promise((finish) => {
+      this.client.once('ready', async () => {
+        console.log('ready event');
+        if (postInit) await postInit.call(this);
 
-      for (let event of events) {
-        if (event === 'message') continue;
-        this.client.on(event, (...args) => {
-          this.emit(event, ...args);
-        });
-      }
-
-      this.client.on('message', (message) => {
-        const parsed = this.parseCommand(message);
-
-        if (parsed) {
-          this.emit('command', parsed);
-        } else {
-          this.emit('message', message);
+        for (let event of events) {
+          if (event === 'message') continue;
+          this.client.on(event, (...args) => {
+            this.emit(event, ...args);
+          });
         }
+
+        this.client.on('message', (message) => {
+          const parsed = this.parseCommand(message);
+
+          if (parsed) {
+            this.emit('command', parsed);
+          } else {
+            this.emit('message', message);
+          }
+        });
+
+        finish();
       });
     });
+
+    await this.client.login(this.token);
+    await initializing;
   }
 
   get mention() {
@@ -106,7 +116,7 @@ class Bot extends EventEmitter {
 
   async loadManager(id) {
     const folder = path.join(this.paths.data, 'guilds');
-    const manager = await GuildManager.load(folder, id);
+    const manager = await GuildManager.load(id, folder);
     if (manager.logger.rotation) await manager.logger.checkRotation();
     this.managers.set(id, manager);
   }
