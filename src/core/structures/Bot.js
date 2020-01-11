@@ -42,7 +42,7 @@ class Bot extends EventEmitter {
     /** @type {Collection<Command>} */
     this.commands = new Collection();
 
-    /** @type {Map<>} */
+    /** @type {Map<string, GuildManager>} */
     this.managers = new Map();
   }
 

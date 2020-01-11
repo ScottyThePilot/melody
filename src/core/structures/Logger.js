@@ -37,8 +37,8 @@ class Logger {
   /**
    * Creates an entry in this logger
    * @param {string} header
-   * @param {string} text
-   * @param {...string} rest
+   * @param {string} [text]
+   * @param {...string} [rest]
    */
   log(header, text, ...rest) {
     const writable = this.stream.writable;
