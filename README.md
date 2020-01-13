@@ -4,10 +4,6 @@ This is a simple Discord bot, made by me, Scotty#4263. My lazy ass is still in t
 
 If you want to run your own copy of my bot to learn how it works, to provide feedback, to investigate issues, or to simply check out my bot, feel free to clone or fork my repo, and follow the instructions below on how to host it. 
 
-## How does it work?
-
-`index.js` serves to keep the bot alive by forking off a child node process (which is the bot), restarting it when it exits with 0, and exiting when the child process exits with 1. This version of Melody works around a `Bot` class. `Bot` instances contain a `Discord.Client`, a `Logger`, a `GuildManager` for each guild, and `Command`s for each command. This instance bundles everything important into one object so only a single variable has to be passed around for full access to the bot. Upon receiving the `'ready'` event from the Discord API, the bot initializes its data directories, loads each `GuildManager` instance, builds all of the commands from the commands directory, and sets up scheduled tasks. From there it listens to input and reacts accordingly.
-
 ## File Structure and Config
 
 This diagram only shows the important files needed for the bot to work. Some files and folders are omitted to reduce size.
@@ -15,6 +11,8 @@ The data folder does not have to be included, as it is generated automatically b
 ```
 melody_v3/
 ├─src/
+│ ├─core/
+│ └─melody.js
 ├─index.js
 └─start.bat
 ```

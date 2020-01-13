@@ -3,8 +3,9 @@ const path = require('path');
 const Discord = require('discord.js');
 const EventEmitter = require('events');
 const Logger = require('./Logger.js');
-const Collection = require('./Collection.js');
 const GuildManager = require('./GuildManager.js');
+const Command = require('./Command.js');
+const Collection = require('./Collection.js');
 const { exists, mkdir } = require('../modules/utils/fs.js');
 const { mergeDefault } = require('../modules/utils/object.js');
 const { awaitEvent } = require('../modules/utils/general.js');
@@ -54,9 +55,9 @@ class Bot extends EventEmitter {
     this.managers = new Map();
   }
 
-  async init() {
-    if (!await exists(this.paths.data))
-      await mkdir(this.paths.data);
+  async init(callback) {
+    for (let p of ['data', 'guilds', 'commands'])
+      if (!await exists(this.paths[p])) await mkdir(this.paths[p]);
 
     this.logger = new Logger(path.join(this.paths.data, 'main.log'), {
       core: path.join(this.paths.data, 'logs'),
@@ -83,6 +84,10 @@ class Bot extends EventEmitter {
     });
 
     await this.client.login(this.token);
+
+    if (callback) await callback.call(this);
+
+    return this;
   }
 
   get mention() {
@@ -120,6 +125,11 @@ class Bot extends EventEmitter {
 
   async unloadManager(id) {
     await this.managers.get(id).unload();
+  }
+
+  async loadCommandAt(location) {
+    const command = requireRoot(location);
+    if (command instanceof Command) this.commands.add(command);
   }
 }
 

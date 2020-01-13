@@ -1,7 +1,7 @@
 'use strict';
-const { fork } = require('child_process');
-const { utils: { logging: { makeLogEntry } } } = require('./src/core/core.js');
 const path = require('path');
+const { fork } = require('child_process');
+const { makeLogEntry } = require('./src/core/core.js').utils.logging;
 
 global.requireRoot = (id) => require(path.join(__dirname, id));
 global.startTime = new Date();
