@@ -2,9 +2,12 @@
 const path = require('path');
 const Discord = require('discord.js');
 const EventEmitter = require('events');
+const Logger = require('./Logger.js');
 const Collection = require('./Collection.js');
 const GuildManager = require('./GuildManager.js');
+const { exists, mkdir } = require('../modules/utils/fs.js');
 const { mergeDefault } = require('../modules/utils/object.js');
+const { awaitEvent } = require('../modules/utils/general.js');
 
 const events = Object.values(Discord.Constants.Events);
 
@@ -26,6 +29,11 @@ class Bot extends EventEmitter {
     if (!token) throw new Error('No token provided');
     if (!prefix) throw new Error('No prefix provided');
 
+    for (let p of ['data', 'guilds', 'commands'])
+      if (!options.paths[p]) throw new Error(`No ${p} path provided`);
+
+    /** @type {{data: string, guilds: string, commands: string}} */
+    this.paths = options.paths;
     
     /** @type {string} */
     this.version = version;
@@ -46,46 +54,35 @@ class Bot extends EventEmitter {
     this.managers = new Map();
   }
 
-  async init(callbacks) {
-    const { preInit, postInit } = mergeDefault({
-      preInit: null,
-      postInit: null
-    }, callbacks);
+  async init() {
+    if (!await exists(this.paths.data))
+      await mkdir(this.paths.data);
 
-    console.log('preinit?');
-    if (preInit) await preInit.call(this);
+    this.logger = new Logger(path.join(this.paths.data, 'main.log'), {
+      core: path.join(this.paths.data, 'logs'),
+      console: true
+    });
 
-    console.log('logging in?');
-    console.log('logged in');
+    await awaitEvent(this.client, 'ready');
 
-    const initializing = new Promise((finish) => {
-      this.client.once('ready', async () => {
-        console.log('ready event');
-        if (postInit) await postInit.call(this);
-
-        for (let event of events) {
-          if (event === 'message') continue;
-          this.client.on(event, (...args) => {
-            this.emit(event, ...args);
-          });
-        }
-
-        this.client.on('message', (message) => {
-          const parsed = this.parseCommand(message);
-
-          if (parsed) {
-            this.emit('command', parsed);
-          } else {
-            this.emit('message', message);
-          }
-        });
-
-        finish();
+    for (let event of events) {
+      if (event === 'message') continue;
+      this.client.on(event, (...args) => {
+        this.emit(event, ...args);
       });
+    }
+
+    this.client.on('message', (message) => {
+      const parsed = this.parseCommand(message);
+
+      if (parsed) {
+        this.emit('command', parsed);
+      } else {
+        this.emit('message', message);
+      }
     });
 
     await this.client.login(this.token);
-    await initializing;
   }
 
   get mention() {
@@ -128,7 +125,12 @@ class Bot extends EventEmitter {
 
 Bot.defaultOptions = {
   config: null,
-  client: {}
+  client: {},
+  paths: {
+    data: null,
+    guilds: null,
+    commands: null
+  }
 };
 
 module.exports = Bot;

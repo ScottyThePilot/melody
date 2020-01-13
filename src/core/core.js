@@ -13,6 +13,7 @@ module.exports = {
   utils: {
     fs: require('./modules/utils/fs.js'),
     logging: require('./modules/utils/logging.js'),
-    object: require('./modules/utils/object.js')
+    object: require('./modules/utils/object.js'),
+    general: require('./modules/utils/general.js')
   }
 };
