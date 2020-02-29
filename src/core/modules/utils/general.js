@@ -11,6 +11,11 @@ function awaitEvent(emitter, event) {
   });
 }
 
+function wait(ms) {
+  return new Promise((res) => setTimeout(res, ms));
+}
+
 module.exports = {
-  awaitEvent
+  awaitEvent,
+  wait
 };

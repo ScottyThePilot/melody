@@ -1,6 +1,8 @@
 'use strict';
 const path = require('path');
-const { Bot, utils: { fs: { readdir }, logging: { logifyGuild } } } = require('./core/core.js');
+const Bot = require('./core/structures/Bot.js');
+const { readdir } = require('./core/modules/utils/fs.js');
+const { logifyGuild } = require('./core/modules/utils/logging.js');
 
 // Crash when a promise rejection goes unhandled
 process.on('unhandledRejection', (reason) => { throw reason; });
@@ -24,6 +26,8 @@ const melody = new Bot({
   }
 });
 
+console.log('#00?');
+
 melody.init(async function () {
   this.logger.log('INFO', 'Loading Bot...');
 
@@ -39,3 +43,6 @@ melody.init(async function () {
 
   this.logger.log('DATA', `${this.commands.size} Commands loaded`);
 });
+
+melody.client.on('debug', console.log);
+

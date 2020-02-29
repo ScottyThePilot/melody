@@ -8,7 +8,7 @@ const Command = require('./Command.js');
 const Collection = require('./Collection.js');
 const { exists, mkdir } = require('../modules/utils/fs.js');
 const { mergeDefault } = require('../modules/utils/object.js');
-const { awaitEvent } = require('../modules/utils/general.js');
+const { awaitEvent, wait } = require('../modules/utils/general.js');
 
 const events = Object.values(Discord.Constants.Events);
 
@@ -64,7 +64,12 @@ class Bot extends EventEmitter {
       console: true
     });
 
-    await awaitEvent(this.client, 'ready');
+    await Promise.all([
+      awaitEvent(this.client, 'ready'),
+      this.client.login(this.token)
+    ]);
+
+    await wait(1000);
 
     for (let event of events) {
       if (event === 'message') continue;
@@ -82,8 +87,6 @@ class Bot extends EventEmitter {
         this.emit('message', message);
       }
     });
-
-    await this.client.login(this.token);
 
     if (callback) await callback.call(this);
 
@@ -118,8 +121,11 @@ class Bot extends EventEmitter {
 
   async loadManager(id) {
     const folder = path.join(this.paths.data, 'guilds');
+    console.log('#b1?');
     const manager = await GuildManager.load(id, folder);
+    console.log('#b2?');
     if (manager.logger.rotation) await manager.logger.checkRotation();
+    console.log('#b3?');
     this.managers.set(id, manager);
   }
 
