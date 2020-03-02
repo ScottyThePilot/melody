@@ -121,11 +121,8 @@ class Bot extends EventEmitter {
 
   async loadManager(id) {
     const folder = path.join(this.paths.data, 'guilds');
-    console.log('#b1?');
     const manager = await GuildManager.load(id, folder);
-    console.log('#b2?');
     if (manager.logger.rotation) await manager.logger.checkRotation();
-    console.log('#b3?');
     this.managers.set(id, manager);
   }
 

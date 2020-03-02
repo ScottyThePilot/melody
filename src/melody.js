@@ -26,8 +26,6 @@ const melody = new Bot({
   }
 });
 
-console.log('#00?');
-
 melody.init(async function () {
   this.logger.log('INFO', 'Loading Bot...');
 
