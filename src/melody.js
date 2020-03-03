@@ -1,46 +1,113 @@
 'use strict';
 const path = require('path');
 const Bot = require('./core/structures/Bot.js');
+const Command = require('./core/structures/Command.js');
 const { readdir } = require('./core/modules/utils/fs.js');
 const { logifyGuild } = require('./core/modules/utils/logging.js');
+const config = require('./config.json');
 
 // Crash when a promise rejection goes unhandled
 process.on('unhandledRejection', (reason) => { throw reason; });
 
-const melody = new Bot({
-  config: require('./config.json'),
-  client: {
-    disableEveryone: true,
-    restTimeOffset: 750,
-    disabledEvents: [
-      'VOICE_STATE_UPDATE',
-      'VOICE_SERVER_UPDATE',
-      'TYPING_START',
-      'PRESENCE_UPDATE'
-    ]
-  },
-  paths: {
-    data: './data/',
-    guilds: './data/guilds',
-    commands: './src/commands/'
+class Melody extends Bot {
+  constructor() {
+    super({
+      config,
+      client: {
+        disableEveryone: true,
+        restTimeOffset: 750,
+        disabledEvents: [
+          'VOICE_STATE_UPDATE',
+          'VOICE_SERVER_UPDATE',
+          'TYPING_START',
+          'PRESENCE_UPDATE'
+        ]
+      },
+      paths: {
+        data: './data/',
+        guilds: './data/guilds',
+        commands: './src/commands/'
+      }
+    });
+
+    this.ready = false;
+
+    this.embeds = {
+      help: {
+        plugins: [],
+        commands: []
+      },
+      changelog: null
+    };
+
+    this.client.on('debug', console.log);
+    this.on('command', (...args) => this.onCommand(...args));
+    this.on('message', (...args) => this.onMessage(...args));
   }
-});
 
-melody.init(async function () {
-  this.logger.log('INFO', 'Loading Bot...');
+  async init() {
+    await super.init();
 
-  for (const guild of this.client.guilds.values()) {
-    await this.loadManager(guild.id);
-    this.logger.log('DATA', `Guild ${logifyGuild(guild)} loaded`);
+    this.logger.log('INFO', 'Connection established');
+  
+    for (const guild of this.client.guilds.values()) {
+      await this.loadManager(guild.id);
+      this.logger.log('DATA', `Guild ${logifyGuild(guild)} loaded`);
+    }
+  
+    for (const file of await readdir(this.paths.commands)) {
+      const location = path.join(this.paths.commands, file.toString());
+      await this.loadCommandAt(location);
+    }
+  
+    this.logger.log('DATA', `${this.commands.size} Commands loaded`);
+
+    await this.client.user.setActivity('waiting...');
+
+    this.ready = true;
+
+    this.logger.log('INFO', `Tracking ${this.client.guilds.size} Guilds with ${this.client.users.size} Users`);
+    this.logger.log(undefined, `Bot Invite: ${await this.client.generateInvite(268823760)}`);
+    this.logger.log('INFO', 'Bot ready!');
   }
 
-  for (const file of await readdir(this.paths.commands)) {
-    const location = path.join(this.paths.commands, file.toString());
-    await this.loadCommandAt(location);
+  catcher(error) {
+    this.logger.log('WARN', 'Caught an error', error);
   }
 
-  this.logger.log('DATA', `${this.commands.size} Commands loaded`);
-});
+  async onCommand(data) {
+    const cmd = Command.find(this.commands, data.command);
 
-melody.client.on('debug', console.log);
+    if (!cmd) return;
 
+    return await cmd.attempt({
+      melody: this,
+      level: this.getUserLevel(data),
+      where: data.message.guild ? 'Guild' : 'DM',
+      manager: data.message.guild
+        ? this.managers.get(data.message.guild.id)
+        : null,
+      ...data
+    });
+  }
+
+  async onMessage(message) {
+    this.logger.log('MESSAGE', message.content);
+  }
+
+  getUserLevel({ message }) {
+    let userLevel = 0;
+
+    if (message.guild) {
+      if (message.member.hasPermission('ADMINISTRATOR')) userLevel = 1;
+      if (message.guild.owner.id === message.author.id) userLevel = 2;
+    } else if (config.trustedUsers.includes(message.author.id)) userLevel = 3;
+  
+    if (config.ownerID === message.author.id) userLevel = 10;
+
+    return userLevel;
+  }
+}
+
+const melody = new Melody();
+melody.init();

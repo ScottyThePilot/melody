@@ -11,7 +11,9 @@ The data folder does not have to be included, as it is generated automatically b
 ```
 melody_v3/
 ├─src/
+│ ├─commands/
 │ ├─core/
+│ ├─config.json/
 │ └─melody.js
 ├─index.js
 └─start.bat

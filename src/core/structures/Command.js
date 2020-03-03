@@ -13,6 +13,9 @@ class Command {
 
     /** @type {string} */
     this.name = options.name;
+
+    /** @type {CommandHelp} */
+    this.help = options.help;
     
     /** @type {string[]} */
     this.aliases = options.aliases;
@@ -25,12 +28,26 @@ class Command {
     
     /** @type {boolean} */
     this.disabled = options.disabled;
+
+    /** @type {number|string} */
+    this.level = options.level;
     
     /** @type {boolean} */
     this.hidden = options.hidden;
     
     /** @type {async (data: object) => any} */
     this.run = options.run;
+  }
+
+  get levelString() {
+    switch (this.level) {
+      case 0: return 'Everyone';
+      case 1: return 'Server administrators';
+      case 2: return 'Server owners';
+      case 3: return 'Trusted Users';
+      case 10: return 'Bot owner';
+      default: return this.level;
+    }
   }
 
   /**
@@ -49,7 +66,7 @@ class Command {
     if (!inDM && this.where === Command.DM) return null;
     if (inDM && this.where === Command.GUILD) return null;
 
-    return await this.run(data);
+    return await this.run.call(this, data);
   }
 
   /**
@@ -66,7 +83,7 @@ class Command {
 
   /**
    * Search a list of commands for one with the given name.
-   * @param {Set<Command>} commands A set of commands to search through
+   * @param {Collection<Command>} commands A set of commands to search through
    * @param {string} query The name or alias of a command to find
    * @returns {Command|null} The command object if one was found, or `null` if one wasn't
    */
@@ -83,9 +100,16 @@ Command.ANYWHERE = 'anywhere';
 
 Command.defaultOptions = {
   name: 'default',
+  help: {
+    short: 'Invalid',
+    long: 'Invalid',
+    usage: 'Invalid',
+    example: 'Invalid'
+  },
   aliases: [],
   info: {},
   where: 'anywhere',
+  level: 0,
   disabled: false,
   hidden: false,
   run: null
@@ -96,10 +120,20 @@ module.exports = Command;
 /**
  * @typedef CommandOptions
  * @property {string} name
+ * @property {CommandHelp} help
  * @property {string[]} aliases
  * @property {object} info
  * @property {'dm'|'guild'|'anywhere'} where
+ * @property {number|string} level
  * @property {boolean} disabled
  * @property {boolean} hidden
  * @property {async (data: object) => any} run
+ */
+
+/**
+ * @typedef CommandHelp
+ * @property {string} short
+ * @property {string} long
+ * @property {string} usage
+ * @property {string} example
  */

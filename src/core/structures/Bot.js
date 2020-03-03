@@ -55,7 +55,7 @@ class Bot extends EventEmitter {
     this.managers = new Map();
   }
 
-  async init(callback) {
+  async init() {
     for (let p of ['data', 'guilds', 'commands'])
       if (!await exists(this.paths[p])) await mkdir(this.paths[p]);
 
@@ -87,10 +87,6 @@ class Bot extends EventEmitter {
         this.emit('message', message);
       }
     });
-
-    if (callback) await callback.call(this);
-
-    return this;
   }
 
   get mention() {
