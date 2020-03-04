@@ -21,7 +21,7 @@ function savifyDate(date) {
  * @param {...string} [rest]
  * @returns {string}
  */
-function makeLogEntry(header = 'default', text = '', ...rest) { // jshint ignore:line
+function makeLogEntry(header, text = '', ...rest) { // jshint ignore:line
   const h = header ? `[${('' + header).toUpperCase()}] ` : '';
   const r = rest.length ? ':\n' + rest.map(e => '  ' + e).join('\n') : '';
   const data = text.trim() + r.trim();

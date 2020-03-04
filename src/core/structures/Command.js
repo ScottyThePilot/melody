@@ -55,8 +55,8 @@ class Command {
    * if it is disabled, or if its `where` property does not match up with whether it is
    * in DM or a guild.
    * @param {object} data A command data object
-   * @returns {Promise} A promise resolving to whatever the command's `run` function resolves,
-   *   or `null` if the command did not execute.
+   * @returns {Promise} A promise resolving when the command finishes,
+   *   or to `null` if the command did not execute.
    */
   async attempt(data) {
     if (this.disabled) return null;
@@ -65,8 +65,9 @@ class Command {
 
     if (!inDM && this.where === Command.DM) return null;
     if (inDM && this.where === Command.GUILD) return null;
+    if (data.level < this.level) return null;
 
-    return await this.run.call(this, data);
+    await this.run.call(this, data);
   }
 
   /**

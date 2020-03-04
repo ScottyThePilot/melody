@@ -18,9 +18,5 @@
   "varstmt": true,
 
   "laxbreak": true,
-  "loopfunc": true,
-
-  "globals": {
-    "requireRoot": true
-  }
+  "loopfunc": true
 }

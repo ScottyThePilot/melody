@@ -26,7 +26,7 @@ function blockify(val, sep, p = '') {
 
 
 class CommandHelpList extends RichEmbed {
-  constructor(commands, level) {
+  constructor(commands, level, title) {
     super();
     const body = [...commands.values()]
       .filter((command) => command.level <= level)
@@ -40,8 +40,8 @@ class CommandHelpList extends RichEmbed {
       'This list only shows commands you have access to.'
     );
     this.setColor([114, 137, 218]);
-    this.addField('Command List', body);
-    this.setFooter(`Melody v${config.version[1]} ${config.version[0]}`);
+    this.addField('Command List' + (title ? ' (' + title + ')' : ''), body);
+    this.setFooter(`Melody v${config.version}`);
   }
 }
 

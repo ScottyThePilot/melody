@@ -13,13 +13,14 @@ melody_v3/
 ├─src/
 │ ├─commands/
 │ ├─core/
+│ ├─client_config.json/
 │ ├─config.json/
 │ └─melody.js
 ├─index.js
 └─start.bat
 ```
 
-Here's an example of what config.js might look like
+Here's an example of what config.json might look like
 ```json
 {
   "version": "1.0.0",

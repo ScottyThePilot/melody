@@ -1,10 +1,6 @@
 'use strict';
-const path = require('path');
 const { fork } = require('child_process');
 const { makeLogEntry } = require('./src/core/modules/utils/logging.js');
-
-global.requireRoot = (id) => require(path.join(__dirname, id));
-global.startTime = new Date();
 
 function launch() {
   log('PARENT', 'Launching Bot...');

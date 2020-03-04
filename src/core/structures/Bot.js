@@ -26,7 +26,7 @@ class Bot extends EventEmitter {
     /** @type {Discord.Client} */
     this.client = new Discord.Client(options.client);
 
-    const { version, token, prefix, owner } = options.config;
+    const { version, token, prefix, owner, trustedUsers = [] } = options.config;
     if (!token) throw new Error('No token provided');
     if (!prefix) throw new Error('No prefix provided');
 
@@ -47,6 +47,9 @@ class Bot extends EventEmitter {
     
     /** @type {string} */
     this.owner = owner;
+
+    /** @type {string[]} */
+    this.trustedUsers = trustedUsers;
 
     /** @type {Collection<Command>} */
     this.commands = new Collection();
@@ -80,6 +83,8 @@ class Bot extends EventEmitter {
 
     this.client.on('message', (message) => {
       const parsed = this.parseCommand(message);
+      console.log(parsed ? '{}' : 'null');
+      console.log(message.content);
 
       if (parsed) {
         this.emit('command', parsed);
@@ -101,7 +106,7 @@ class Bot extends EventEmitter {
     if (!content.startsWith(prefix)) return null;
   
     // Dissallow whitespace between the prefix and command name
-    if (/^\s+/.test(content.slice(prefix.length))) return;
+    if (/^\s+/.test(content.slice(prefix.length))) return null;
   
     let args = content.slice(prefix.length).trim().split(/\s+/g);
     const command = args.shift().toLowerCase();
@@ -141,6 +146,10 @@ Bot.defaultOptions = {
     commands: null
   }
 };
+
+function requireRoot(id) {
+  return require(path.join(process.cwd(), id));
+}
 
 module.exports = Bot;
 

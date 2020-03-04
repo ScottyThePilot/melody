@@ -1,7 +1,7 @@
 'use strict';
 const Command = require('../core/structures/Command.js');
 const Embeds = require('../Embeds.js');
-const config = require('../config.js');
+const config = require('../config.json');
 
 module.exports = new Command({
   name: 'help',
@@ -13,10 +13,11 @@ module.exports = new Command({
   },
   aliases: ['helpall', 'halp', 'h'],
   run: async function run({ melody, message, level, args, command }) {
-    for (const [arg, i] of args.entries()) args[i] = arg.toLowerCase();
+    for (const [i, arg] of args.entries()) args[i] = arg.toLowerCase();
 
     if (!args[0] || command === 'helpall') {
-      const embed = new Embeds.CommandHelpList(melody.commands, level);
+      const guild = message.guild ? message.guild.name : undefined;
+      const embed = new Embeds.CommandHelpList(melody.commands, level, guild);
       await message.author.send(embed).catch(melody.catcher);
     } else {
       const cmd = Command.find(melody.commands, args[0]);

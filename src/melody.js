@@ -4,7 +4,6 @@ const Bot = require('./core/structures/Bot.js');
 const Command = require('./core/structures/Command.js');
 const { readdir } = require('./core/modules/utils/fs.js');
 const { logifyGuild } = require('./core/modules/utils/logging.js');
-const config = require('./config.json');
 
 // Crash when a promise rejection goes unhandled
 process.on('unhandledRejection', (reason) => { throw reason; });
@@ -12,17 +11,8 @@ process.on('unhandledRejection', (reason) => { throw reason; });
 class Melody extends Bot {
   constructor() {
     super({
-      config,
-      client: {
-        disableEveryone: true,
-        restTimeOffset: 750,
-        disabledEvents: [
-          'VOICE_STATE_UPDATE',
-          'VOICE_SERVER_UPDATE',
-          'TYPING_START',
-          'PRESENCE_UPDATE'
-        ]
-      },
+      config: require('./config.json'),
+      client: require('./client_config.json'),
       paths: {
         data: './data/',
         guilds: './data/guilds',
@@ -30,6 +20,7 @@ class Melody extends Bot {
       }
     });
 
+    /** @type {boolean} */
     this.ready = false;
 
     this.embeds = {
@@ -101,9 +92,9 @@ class Melody extends Bot {
     if (message.guild) {
       if (message.member.hasPermission('ADMINISTRATOR')) userLevel = 1;
       if (message.guild.owner.id === message.author.id) userLevel = 2;
-    } else if (config.trustedUsers.includes(message.author.id)) userLevel = 3;
+    } else if (this.trustedUsers.includes(message.author.id)) userLevel = 3;
   
-    if (config.ownerID === message.author.id) userLevel = 10;
+    if (this.owner === message.author.id) userLevel = 10;
 
     return userLevel;
   }
