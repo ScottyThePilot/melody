@@ -35,7 +35,7 @@ class Command {
     /** @type {boolean} */
     this.hidden = options.hidden;
     
-    /** @type {async (data: object) => any} */
+    /** @type {(data: CommandData) => Promise} */
     this.run = options.run;
   }
 
@@ -54,7 +54,7 @@ class Command {
    * Try to execute a command with the given data object. The command will not execute
    * if it is disabled, or if its `where` property does not match up with whether it is
    * in DM or a guild.
-   * @param {object} data A command data object
+   * @param {CommandData} data A command data object
    * @returns {Promise} A promise resolving when the command finishes,
    *   or to `null` if the command did not execute.
    */
@@ -125,4 +125,16 @@ module.exports = Command;
  * @property {string} long
  * @property {string} usage
  * @property {string} example
+ */
+
+/**
+ * @typedef CommandData
+ * @property {Discord.Message} message
+ * @property {string} command
+ * @property {string[]} args
+ * @property {string} argsText
+ * @property {Melody} melody
+ * @property {number|string} level
+ * @property {'dm'|'guild'|'anywhere'} where
+ * @property {import('./GuildManager')} manager
  */

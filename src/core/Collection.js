@@ -49,7 +49,7 @@ class Collection extends Set {
    * specified by the `fn` parameter. If no elements pass the check,
    * undefined is returned.
    * @param {(el: T, coll: this) => boolean} fn 
-   * @returns {T}
+   * @returns {T | undefined}
    */
   find(fn) {
     for (const e of this) if (fn(e, this)) return e;

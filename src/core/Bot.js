@@ -58,6 +58,7 @@ class Bot extends EventEmitter {
     this.managers = new Map();
   }
 
+  /** @returns {Promise<void>} */
   async init() {
     for (const p of ['data', 'guilds', 'commands'])
       if (!await exists(this.paths[p])) await mkdir(this.paths[p]);
@@ -96,6 +97,12 @@ class Bot extends EventEmitter {
     return new RegExp(`^<@!?${this.client.user.id}>\\s*`);
   }
 
+  /**
+   * Parse a command into a data object
+   * @param {Discord.Message} message
+   * @param {boolean} prefixOverride
+   * @returns {{ message: Discord.Message, command: string, args: string[], argsText: string }}
+   */
   parseCommand(message, prefixOverride) {
     if (message.author.bot) return null;
   
@@ -118,6 +125,7 @@ class Bot extends EventEmitter {
     return channel.send(...args).catch(() => null);
   }
 
+  /** @returns {Promise<void>} */
   async loadManager(id) {
     const folder = path.join(this.paths.data, 'guilds');
     const manager = await GuildManager.load(id, folder);
@@ -125,15 +133,18 @@ class Bot extends EventEmitter {
     this.managers.set(id, manager);
   }
 
+  /** @returns {Promise<void>} */
   async unloadManager(id) {
     await this.managers.get(id).unload();
   }
 
-  async loadCommandAt(location) {
+  loadCommandAt(location) {
     const command = requireRoot(location);
-    if (command instanceof Command) this.commands.add(command);
+    if (command instanceof Command)
+      this.commands.add(command);
   }
 
+  /** @returns {Promise<void>} */
   async destroy() {
     await this.client.destroy();
     await this.logger.destroy();

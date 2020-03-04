@@ -1,7 +1,6 @@
 'use strict';
 const path = require('path');
 const Bot = require('./core/Bot.js');
-const Command = require('./core/Command.js');
 const { readdir } = require('./utils/fs.js');
 const { logifyGuild } = require('./utils/text.js');
 
@@ -48,7 +47,7 @@ class Melody extends Bot {
   
     for (const file of await readdir(this.paths.commands)) {
       const location = path.join(this.paths.commands, file.toString());
-      await this.loadCommandAt(location);
+      this.loadCommandAt(location);
     }
   
     this.logger.log('DATA', `${this.commands.size} Commands loaded`);
@@ -66,12 +65,15 @@ class Melody extends Bot {
     this.logger.log('WARN', 'Caught an error', error);
   }
 
+  /**
+   * @param {{ message: Discord.Message, command: string, args: string[], argsText: string }} data
+   */
   async onCommand(data) {
     const cmd = this.commands.find((c) => c.is(data.command));
 
     if (!cmd) return;
 
-    return await cmd.attempt({
+    await cmd.attempt({
       melody: this,
       level: this.getUserLevel(data),
       where: data.message.guild ? 'Guild' : 'DM',
