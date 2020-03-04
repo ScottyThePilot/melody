@@ -67,7 +67,7 @@ class Melody extends Bot {
   }
 
   async onCommand(data) {
-    const cmd = Command.find(this.commands, data.command);
+    const cmd = this.commands.find((c) => c.is(data.command));
 
     if (!cmd) return;
 
@@ -82,7 +82,9 @@ class Melody extends Bot {
     });
   }
 
-  async onMessage(message) {}
+  async onMessage(message) {
+    
+  }
 
   getUserLevel({ message }) {
     let userLevel = 0;

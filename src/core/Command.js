@@ -77,21 +77,9 @@ class Command {
    */
   is(query) {
     if (this.name === query) return true;
-    for (let alias of this.aliases)
+    for (const alias of this.aliases)
       if (alias === query) return true;
     return false;
-  }
-
-  /**
-   * Search a list of commands for one with the given name.
-   * @param {Collection<Command>} commands A set of commands to search through
-   * @param {string} query The name or alias of a command to find
-   * @returns {Command|null} The command object if one was found, or `null` if one wasn't
-   */
-  static find(commands, query) {
-    for (let command of commands)
-      if (command.is(query)) return command;
-    return null;
   }
 }
 

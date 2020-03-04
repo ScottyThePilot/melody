@@ -1,7 +1,7 @@
 'use strict';
 const { RichEmbed } = require('discord.js');
 const config = require('./config.json');
-const { capFirst } = require('./utils/util.js');
+const { capFirst } = require('./utils/text.js');
 
 
 
@@ -11,16 +11,16 @@ class CommandHelp extends RichEmbed {
     this.setTitle(capFirst(command.name));
     this.setDescription(command.help.long);
     this.setColor([114, 137, 218]);
-    this.addField('Usage', blockify(command.help.usage, '\n'));
-    this.addField('Example', blockify(command.help.example, '\n'));
-    this.addField('Aliases', blockify(command.aliases, ', ', config.prefix), true);
+    this.addField('Usage', CommandHelp.blockify(command.help.usage, '\n'));
+    this.addField('Example', CommandHelp.blockify(command.help.example, '\n'));
+    this.addField('Aliases', CommandHelp.blockify(command.aliases, ', ', config.prefix), true);
     this.addField('Permissions', command.levelString, true);
   }
-}
 
-function blockify(val, sep, p = '') {
-  if (typeof val === 'string') val = [val];
-  return val.map((v) => '\`' + p + v + '\`').join(sep);
+  static blockify(val, sep, p = '') {
+    if (typeof val === 'string') val = [val];
+    return val.map((v) => '\`' + p + v + '\`').join(sep);
+  }
 }
 
 

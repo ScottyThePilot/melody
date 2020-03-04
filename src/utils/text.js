@@ -62,6 +62,10 @@ function logify(obj) {
   return `${obj.name} (${obj.id})`;
 }
 
+function capFirst(str) {
+  return ''.charAt.call(str, 0).toUpperCase() + ''.slice.call(str, 1).toLowerCase();
+}
+
 module.exports = {
   makeLogEntry,
 
@@ -70,7 +74,9 @@ module.exports = {
   logifyUser,
   logifyGuild,
   logifyError,
-  savifyDate
+  savifyDate,
+
+  capFirst
 };
 
 /**

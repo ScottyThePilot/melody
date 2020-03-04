@@ -52,7 +52,7 @@ class Logger {
    * Shuts down the logger
    * @returns {Promise<Void>}
    */
-  async end() {
+  async destroy() {
     await ws.end(this.stream);
   }
 

@@ -15,12 +15,7 @@ function wait(ms) {
   return new Promise((res) => setTimeout(res, ms));
 }
 
-function capFirst(str) {
-  return ''.charAt.call(str, 0).toUpperCase() + ''.slice.call(str, 1).toLowerCase();
-}
-
 module.exports = {
   awaitEvent,
-  wait,
-  capFirst
+  wait
 };

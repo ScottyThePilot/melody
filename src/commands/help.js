@@ -20,7 +20,7 @@ module.exports = new Command({
       const embed = new Embeds.CommandHelpList(melody.commands, level, guild);
       await message.author.send(embed).catch(melody.catcher);
     } else {
-      const cmd = Command.find(melody.commands, args[0]);
+      const cmd = this.commands.find((c) => c.is(args[0]));
       if (!cmd) {
         await message.author.send('I can\'t find that command.').catch(melody.catcher);
       } else {

@@ -91,6 +91,11 @@ class GuildManager {
   write() {
     return this.queue.pushPromise(() => this.store.write());
   }
+
+  async destroy() {
+    await this.logger.destroy();
+    await this.store.destroy();
+  }
 }
 
 module.exports = GuildManager;

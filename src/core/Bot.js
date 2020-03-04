@@ -30,7 +30,7 @@ class Bot extends EventEmitter {
     if (!token) throw new Error('No token provided');
     if (!prefix) throw new Error('No prefix provided');
 
-    for (let p of ['data', 'guilds', 'commands'])
+    for (const p of ['data', 'guilds', 'commands'])
       if (!options.paths[p]) throw new Error(`No ${p} path provided`);
 
     /** @type {{data: string, guilds: string, commands: string}} */
@@ -59,7 +59,7 @@ class Bot extends EventEmitter {
   }
 
   async init() {
-    for (let p of ['data', 'guilds', 'commands'])
+    for (const p of ['data', 'guilds', 'commands'])
       if (!await exists(this.paths[p])) await mkdir(this.paths[p]);
 
     this.logger = new Logger(path.join(this.paths.data, 'main.log'), {
@@ -74,7 +74,7 @@ class Bot extends EventEmitter {
 
     await wait(1000);
 
-    for (let event of events) {
+    for (const event of events) {
       if (event === 'message') continue;
       this.client.on(event, (...args) => {
         this.emit(event, ...args);
@@ -132,6 +132,13 @@ class Bot extends EventEmitter {
   async loadCommandAt(location) {
     const command = requireRoot(location);
     if (command instanceof Command) this.commands.add(command);
+  }
+
+  async destroy() {
+    await this.client.destroy();
+    await this.logger.destroy();
+    for (const manager of this.managers)
+      await manager.destroy();
   }
 }
 

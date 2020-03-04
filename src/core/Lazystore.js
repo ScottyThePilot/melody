@@ -43,6 +43,7 @@ class Lazystore {
    * @returns {any}
    */
   get(p) {
+    if (!this.ready) throw new Error('Unable to read/modify state');
     const out = get(this.state, p);
     this.touch();
     return out;
@@ -55,6 +56,7 @@ class Lazystore {
    * @returns {void}
    */
   set(p, value) {
+    if (!this.ready) throw new Error('Unable to read/modify state');
     set(this.state, p, value);
     this.touch();
   }
@@ -65,6 +67,7 @@ class Lazystore {
    * @returns {boolean}
    */
   has(p) {
+    if (!this.ready) throw new Error('Unable to read/modify state');
     const out = has(this.state, p);
     this.touch();
     return out;
@@ -81,6 +84,7 @@ class Lazystore {
    * @returns {Promise<Void>}
    */
   async write(force) {
+    if (!this.ready) throw new Error('Cannot write state to disk');
     if (this.synced && !force) return false;
 
     await write(
@@ -125,6 +129,14 @@ class Lazystore {
         this.options.defaultState
       );
     }
+  }
+
+  async destroy(write) {
+    if (!this.ready) throw new Error('Unable to destroy store');
+    if (write) await this.write(true);
+    this.ready = false;
+    this.state = null;
+    this.synced = false;
   }
 }
 

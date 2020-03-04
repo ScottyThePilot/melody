@@ -17,7 +17,7 @@ class Collection extends Set {
    * @returns {boolean}
    */
   every(fn) {
-    for (let e of this) if (!fn(e, this)) return false;
+    for (const e of this) if (!fn(e, this)) return false;
     return true;
   }
 
@@ -28,7 +28,7 @@ class Collection extends Set {
    * @returns {boolean}
    */
   some(fn) {
-    for (let e of this) if (fn(e, this)) return true;
+    for (const e of this) if (fn(e, this)) return true;
     return false;
   }
 
@@ -40,7 +40,7 @@ class Collection extends Set {
    */
   filter(fn) {
     let out = new Collection();
-    for (let e of this) if (fn(e, this)) out.add(e);
+    for (const e of this) if (fn(e, this)) out.add(e);
     return out;
   }
 
@@ -52,7 +52,7 @@ class Collection extends Set {
    * @returns {T}
    */
   find(fn) {
-    for (let e of this) if (fn(e, this)) return e;
+    for (const e of this) if (fn(e, this)) return e;
   }
   
   /**
@@ -64,7 +64,7 @@ class Collection extends Set {
    */
   map(fn) {
     let out = new Collection();
-    for (let e of this) out.add(fn(e, this));
+    for (const e of this) out.add(fn(e, this));
     return out;
   }
 }
