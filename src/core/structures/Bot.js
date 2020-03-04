@@ -83,8 +83,6 @@ class Bot extends EventEmitter {
 
     this.client.on('message', (message) => {
       const parsed = this.parseCommand(message);
-      console.log(parsed ? '{}' : 'null');
-      console.log(message.content);
 
       if (parsed) {
         this.emit('command', parsed);

@@ -82,9 +82,7 @@ class Melody extends Bot {
     });
   }
 
-  async onMessage(message) {
-    this.logger.log('MESSAGE', message.content);
-  }
+  async onMessage(message) {}
 
   getUserLevel({ message }) {
     let userLevel = 0;
