@@ -1,5 +1,5 @@
 'use strict';
-const Command = require('../core/structures/Command.js');
+const Command = require('../core/Command.js');
 const Embeds = require('../Embeds.js');
 const config = require('../config.json');
 

@@ -1,9 +1,9 @@
 'use strict';
 const path = require('path');
-const Bot = require('./core/structures/Bot.js');
-const Command = require('./core/structures/Command.js');
-const { readdir } = require('./core/modules/utils/fs.js');
-const { logifyGuild } = require('./core/modules/utils/logging.js');
+const Bot = require('./core/Bot.js');
+const Command = require('./core/Command.js');
+const { readdir } = require('./utils/fs.js');
+const { logifyGuild } = require('./utils/text.js');
 
 // Crash when a promise rejection goes unhandled
 process.on('unhandledRejection', (reason) => { throw reason; });
@@ -31,7 +31,7 @@ class Melody extends Bot {
       changelog: null
     };
 
-    this.client.on('debug', console.log);
+    //this.client.on('debug', console.log);
     this.on('command', (...args) => this.onCommand(...args));
     this.on('message', (...args) => this.onMessage(...args));
   }

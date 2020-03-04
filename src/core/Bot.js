@@ -6,9 +6,9 @@ const Logger = require('./Logger.js');
 const GuildManager = require('./GuildManager.js');
 const Command = require('./Command.js');
 const Collection = require('./Collection.js');
-const { exists, mkdir } = require('../modules/utils/fs.js');
-const { mergeDefault } = require('../modules/utils/object.js');
-const { awaitEvent, wait } = require('../modules/utils/general.js');
+const { exists, mkdir } = require('../utils/fs.js');
+const { mergeDefault } = require('../utils/obj.js');
+const { awaitEvent, wait } = require('../utils/util.js');
 
 const events = Object.values(Discord.Constants.Events);
 

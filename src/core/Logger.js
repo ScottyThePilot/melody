@@ -1,8 +1,8 @@
 'use strict';
 const path = require('path');
-const { ws, write, read, mkdir, stat, exists } = require('../modules/utils/fs.js');
-const { makeLogEntry, savifyDate } = require('../modules/utils/logging');
-const { mergeDefault } = require('../modules/utils/object.js');
+const { ws, write, read, mkdir, stat, exists } = require('../utils/fs.js');
+const { makeLogEntry, savifyDate } = require('../utils/text.js');
+const { mergeDefault } = require('../utils/obj.js');
 
 class Logger {
   /**

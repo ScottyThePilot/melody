@@ -1,6 +1,6 @@
 'use strict';
 const { fork } = require('child_process');
-const { makeLogEntry } = require('./src/core/modules/utils/logging.js');
+const { makeLogEntry } = require('./src/utils/text.js');
 
 function launch() {
   log('PARENT', 'Launching Bot...');

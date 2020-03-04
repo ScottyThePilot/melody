@@ -3,7 +3,7 @@ const path = require('path');
 const Logger = require('./Logger.js');
 const Lazystore = require('./Lazystore.js');
 const Queue = require('./Queue.js');
-const { mkdir, exists } = require('../modules/utils/fs.js');
+const { mkdir, exists } = require('../utils/fs.js');
 
 class GuildManager {
   /**
