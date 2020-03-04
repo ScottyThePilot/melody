@@ -1,7 +1,7 @@
 'use strict';
 const { RichEmbed } = require('discord.js');
 const config = require('./config.json');
-const { capFirst } = require('./utils/general.js');
+const { capFirst } = require('./utils/util.js');
 
 
 
