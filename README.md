@@ -2,7 +2,7 @@
 
 This is a simple Discord bot, made by me, Scotty#4263. My lazy ass is still in the process of writing it, so I would not recommend using it. I really only have this public so I can show the horrible code to other people.
 
-If you want to run your own copy of my bot to learn how it works, to provide feedback, to investigate issues, or to simply check out my bot, feel free to clone or fork my repo, and follow the instructions below on how to host it. 
+If you want to run your own copy of my bot to learn how it works, to provide feedback, to investigate issues, or to simply check out my bot, feel free to clone or fork my repo, and follow the instructions below on how to host it.
 
 ## File Structure and Config
 
@@ -23,12 +23,26 @@ melody_v3/
 Here's an example of what config.json might look like
 ```json
 {
-  "version": "1.0.0",
+  "client": {
+    "disableEveryone": true,
+    "restTimeOffset": 750,
+    "disabledEvents": [
+      "VOICE_STATE_UPDATE",
+      "VOICE_SERVER_UPDATE",
+      "TYPING_START",
+      "PRESENCE_UPDATE"
+    ]
+  },
+  "version": "0.0.0",
   "prefix": "!",
   "token": "your-token-goes-here",
   "owner": "your-discord-id-here",
   "trustedUsers": [
     "a-discord-id-of-someone-you-trust"
-  ]
+  ],
+  "paths": {
+    "data": "./data",
+    "guilds": "./src/commands"
+  }
 }
 ```
