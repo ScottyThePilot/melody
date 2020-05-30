@@ -13,6 +13,10 @@ import path from 'path';
 
 const events = Object.values(Discord.Constants.Events);
 
+/*
+
+*/
+
 namespace Melody {
   export interface Config {
     readonly client?: Discord.ClientOptions;
