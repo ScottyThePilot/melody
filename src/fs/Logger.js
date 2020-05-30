@@ -27,6 +27,8 @@ class Logger {
    */
   static async create(p, options) {
     const stream = fs.createWriteStream(p, { flags: 'a' });
+    const { wipeOnLoad = Logger.defaultOptions.wipeOnLoad } = options;
+    if (wipeOnLoad) await fs.promises.writeFile(p, '');
     await Util.onceEvent(stream, 'ready');
     return await new Logger(p, stream, options).init();
   }
@@ -100,6 +102,7 @@ class Logger {
 Logger.defaultOptions = {
   logToConsole: false,
   logsFolder: null,
+  wipeOnLoad: false,
   maxFileSize: 524288
 };
 
@@ -137,5 +140,6 @@ function getHeaderColor(header) {
  * @typedef LoggerOptions
  * @property {boolean} logToConsole
  * @property {fs.PathLike | null} logsFolder
+ * @property {boolean} wipeOnLoad
  * @property {number} maxFileSize
  */

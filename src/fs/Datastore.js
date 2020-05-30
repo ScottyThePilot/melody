@@ -116,7 +116,6 @@ class Datastore {
    */
   async resolveState() {
     const wipe = this.options.wipeIfCorrupt;
-    console.log('wipe: ' + wipe);
     let data = await this.handle.readFile({ flag: 'r+' });
     try {
       data = parseJSON(data);

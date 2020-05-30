@@ -29,7 +29,7 @@ export default class Command {
     this.level = level;
     /** @type {boolean} */
     this.hidden = hidden;
-    /** @type {Executor} */
+    /** @type {ExecutorFunction} */
     this.exec = exec;
   }
 
@@ -49,14 +49,14 @@ export default class Command {
 
   /**
    * @param {Data} data
-   * @returns {Promise<string>}
+   * @returns {Promise<'disabled' | 'not_here' | 'wrong_level' | 'ok'>}
    */
   async attempt(data) {
     if (this.disabled) return 'disabled';
     if (!this.here(data.location)) return 'not_here';
     if (data.level < this.level) return 'wrong_level';
 
-    
+    await this.exec.call(this, data);
 
     return 'ok';
   }
@@ -102,10 +102,10 @@ export default class Command {
 
 /**
  * @typedef Data
- * @property {import('./Melody')} melody
+ * @property {import('./Melody').default} melody
  * @property {number} level
  * @property {Where} where
- * @property {import('./Manager') | null} manager
+ * @property {import('./Manager').default | null} manager
  * @property {import('discord.js').Message} message
  * @property {string} command
  * @property {string} argsText
@@ -126,7 +126,7 @@ export default class Command {
  * @property {boolean} [disabled]
  * @property {number} [level]
  * @property {boolean} [hidden]
- * @property {Executor} exec
+ * @property {ExecutorFunction} exec
  */
 
 

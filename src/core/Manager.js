@@ -30,9 +30,8 @@ export default class Manager {
   /**
    * @param {string} id
    * @param {import('fs').PathLike} location
-   * @param {object} [defaultState]
    */
-  static async create(id, location, defaultState) {
+  static async create(id, location) {
     const folder = path.join(location.toString(), id);
     await Util.suppressCode(fs.promises.mkdir(folder), 'EEXIST');
 
@@ -41,7 +40,7 @@ export default class Manager {
     });
 
     const store = await Datastore.create(path.join(folder, 'store.json'), {
-      defaultState
+      defaultState: Manager.defaultState
     });
 
     return new Manager(id, logger, store);
@@ -96,3 +95,12 @@ export default class Manager {
     ]);
   }
 }
+
+/** @type */
+Manager.defaultState = {
+  prefix: null,
+  disabledCommands: [],
+  loggingLevel: 0
+};
+
+// Level 0: None, Level 1: Edits/Deletions, Level 2: All Messages

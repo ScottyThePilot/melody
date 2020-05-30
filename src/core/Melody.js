@@ -42,7 +42,7 @@ export default class Melody extends EventEmitter {
     this.client = client;
     /** @type {Logger} */
     this.logger = logger;
-    /** @type {Group<Command>} */
+    /** @type {Group<import('./Command').default>} */
     this.commands = commands;
     /** @type {Table<string, Manager>} */
     this.managers = managers;
@@ -59,13 +59,14 @@ export default class Melody extends EventEmitter {
     this.trustedUsers = trustedUsers;
     /** @type {string} */
     this.dataDir = dataDir;
+    /** @type {{  }} */
   }
 
   /**
    * @param {Config} config
    * @param {Group<Command>} [commands]
    */
-  static async create(config, commands = new Group()) {
+  static async create(config, commandArray = []) {
     const client = new Discord.Client(config.client);
 
     await Util.suppressCode(fs.promises.mkdir(config.dataDir, { recursive: true }), 'EEXIST');
@@ -76,6 +77,7 @@ export default class Melody extends EventEmitter {
     });
 
     const managers = new Table();
+    const commands = new Group(commandArray);
     return await new Melody(client, { logger, managers, commands, config }).init();
   }
 
@@ -104,7 +106,10 @@ export default class Melody extends EventEmitter {
 
     this.client.on('message', message => {
       const parsed = this.parseCommand(message);
-      if (parsed) this.emit('command', parsed);else this.emit('message', message);
+      if (parsed)
+        this.emit('command', parsed);
+      else
+        this.emit('message', message);
     });
 
     // Register guild managers
@@ -159,6 +164,19 @@ export default class Melody extends EventEmitter {
     const manager = this.managers.get(id);
     if (!manager) throw new Error('Cannot find manager with id ' + id);
     await manager.destroy();
+  }
+
+  getUserLevel(data) {
+    let level = 0;
+
+    if (data.message.guild) {
+      if (data.message.member.hasPermission('ADMINISTRATOR')) level = 1;
+      if (data.message.guild.owner.id === data.message.author.id) level = 2;
+    } else if (this.trustedUsers.includes(data.message.author.id)) level = 3;
+
+    if (this.owner === data.message.author.id) level = 10;
+
+    return level;
   }
 
   /**
