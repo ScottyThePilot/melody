@@ -96,7 +96,7 @@ export default class Manager {
   }
 }
 
-/** @type */
+/** @type {object} */
 Manager.defaultState = {
   prefix: null,
   disabledCommands: [],
