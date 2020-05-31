@@ -1,6 +1,7 @@
 'use strict';
 import Manager from './Manager.js';
 import Logger from '../fs/Logger.js';
+import CleverBotManager from '../feature/CleverBotManager.js';
 import Group from '../utils/Group.js';
 import Table from '../utils/Table.js';
 import Util from '../utils/Util.js';
@@ -25,6 +26,7 @@ export default class Melody extends EventEmitter {
       logger,
       commands,
       managers,
+      clever,
       config: {
         version,
         token,
@@ -42,6 +44,8 @@ export default class Melody extends EventEmitter {
     this.client = client;
     /** @type {Logger} */
     this.logger = logger;
+    /** @type {CleverBotManager} */
+    this.clever = clever;
     /** @type {Group<import('./Command').default>} */
     this.commands = commands;
     /** @type {Table<string, Manager>} */
@@ -59,7 +63,6 @@ export default class Melody extends EventEmitter {
     this.trustedUsers = trustedUsers;
     /** @type {string} */
     this.dataDir = dataDir;
-    /** @type {{  }} */
   }
 
   /**
@@ -76,9 +79,11 @@ export default class Melody extends EventEmitter {
       logToConsole: true
     });
 
+    const clever = new CleverBotManager();
+
     const managers = new Table();
     const commands = new Group(commandArray);
-    return await new Melody(client, { logger, managers, commands, config }).init();
+    return await new Melody(client, { logger, clever, managers, commands, config }).init();
   }
 
   /**

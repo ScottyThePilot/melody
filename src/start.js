@@ -21,11 +21,16 @@ Melody.create(config, commands).then((melody) => {
     melody.destroy().then(() => process.exit());
   });
 
-
-
-  /*melody.on('message', async (message) => {
-    console.log('message: %s',  message.content);
-  });*/
+  melody.on('message', async (message) => {
+    if (melody.mention.test(message.contents)) {
+      const match = message.contents.match(melody.mention)[0];
+      const msg = message.contents.slice(match.length).trim();
+      const response = await melody.clever.send(message.channel.id, msg).catch(() => null);
+      
+      if (response === null) await message.react('\u274e').catch();
+      else await message.channel.send(response).catch(melody.catcher);
+    }
+  });
 
   melody.on('command', async (data) => {
     const { message, command } = data;
