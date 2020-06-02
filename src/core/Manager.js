@@ -32,7 +32,7 @@ export default class Manager {
     await Util.suppressCode(fs.promises.mkdir(folder), 'EEXIST');
 
     const register = await Register.create(path.join(folder, 'register.db'), {
-      logsFolder: path.join(location.toString(), id, 'logs')
+      logsFolder: path.join(folder, 'logs')
     });
 
     const store = await Datastore.create(path.join(folder, 'store.json'), {
