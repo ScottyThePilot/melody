@@ -2,9 +2,6 @@
 import Util from '../utils/Util.js';
 import fs from 'fs';
 
-/**
- * @implements {DatastoreAgent}
- */
 class Datastore {
   /**
    * @param {import('fs').PathLike} p
@@ -162,12 +159,4 @@ function parseJSON(text) {
  * @property {object} defaultState
  * @property {boolean} wipeIfCorrupt
  * @property {boolean} compact
- */
-
-/**
- * @typedef DatastoreAgent
- * @property {(p: string | string[]) => any} get
- * @property {(p: string | string[], value: any) => void} set
- * @property {(p: string | string[]) => boolean} has
- * @property {(force: boolean) => Promise<boolean>} write
  */

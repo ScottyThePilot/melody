@@ -6,6 +6,16 @@ import fs from 'fs';
 class Logger extends LoggerBase {
   /**
    * @param {fs.PathLike} p 
+   * @param {fs.WriteStream} stream 
+   * @param {LoggerBaseOptions} [options] 
+   */
+  constructor(p, stream, options) {
+    super(p, stream, options);
+    this.options.fileExtension = '.log';
+  }
+
+  /**
+   * @param {fs.PathLike} p 
    * @param {import('./LoggerBase.js').LoggerBaseOptions} options
    * @returns {Promise<Logger>}
    */
@@ -24,7 +34,7 @@ class Logger extends LoggerBase {
   log(header, text, ...rest) {
     const entry = Util.makeLogEntry(header, text, ...rest);
     if (this.options.logToConsole) console.log(getHeaderColor(header) + entry);
-    return this.write(entry + '\n');
+    return this.writeEntry(entry + '\n');
   }
 }
 

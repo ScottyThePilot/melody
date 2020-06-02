@@ -12,9 +12,6 @@ import fs from 'fs';
 
 const events = Object.values(Discord.Constants.Events);
 
-/**
- * @implements {import('../fs/Logger').LoggerAgent}
- */
 export default class Melody extends EventEmitter {
   /**
    * @param {Discord.Client} client 

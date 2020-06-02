@@ -3,7 +3,7 @@ import LoggerBase from './LoggerBase.js';
 import Util from '../utils/Util.js';
 import fs from 'fs';
 
-class Entrystore extends LoggerBase {
+class Register extends LoggerBase {
   /**
    * @param {fs.PathLike} p 
    * @param {fs.WriteStream} stream 
@@ -13,17 +13,18 @@ class Entrystore extends LoggerBase {
     super(p, stream, options);
     /** @type {fs.PathLike} */
     this.path = p;
+    this.options.fileExtension = '.db';
   }
 
   /**
    * @param {fs.PathLike} p 
    * @param {import('./LoggerBase.js').LoggerBaseOptions} options
-   * @returns {Promise<Entrystore>}
+   * @returns {Promise<Register>}
    */
   static async create(p, options) {
     const stream = fs.createWriteStream(p, { flags: 'a' });
     await Util.onceEvent(stream, 'ready');
-    return await new Entrystore(p, stream, options).init();
+    return await new Register(p, stream, options).init();
   }
 
   /**
@@ -31,7 +32,7 @@ class Entrystore extends LoggerBase {
    * @returns {boolean}
    */
   write(entry) {
-    return super.entry(JSON.stringify(entry));
+    return super.writeEntry(JSON.stringify(entry));
   }
 
   /**
@@ -46,4 +47,4 @@ class Entrystore extends LoggerBase {
   }
 }
 
-export default Entrystore;
+export default Register;

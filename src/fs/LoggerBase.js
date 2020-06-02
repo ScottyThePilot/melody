@@ -63,7 +63,7 @@ class LoggerBase {
     const rotate = size >= this.options.maxFileSize;
     if (rotate) {
       const folder = this.options.logsFolder.toString();
-      const filepath = path.join(folder, Util.savifyDate(now) + '.log');
+      const filepath = path.join(folder, Util.savifyDate(now) + this.options.fileExtension);
       
       const contents = await handle.readFile();
       await fs.promises.writeFile(filepath, contents, { flag: 'wx' });
@@ -80,8 +80,9 @@ class LoggerBase {
   /**
    * @param {string|Buffer} entry
    * @returns {boolean}
+   * @private
    */
-  write(entry) {
+  writeEntry(entry) {
     return this.stream.writable ? this.stream.write(entry + '\n') : true;
   }
 
@@ -96,7 +97,8 @@ class LoggerBase {
 LoggerBase.defaultOptions = {
   logToConsole: false,
   logsFolder: null,
-  maxFileSize: 524288
+  maxFileSize: 524288,
+  fileExtension: '.log'
 };
 
 export default LoggerBase;

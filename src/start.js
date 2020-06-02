@@ -17,19 +17,14 @@ const commands = [
 ];
 
 Melody.create(config, commands).then((melody) => {
-  process.on('SIGHUP', () => {
-    melody.destroy().then(() => process.exit());
+  process.on('SIGHUP', async () => {
+    await melody.destroy();
+    process.exit(0);
   });
 
-  melody.on('message', async (message) => {
-    if (melody.mention.test(message.content)) {
-      const match = message.content.match(melody.mention)[0];
-      const msg = message.content.slice(match.length).trim();
-      const response = await melody.clever.send(message.channel.id, msg).catch(() => null);
-
-      if (response === null) await message.react('\u274e').catch();
-      else await message.channel.send(`<@${message.author.id}>, ${response}`).catch(melody.catcher);
-    }
+  melody.on('invalidated', async () => {
+    await melody.destroy();
+    process.exit(0);
   });
 
   melody.on('command', async (data) => {
@@ -54,6 +49,17 @@ Melody.create(config, commands).then((melody) => {
       case 'disabled': return await message.channel.send('That command is disabled.');
       case 'not_here': return await message.channel.send('You cannot use this command here.');
       case 'wrong_level': return await message.channel.send('You do not have permission to do that.');
+    }
+  });
+
+  melody.on('message', async (message) => {
+    if (melody.mention.test(message.content)) {
+      const match = message.content.match(melody.mention)[0];
+      const msg = message.content.slice(match.length).trim();
+      const response = await melody.clever.send(message.channel.id, msg).catch(() => null);
+
+      if (response === null) await message.react('\u274e').catch();
+      else await message.channel.send(`<@${message.author.id}>, ${response}`).catch(melody.catcher);
     }
   });
 });
