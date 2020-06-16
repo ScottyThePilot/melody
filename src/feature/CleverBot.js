@@ -1,7 +1,7 @@
 'use strict';
 /* jshint esversion: 9, node: true */
 // Initially written by Yernemm (https://yernemm.xyz)
-// Edited by Scotty
+// Edited by ScottyThePilot
 
 import https from 'https';
 import md5 from 'md5';
@@ -88,6 +88,7 @@ export default class CleverBot {
    */
   async send(msg) {
     const reply = await CleverBot.send(msg, this.history);
+    this.history.push(msg);
     this.history.push(reply);
     if (this.history.length > this.history)
       this.history.shift();
