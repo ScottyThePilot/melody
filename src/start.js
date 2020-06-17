@@ -19,7 +19,7 @@ const commands = [
 Melody.create(config, commands).then((melody) => {
   process.on('SIGHUP', async () => {
     await melody.destroy();
-    process.exit(0);
+    process.exit(1);
   });
 
   melody.on('invalidated', async () => {
@@ -29,6 +29,7 @@ Melody.create(config, commands).then((melody) => {
 
   melody.on('command', async (data) => {
     const { message, command } = data;
+    if (message.bot || message.system) return;
     const found = melody.commands.find((cmd) => cmd.is(command));
 
     if (!found) return;
@@ -60,6 +61,42 @@ Melody.create(config, commands).then((melody) => {
 
       if (response === null) await message.react('\u274e').catch();
       else await message.channel.send(`<@${message.author.id}>, ${response}`).catch(melody.catcher);
+    }
+
+    const guild = message.guild;
+    const manager = guild ? melody.managers.get(guild.id) : null;
+
+    if (manager && manager.store.get('logLevel') >= 2) {
+      
+
+
+    }
+  });
+
+  melody.on('messageUpdate', async (oldMessage, newMessage) => {
+    const guild = oldMessage.guild;
+    const manager = guild ? melody.managers.get(guild.id) : null;
+
+    if (manager && manager.store.get('logLevel') >= 1) {
+      
+    }
+  });
+
+  melody.on('messageDelete', async (message) => {
+    const guild = message.guild;
+    const manager = guild ? melody.managers.get(guild.id) : null;
+
+    if (manager && manager.store.get('logLevel') >= 1) {
+
+    }
+  });
+
+  melody.on('messageDeleteBulk', async (messages) => {
+    const guild = messages.first().guild;
+    const manager = guild ? melody.managers.get(guild.id) : null;
+
+    if (manager && manager.store.get('logLevel') >= 1) {
+
     }
   });
 });

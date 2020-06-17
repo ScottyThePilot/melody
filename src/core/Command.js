@@ -49,12 +49,15 @@ export default class Command {
 
   /**
    * @param {Data} data
-   * @returns {Promise<'disabled' | 'not_here' | 'wrong_level' | 'ok'>}
+   * @returns {Promise<'disabled' | 'not_here' | 'wrong_level' | 'hidden_error' | 'ok'>}
    */
   async attempt(data) {
-    if (this.disabled) return 'disabled';
-    if (!this.here(data.location)) return 'not_here';
-    if (data.level < this.level) return 'wrong_level';
+    if (this.disabled)
+      return this.hidden ? 'hidden_error' : 'disabled';
+    if (!this.here(data.location))
+      return this.hidden ? 'hidden_error' : 'not_here';
+    if (data.level < this.level)
+      return this.hidden ? 'hidden_error' : 'wrong_level';
 
     await this.exec.call(this, data);
 

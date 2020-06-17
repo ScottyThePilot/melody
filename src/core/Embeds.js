@@ -40,3 +40,11 @@ export class CommandHelpList extends Discord.MessageEmbed {
     this.setFooter(`Melody v${config.version}`);
   }
 }
+
+export class List extends Discord.MessageEmbed {
+  constructor(list) {
+    this.setColor([114, 137, 218]);
+    for (const [i, value] of list.entries())
+      this.addField(`\`${i}\``, value.toString());
+  }
+}

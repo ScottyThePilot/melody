@@ -16,6 +16,16 @@ export default class CleverBotManager {
 
   /**
    * @param {string} id
+   * @returns {CleverBotChannel | null}
+   */
+  get(id) {
+    return this.channels.has(id)
+      ? this.channels.get(id)
+      : null;
+  }
+
+  /**
+   * @param {string} id
    * @returns {Promise<void>}
    */
   clear(id) {
@@ -63,5 +73,10 @@ export class CleverBotChannel {
    */
   send(msg) {
     return this.queue.wait(() => this.clever.send(msg));
+  }
+
+  /** @type {string[]} */
+  get history() {
+    return this.clever.history;
   }
 }

@@ -22,10 +22,10 @@ export default new Command({
     } else {
       const cmd = melody.commands.find((c) => c.is(args[0]));
       if (!cmd) {
-        await message.author.send('That command does not exist.').catch(melody.catcher);
+        await message.channel.send('That command does not exist.').catch(melody.catcher);
       } else {
         const embed = new Embeds.CommandHelp(cmd);
-        await message.author.send(embed).catch(melody.catcher);
+        await message.channel.send(embed).catch(melody.catcher);
       }
     }
   }
