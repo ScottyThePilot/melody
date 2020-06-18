@@ -43,8 +43,12 @@ export class CommandHelpList extends Discord.MessageEmbed {
 
 export class List extends Discord.MessageEmbed {
   constructor(list) {
+    super();
     this.setColor([114, 137, 218]);
-    for (const [i, value] of list.entries())
-      this.addField(`\`${i}\``, value.toString());
+    for (const [i, v] of list.entries()) {
+      if (i >= 25) break;
+      const value = v.length > 1021 ? v.slice(0, 1021) + '...' : v;
+      this.addField(`\`${i}\``, value);
+    }
   }
 }

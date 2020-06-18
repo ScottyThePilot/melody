@@ -17,12 +17,17 @@ export default new Command({
     if (!args[0]) {
       await message.channel.send('No subcommand provided. Try \`dump\` or \`clear\`.').catch(melody.catcher);
     } else if (args[0] === 'dump') {
-      const channel = melody.clever.get(message.channel.id);
-      if (channel || channel.history.length === 0) {
+      const id = message.channel.id;
+      const channel = melody.clever.get(id);
+      if (channel === null || channel.history.length === 0) {
         await message.channel.send(`No CleverBot context for channel \`${id}\`.`).catch(melody.catcher);
       } else {
-        const list = new Embeds.List(channel.history);
-        await message.channel.send(`CleverBot context for channel \`${id}\`:`, list).catch(melody.catcher);
+        const list = getList(channel.history);
+        if (list === null) {
+          await message.channel.send(`Unable to send CleverBot context for channel \`${id}\``).catch(melody.catcher);
+        } else {
+          await message.channel.send(`CleverBot context for channel \`${id}\`:`, list).catch(melody.catcher);
+        }
       }
     } else if (args[0] === 'clear') {
       const id = message.channel.id;
@@ -33,3 +38,11 @@ export default new Command({
     }
   }
 });
+
+function getList(history) {
+  try {
+    return new Embeds.List(history);
+  } catch (e) {
+    return null;
+  }
+}

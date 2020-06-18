@@ -90,7 +90,7 @@ export default class CleverBot {
     const reply = await CleverBot.send(msg, this.history);
     this.history.push(msg);
     this.history.push(reply);
-    if (this.history.length > this.history)
+    while (this.history.length > this.size)
       this.history.shift();
     return reply;
   }
