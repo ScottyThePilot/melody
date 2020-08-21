@@ -3,7 +3,7 @@ import Command from '../core/Command.js';
 import config from '../config.js';
 import aghpb from 'aghpb_get';
 
-let list = null;
+let list = aghpb();
 
 export default new Command({
   name: 'aghpb',
@@ -21,6 +21,6 @@ export default new Command({
 });
 
 async function pickImage() {
-  if (list === null) list = await aghpb();
-  return list[Math.floor(Math.random() * list.length)];
+  const l = await list;
+  return l[Math.floor(Math.random() * l.length)];
 }
