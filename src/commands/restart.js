@@ -12,7 +12,7 @@ export default new Command({
     example: `${config.prefix}restart`
   },
   exec: async function exec({ melody, message }) {
-    await message.react('\u2705').catch();
+    await message.react('\u2705').catch(() => null);
     await melody.destroy();
 
     // Exit with 0 to signal that the process should restart

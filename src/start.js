@@ -63,7 +63,7 @@ Melody.create(config, commands).then((melody) => {
       const msg = message.content.slice(match.length).trim();
       const response = await melody.clever.send(message.channel.id, msg).catch(() => null);
 
-      if (response === null) await message.react('\u274e').catch();
+      if (response === null) await message.react('\u274e').catch(() => null);
       else await message.channel.send(`<@${message.author.id}>, ${response}`).catch(melody.catcher);
     }
 

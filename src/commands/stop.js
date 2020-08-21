@@ -12,7 +12,7 @@ export default new Command({
     example: `${config.prefix}stop`
   },
   exec: async function exec({ melody, message }) {
-    await message.react('\u2705').catch();
+    await message.react('\u2705').catch(() => null);
     await melody.destroy();
 
     // Exit with 1 to signal that the process should not restart
