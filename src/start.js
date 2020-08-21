@@ -4,6 +4,7 @@ import config from './config.js';
 
 process.on('unhandledRejection', (reason) => { throw reason; });
 
+import cmdAGHPB from './commands/aghpb.js';
 import cmdClever from './commands/clever.js';
 import cmdHelp from './commands/help.js';
 import cmdPing from './commands/ping.js';
@@ -11,6 +12,7 @@ import cmdRestart from './commands/restart.js';
 import cmdStop from './commands/stop.js';
 
 const commands = [
+  cmdAGHPB,
   cmdClever,
   cmdHelp,
   cmdPing,
