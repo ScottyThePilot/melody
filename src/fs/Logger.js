@@ -34,7 +34,7 @@ class Logger extends LoggerBase {
   log(header, text, ...rest) {
     const entry = Util.makeLogEntry(header, text, ...rest);
     if (this.options.logToConsole) console.log(getHeaderColor(header) + entry);
-    return this.writeEntry(entry + '\n');
+    return this.writeEntry(entry);
   }
 }
 

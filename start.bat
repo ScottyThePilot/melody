@@ -1,5 +1,5 @@
 @echo off
 title MelodyBot
-node .
+node --experimental-modules .
 pause
 exit
