@@ -11,7 +11,8 @@ export default class Command {
     where = 'anywhere',
     disabled = false,
     level = 0,
-    hidden = false
+    hidden = false,
+    exclusive = null
   }) {
     /** @type {string} */
     this.name = name;
@@ -29,6 +30,8 @@ export default class Command {
     this.level = level;
     /** @type {boolean} */
     this.hidden = hidden;
+    /** @type {string | null} */
+    this.exclusive = exclusive;
     /** @type {ExecutorFunction} */
     this.exec = exec;
   }
@@ -49,9 +52,11 @@ export default class Command {
 
   /**
    * @param {Data} data
-   * @returns {Promise<'disabled' | 'not_here' | 'wrong_level' | 'hidden_error' | 'ok'>}
+   * @returns {Promise<'disabled' | 'not_here' | 'wrong_level' | 'exclusive' | 'hidden_error' | 'ok'>}
    */
   async attempt(data) {
+    if (this.exclusive && this.exclusive !== data.message.guild.id)
+      return this.hidden ? 'hidden_error' : 'exclusive';
     if (this.disabled)
       return this.hidden ? 'hidden_error' : 'disabled';
     if (!this.here(data.location))
@@ -65,7 +70,7 @@ export default class Command {
   }
 
   /**
-   * @param {Location} location 
+   * @param {Location} location
    * @returns {boolean}
    */
   here(location) {
@@ -131,5 +136,3 @@ export default class Command {
  * @property {boolean} [hidden]
  * @property {ExecutorFunction} exec
  */
-
-

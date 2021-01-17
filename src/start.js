@@ -6,18 +6,24 @@ process.on('unhandledRejection', (reason) => { throw reason; });
 
 import cmdAGHPB from './commands/aghpb.js';
 import cmdClever from './commands/clever.js';
+import cmdEval from './commands/eval.js';
 import cmdHelp from './commands/help.js';
 import cmdPing from './commands/ping.js';
 import cmdRestart from './commands/restart.js';
 import cmdStop from './commands/stop.js';
 
+import cmdJASCWatchNext from './commands/jasc-watchnext.js';
+
 const commands = [
   cmdAGHPB,
   cmdClever,
+  cmdEval,
   cmdHelp,
   cmdPing,
   cmdRestart,
-  cmdStop
+  cmdStop,
+  
+  cmdJASCWatchNext
 ];
 
 Melody.create(config, commands).then((melody) => {
@@ -71,7 +77,7 @@ Melody.create(config, commands).then((melody) => {
     const manager = guild ? melody.managers.get(guild.id) : null;
 
     if (manager && manager.store.get('logLevel') >= 2) {
-      
+
 
 
     }
@@ -82,7 +88,7 @@ Melody.create(config, commands).then((melody) => {
     const manager = guild ? melody.managers.get(guild.id) : null;
 
     if (manager && manager.store.get('logLevel') >= 1) {
-      
+
     }
   });
 

@@ -5,3 +5,7 @@ package-lock.json
 # Secret Data
 config.json
 data/
+
+# Rust Branch Stuff
+Cargo.lock
+target/
