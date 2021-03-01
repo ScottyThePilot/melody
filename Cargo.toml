@@ -5,3 +5,8 @@ authors = ["ScottyThePilot <scotty.codes@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+serenity = { version = "^0.10.2", features = ["unstable_discord_api"] }
+serde_multi = { git = "https://github.com/ScottyThePilot/serde_multi", features = ["toml", "bincode"] }
+serde = { version = "^1.0", features = ["derive"] }
+tokio = { version = "^1.2", features = ["full"] }
+util_macros = { git = "https://github.com/ScottyThePilot/util_macros" }
