@@ -2,11 +2,31 @@
 name = "melody"
 version = "0.1.0"
 authors = ["ScottyThePilot <scotty.codes@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
-serenity = { version = "^0.10.2", features = ["unstable_discord_api"] }
-serde_multi = { git = "https://github.com/ScottyThePilot/serde_multi", features = ["toml", "bincode"] }
-serde = { version = "^1.0", features = ["derive"] }
-tokio = { version = "^1.2", features = ["full"] }
-util_macros = { git = "https://github.com/ScottyThePilot/util_macros" }
+ahash = "0.8"
+bincode = "1.3"
+chrono = "0.4"
+command_attr = "0.4"
+fern = "0.6"
+itertools = "0.10"
+log = "0.4"
+once_cell = "1.14"
+rand = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+singlefile = { git = "https://github.com/ScottyThePilot/singlefile", features = ["tokio"] }
+thiserror = "1.0"
+tokio = { version = "1.21", features = ["full"] }
+toml = "0.5"
+uord = { git = "https://github.com/ScottyThePilot/misc-crates", features = ["serde"] }
+
+[dependencies.serenity]
+version = "0.11"
+default-features = false
+features = [
+  "rustls_backend",
+  "builder", "cache", "chrono", "client",
+  "gateway", "model", "http",
+  "unstable_discord_api"
+]
