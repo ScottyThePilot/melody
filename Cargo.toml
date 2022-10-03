@@ -20,6 +20,7 @@ thiserror = "1.0"
 tokio = { version = "1.21", features = ["full"] }
 toml = "0.5"
 uord = { git = "https://github.com/ScottyThePilot/misc-crates", features = ["serde"] }
+xz2 = "0.1"
 
 [dependencies.serenity]
 version = "0.11"

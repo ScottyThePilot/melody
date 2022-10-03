@@ -1,6 +1,6 @@
 #![allow(missing_debug_implementations)]
-use crate::{Contextualize, MelodyError, MelodyResult};
-use crate::utils::Blockify;
+use crate::{MelodyError, MelodyResult};
+use crate::utils::{Blockify, Contextualize};
 
 use itertools::Itertools;
 use serenity::builder::{
@@ -25,6 +25,9 @@ use serenity::model::user::User;
 use serenity::utils::Color;
 pub use serenity::futures::future::BoxFuture;
 
+use std::collections::HashSet;
+use std::fmt;
+
 macro_rules! when {
   ($ident:ident, $expr:expr) => {
     if let Some($ident) = $ident { $expr; };
@@ -39,7 +42,7 @@ macro_rules! builder {
   });
 }
 
-pub fn commands_builder(commands: &'static [BlueprintCommand])
+pub fn commands_builder<'a>(commands: impl IntoIterator<Item = &'a BlueprintCommand>)
 -> impl FnOnce(&mut CreateApplicationCommands) -> &mut CreateApplicationCommands {
   move |builder| commands.into_iter().fold(builder, move |builder, &blueprint| {
     builder.create_application_command(builder!(blueprint));
@@ -97,6 +100,7 @@ pub struct BlueprintCommand {
   pub description: &'static str,
   pub usage: Option<&'static [&'static str]>,
   pub examples: Option<&'static [&'static str]>,
+  pub plugin: Option<&'static str>,
   pub command_type: CommandType,
   pub allow_in_dms: bool,
   pub default_permissions: Option<Permissions>,
@@ -114,6 +118,17 @@ impl BlueprintCommand {
     };
 
     self.root.build_command(builder);
+  }
+
+  pub fn is_enabled(&self, plugins: &HashSet<String>) -> bool {
+    match self.plugin {
+      Some(plugin) => plugins.contains(plugin),
+      None => true
+    }
+  }
+
+  pub fn is_exclusive(&self) -> bool {
+    self.plugin.is_some()
   }
 
   fn stringify_usage(self) -> String {
@@ -377,7 +392,7 @@ impl BlueprintCommandResponse {
   }
 
   pub async fn send(self, ctx: &Context, interaction: &ApplicationCommandInteraction) -> MelodyResult {
-    interaction.create_interaction_response(&ctx.http, builder!(self))
+    interaction.create_interaction_response(&ctx, builder!(self))
       .await.context("failed to send interaction response")
   }
 }
@@ -566,6 +581,7 @@ macro_rules! blueprint_command {
     description: $description:literal,
     $(usage: [$($usage:expr),+ $(,)?],)?
     $(examples: [$($examples:expr),+ $(,)?],)?
+    $(plugin: $plugin:literal,)?
     $(command_type: $command_type:expr,)?
     $(allow_in_dms: $allow_in_dms:expr,)?
     $(default_permissions: $default_permissions:expr,)?
@@ -575,6 +591,7 @@ macro_rules! blueprint_command {
     description: $description,
     usage: $crate::default_expr!(None, $(Some(&[$($usage),*]))?),
     examples: $crate::default_expr!(None, $(Some(&[$($examples),*]))?),
+    plugin: $crate::default_expr!(None, $(Some($plugin))?),
     command_type: $crate::default_expr!(CommandType::ChatInput, $($command_type)?),
     allow_in_dms: $crate::default_expr!(false, $($allow_in_dms)?),
     default_permissions: $crate::default_expr!(None, $(Some($default_permissions))?),
@@ -587,6 +604,7 @@ macro_rules! blueprint_command {
     description: $description:literal,
     $(usage: [$($usage:expr),+ $(,)?],)?
     $(examples: [$($examples:expr),+ $(,)?],)?
+    $(plugin: $plugin:literal,)?
     $(command_type: $command_type:expr,)?
     $(allow_in_dms: $allow_in_dms:expr,)?
     $(default_permissions: $default_permissions:expr,)?
@@ -597,6 +615,7 @@ macro_rules! blueprint_command {
     description: $description,
     usage: $crate::default_expr!(None, $(Some(&[$($usage),*]))?),
     examples: $crate::default_expr!(None, $(Some(&[$($examples),*]))?),
+    plugin: $crate::default_expr!(None, $(Some($plugin))?),
     command_type: $crate::default_expr!(CommandType::ChatInput, $($command_type)?),
     allow_in_dms: $crate::default_expr!(false, $($allow_in_dms)?),
     default_permissions: $crate::default_expr!(None, $(Some($default_permissions))?),
@@ -751,4 +770,13 @@ macro_rules! blueprint_argument {
     required: $crate::default_expr!(false, $($required)?),
     data: $crate::blueprint::BlueprintOptionData::Attachment
   });
+}
+
+#[derive(Clone)]
+pub struct DisplayCommands<'a>(pub &'a [BlueprintCommand]);
+
+impl<'a> fmt::Display for DisplayCommands<'a> {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    f.debug_list().entries(self.0.iter().map(|blueprint| blueprint.name)).finish()
+  }
 }

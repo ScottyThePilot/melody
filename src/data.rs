@@ -2,7 +2,8 @@ mod brain;
 mod config;
 mod persist;
 
-use crate::{Contextualize, MelodyResult};
+use crate::MelodyResult;
+use crate::utils::Contextualize;
 pub use self::brain::*;
 pub use self::config::*;
 pub use self::persist::*;
@@ -16,6 +17,8 @@ use serde::de::DeserializeOwned;
 use singlefile::error::FormatError;
 use singlefile::manager::FileFormat;
 use tokio::sync::{Mutex, RwLockReadGuard, RwLockWriteGuard};
+use xz2::write::XzEncoder;
+use xz2::read::XzDecoder;
 
 use std::io::{Read, Write};
 use std::sync::Arc;
@@ -58,6 +61,21 @@ impl FileFormat for Bincode {
   }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BincodeCompressed;
+
+impl FileFormat for BincodeCompressed {
+  fn from_reader<R, T>(&self, reader: R) -> Result<T, FormatError>
+  where R: Read, T: DeserializeOwned {
+    bincode::deserialize_from(XzDecoder::new(reader)).map_err(From::from)
+  }
+
+  fn to_writer<W, T>(&self, writer: W, value: &T) -> Result<(), FormatError>
+  where W: Write, T: Serialize {
+    bincode::serialize_into(XzEncoder::new(writer, 9), value).map_err(From::from)
+  }
+}
+
 
 
 macro_rules! key {
@@ -77,11 +95,18 @@ key!(pub struct PersistKey, PersistContainer);
 key!(pub struct PersistGuildsKey, PersistGuildsWrapper);
 key!(pub struct ShardManagerKey, Arc<Mutex<ShardManager>>);
 key!(pub struct PreviousBuildIdKey, u64);
+key!(pub struct RestartKey, bool);
 
 #[inline]
 pub async fn data_insert<K>(client: &Client, value: K::Value)
 where K: TypeMapKey {
   client.data.write().await.insert::<K>(value);
+}
+
+pub async fn data_take<K>(client: &Client) -> K::Value
+where K: TypeMapKey {
+  client.data.write().await.remove::<K>()
+    .expect("failed to take value from typemap")
 }
 
 #[inline]
@@ -134,7 +159,13 @@ where F: FnOnce(RwLockWriteGuard<Persist>) -> MelodyResult<R> {
 }
 
 #[inline]
-pub async fn data_get_persist_guild(ctx: &Context, id: GuildId) -> MelodyResult<PersistGuildContainer> {
+pub async fn data_get_persist_guild(ctx: &Context, id: GuildId) -> Option<PersistGuildContainer> {
+  let persist_guilds = data_get::<PersistGuildsKey>(ctx).await;
+  PersistGuilds::get(persist_guilds, id).await
+}
+
+#[inline]
+pub async fn data_try_get_persist_guild(ctx: &Context, id: GuildId) -> MelodyResult<PersistGuildContainer> {
   let persist_guilds = data_get::<PersistGuildsKey>(ctx).await;
   PersistGuilds::get_default(persist_guilds, id)
     .await.context("failed to retrieve persist-guild")
@@ -143,20 +174,20 @@ pub async fn data_get_persist_guild(ctx: &Context, id: GuildId) -> MelodyResult<
 #[inline]
 pub async fn data_access_persist_guild<F, R>(ctx: &Context, id: GuildId, f: F) -> MelodyResult<R>
 where F: FnOnce(RwLockReadGuard<PersistGuild>) -> MelodyResult<R> {
-  f(data_get_persist_guild(ctx, id).await?.access().await)
+  f(data_try_get_persist_guild(ctx, id).await?.access().await)
 }
 
 #[inline]
 pub async fn data_access_persist_guild_mut<F, R>(ctx: &Context, id: GuildId, f: F) -> MelodyResult<R>
 where F: FnOnce(RwLockWriteGuard<PersistGuild>) -> MelodyResult<R> {
-  f(data_get_persist_guild(ctx, id).await?.access_mut().await)
+  f(data_try_get_persist_guild(ctx, id).await?.access_mut().await)
 }
 
 /// Acquires and provides access to a persist-guild state's write lock,
 /// committing its state to disk afterwards.
 pub async fn data_modify_persist_guild<F, R>(ctx: &Context, id: GuildId, f: F) -> MelodyResult<R>
 where F: FnOnce(RwLockWriteGuard<PersistGuild>) -> MelodyResult<R> {
-  let container = data_get_persist_guild(ctx, id).await?;
+  let container = data_try_get_persist_guild(ctx, id).await?;
   let out = f(container.access_mut().await)?;
   trace!("Saving persist-guild state for guild ({id})...");
   container.commit().await.context("failed to commit persist-guild state to disk")?;

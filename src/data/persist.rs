@@ -5,7 +5,7 @@ use singlefile::Error as FileError;
 use singlefile::container_tokio::ContainerAsyncWritableLocked;
 use tokio::sync::RwLock;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::Entry;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -15,7 +15,8 @@ pub type PersistContainer = ContainerAsyncWritableLocked<Persist, Bincode>;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Persist {
-  build_id: u64
+  build_id: u64,
+  guild_plugins: HashMap<u64, HashSet<String>>
 }
 
 impl Persist {
@@ -28,12 +29,17 @@ impl Persist {
   pub async fn swap_build_id(container: &PersistContainer) -> u64 {
     std::mem::replace(&mut container.access_mut().await.build_id, crate::build_id::get())
   }
+
+  pub async fn get_guild_plugins(container: &PersistContainer, id: GuildId) -> HashSet<String> {
+    container.access_mut().await.guild_plugins.entry(id.into()).or_default().clone()
+  }
 }
 
 impl Default for Persist {
   fn default() -> Self {
     Persist {
-      build_id: 0
+      build_id: 0,
+      guild_plugins: HashMap::new()
     }
   }
 }
@@ -52,11 +58,11 @@ impl PersistGuilds {
   }
 
   pub async fn get(wrapper: PersistGuildsWrapper, id: GuildId) -> Option<PersistGuildContainer> {
-    wrapper.read_owned().await.guilds.get(&id).cloned()
+    wrapper.read().await.guilds.get(&id).cloned()
   }
 
   pub async fn get_default(wrapper: PersistGuildsWrapper, id: GuildId) -> Result<PersistGuildContainer, FileError> {
-    match wrapper.write_owned().await.guilds.entry(id) {
+    match wrapper.write().await.guilds.entry(id) {
       Entry::Occupied(occupied) => Ok(occupied.get().clone()),
       Entry::Vacant(vacant) => Ok(vacant.insert(PersistGuild::create(id).await?).clone())
     }

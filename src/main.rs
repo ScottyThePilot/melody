@@ -25,18 +25,19 @@ pub mod commands;
 pub mod data;
 pub mod feature;
 
-use crate::blueprint::commands_builder;
 use crate::commands::APPLICATION_COMMANDS;
 use crate::data::*;
+use crate::utils::{Contextualize, Loggable};
 
 use fern::Dispatch;
 use rand::Rng;
-use serenity::model::application::command::Command;
 use serenity::model::application::interaction::Interaction;
 use serenity::model::channel::Message;
 use serenity::client::{Context, Client, EventHandler};
 use serenity::model::gateway::{GatewayIntents, Ready};
 use serenity::model::id::GuildId;
+
+use std::time::Duration;
 
 
 
@@ -69,6 +70,7 @@ async fn start() -> MelodyResult<bool> {
   data_insert::<PersistGuildsKey>(&client, PersistGuilds::create()).await;
   data_insert::<ShardManagerKey>(&client, client.shard_manager.clone()).await;
   data_insert::<PreviousBuildIdKey>(&client, previous_build_id).await;
+  data_insert::<RestartKey>(&client, false).await;
 
   let shard_manager = client.shard_manager.clone();
   let ctrl_c = tokio::spawn(async move {
@@ -80,7 +82,14 @@ async fn start() -> MelodyResult<bool> {
   client.start().await.context("failed to start client")?;
   ctrl_c.abort();
 
-  Ok(false)
+  if data_take::<RestartKey>(&client).await {
+    info!("Restarting in 10 seconds...");
+    tokio::time::sleep(Duration::from_secs(10)).await;
+
+    Ok(true)
+  } else {
+    Ok(false)
+  }
 }
 
 #[derive(Debug)]
@@ -90,21 +99,14 @@ struct Handler;
 impl EventHandler for Handler {
   async fn ready(&self, ctx: Context, ready_info: Ready) {
     info!("Bot connected: {} ({})", ready_info.user.tag(), ready_info.user.id);
-
-    if data_get::<PreviousBuildIdKey>(&ctx).await != crate::build_id::get() {
-      info!("New build detected, registering commands");
-      Command::set_global_application_commands(&ctx, commands_builder(APPLICATION_COMMANDS))
-        .await.context("failed to register commands").log();
-    } else {
-      info!("Commands will not be re-registered");
-    };
   }
 
   async fn cache_ready(&self, ctx: Context, guilds: Vec<GuildId>) {
-    for guild_id in guilds {
-      let guild_name = ctx.cache.guild_field(guild_id, |guild| guild.name.clone())
-        .unwrap_or_else(|| "Unknown".to_owned());
-      info!("Discovered guild: {guild_name} ({guild_id})");
+    if data_get::<PreviousBuildIdKey>(&ctx).await != crate::build_id::get() {
+      info!("New build detected, registering commands");
+      crate::commands::register_commands(&ctx, &guilds).await.log();
+    } else {
+      info!("Commands will not be re-registered");
     };
   }
 
@@ -126,12 +128,12 @@ impl EventHandler for Handler {
 
     if should_contribute {
       info!("Contributing to message chain in channel ({})", message.channel_id);
-      message.channel_id.send_message(&ctx.http, |create| create.content(&message.content))
+      message.channel_id.send_message(&ctx, |create| create.content(&message.content))
         .await.context("failed to send message").log();
     };
 
     if message.mentions_user_id(me) && rand::thread_rng().gen_bool(0.10) {
-      message.channel_id.send_message(&ctx.http, |create| create.content("What?"))
+      message.channel_id.send_message(&ctx, |create| create.content("What?"))
         .await.context("failed to send message").log();
     };
   }
@@ -149,40 +151,6 @@ pub enum MelodyError {
   InvalidCommand,
   #[error("Invalid arguments")]
   InvalidArguments
-}
-
-pub trait Contextualize {
-  type Output;
-
-  fn context(self, context: &'static str) -> Self::Output;
-}
-
-impl<T> Contextualize for Result<T, singlefile::Error> {
-  type Output = MelodyResult<T>;
-
-  fn context(self, context: &'static str) -> Self::Output {
-    self.map_err(|error| MelodyError::FileError(error, context))
-  }
-}
-
-impl<T> Contextualize for Result<T, serenity::Error> {
-  type Output = MelodyResult<T>;
-
-  fn context(self, context: &'static str) -> Self::Output {
-    self.map_err(|error| MelodyError::SerenityError(error, context))
-  }
-}
-
-pub trait Loggable {
-  fn log(self);
-}
-
-impl<T, E: std::error::Error> Loggable for Result<T, E> {
-  fn log(self) {
-    if let Err(error) = self {
-      error!("{error}");
-    };
-  }
 }
 
 fn setup_logger() -> Result<(), fern::InitError> {
