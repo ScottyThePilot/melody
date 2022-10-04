@@ -31,7 +31,20 @@ impl Persist {
   }
 
   pub async fn get_guild_plugins(container: &PersistContainer, id: GuildId) -> HashSet<String> {
-    container.access_mut().await.guild_plugins.entry(id.into()).or_default().clone()
+    Self::guild_plugins_mut(container, id, |plugins| plugins.clone()).await
+  }
+
+  pub async fn add_guild_plugin(container: &PersistContainer, id: GuildId, plugin: impl Into<String>) -> bool {
+    Self::guild_plugins_mut(container, id, |plugins| plugins.insert(plugin.into())).await
+  }
+
+  pub async fn remove_guild_plugin(container: &PersistContainer, id: GuildId, plugin: impl AsRef<str>) -> bool {
+    Self::guild_plugins_mut(container, id, |plugins| plugins.remove(plugin.as_ref())).await
+  }
+
+  async fn guild_plugins_mut<F, R>(container: &PersistContainer, id: GuildId, f: F) -> R
+  where F: FnOnce(&mut HashSet<String>) -> R {
+    f(container.access_mut().await.guild_plugins.entry(id.into()).or_default())
   }
 }
 
