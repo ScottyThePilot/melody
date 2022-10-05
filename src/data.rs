@@ -47,32 +47,32 @@ impl FileFormat for Toml {
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Bincode;
+pub struct Cbor;
 
-impl FileFormat for Bincode {
+impl FileFormat for Cbor {
   fn from_reader<R, T>(&self, reader: R) -> Result<T, FormatError>
   where R: Read, T: DeserializeOwned {
-    bincode::deserialize_from(reader).map_err(From::from)
+    serde_cbor::from_reader(reader).map_err(From::from)
   }
 
   fn to_writer<W, T>(&self, writer: W, value: &T) -> Result<(), FormatError>
   where W: Write, T: Serialize {
-    bincode::serialize_into(writer, value).map_err(From::from)
+    serde_cbor::to_writer(writer, value).map_err(From::from)
   }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BincodeCompressed;
+pub struct CborXz;
 
-impl FileFormat for BincodeCompressed {
+impl FileFormat for CborXz {
   fn from_reader<R, T>(&self, reader: R) -> Result<T, FormatError>
   where R: Read, T: DeserializeOwned {
-    bincode::deserialize_from(XzDecoder::new(reader)).map_err(From::from)
+    serde_cbor::from_reader(XzDecoder::new(reader)).map_err(From::from)
   }
 
   fn to_writer<W, T>(&self, writer: W, value: &T) -> Result<(), FormatError>
   where W: Write, T: Serialize {
-    bincode::serialize_into(XzEncoder::new(writer, 9), value).map_err(From::from)
+    serde_cbor::to_writer(XzEncoder::new(writer, 9), value).map_err(From::from)
   }
 }
 

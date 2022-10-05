@@ -1,6 +1,5 @@
-#![warn(missing_debug_implementations, unreachable_pub)]
+#![warn(missing_debug_implementations)]
 extern crate ahash;
-extern crate bincode;
 extern crate chrono;
 extern crate command_attr;
 extern crate fern;
@@ -11,19 +10,20 @@ extern crate serenity;
 extern crate singlefile;
 #[macro_use]
 extern crate serde;
+extern crate serde_cbor;
 #[macro_use]
 extern crate thiserror;
 extern crate tokio;
 extern crate toml;
 
 #[macro_use]
-pub mod utils;
+pub(crate) mod utils;
 #[macro_use]
-pub mod blueprint;
-pub mod build_id;
-pub mod commands;
-pub mod data;
-pub mod feature;
+pub(crate) mod blueprint;
+pub(crate) mod build_id;
+pub(crate) mod commands;
+pub(crate) mod data;
+pub(crate) mod feature;
 
 use crate::commands::APPLICATION_COMMANDS;
 use crate::data::*;

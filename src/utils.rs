@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use itertools::Itertools;
 
 use crate::{MelodyError, MelodyResult};
@@ -34,20 +35,42 @@ impl<S: fmt::Display> fmt::Display for Blockify<S> {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct OrBlockify<'d, S>(pub Result<S, &'d str>);
+pub struct Timestamp(pub DateTime<Utc>, pub TimestampFormat);
 
-impl<'d, S: fmt::Display> OrBlockify<'d, S> {
-  pub fn new(s: Option<S>, default: &'d str) -> Self {
-    OrBlockify(s.ok_or(default))
+impl Timestamp {
+  pub fn new(timestamp: DateTime<Utc>, format: TimestampFormat) -> Self {
+    Timestamp(timestamp, format)
   }
 }
 
-impl<'d, S: fmt::Display> fmt::Display for OrBlockify<'d, S> {
+impl fmt::Display for Timestamp {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    match &self.0 {
-      Ok(s) => Blockify(s).fmt(f),
-      Err(&ref default) => f.write_str(default)
-    }
+    write!(f, "<t:{}:{}>", self.0.timestamp(), self.1)
+  }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum TimestampFormat {
+  ShortTime,
+  LongTime,
+  ShortDate,
+  LongDate,
+  FullDateShortTime,
+  FullDateLongTime,
+  Relative
+}
+
+impl fmt::Display for TimestampFormat {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    f.write_str(match self {
+      TimestampFormat::ShortTime => "t",
+      TimestampFormat::LongTime => "T",
+      TimestampFormat::ShortDate => "d",
+      TimestampFormat::LongDate => "D",
+      TimestampFormat::FullDateShortTime => "f",
+      TimestampFormat::FullDateLongTime => "F",
+      TimestampFormat::Relative => "R"
+    })
   }
 }
 

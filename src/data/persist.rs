@@ -1,4 +1,4 @@
-use super::Bincode;
+use super::Cbor;
 
 use serenity::model::id::GuildId;
 use singlefile::Error as FileError;
@@ -10,7 +10,7 @@ use std::collections::hash_map::Entry;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-pub type PersistContainer = ContainerAsyncWritableLocked<Persist, Bincode>;
+pub type PersistContainer = ContainerAsyncWritableLocked<Persist, Cbor>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -23,7 +23,7 @@ impl Persist {
   pub async fn create() -> Result<PersistContainer, FileError> {
     tokio::fs::create_dir_all("./data/").await?;
     let path = PathBuf::from(format!("./data/persist.bin"));
-    PersistContainer::create_or_default(path, Bincode).await
+    PersistContainer::create_or_default(path, Cbor).await
   }
 
   pub async fn swap_build_id(container: &PersistContainer) -> u64 {
@@ -82,18 +82,18 @@ impl PersistGuilds {
   }
 }
 
-pub type PersistGuildContainer = ContainerAsyncWritableLocked<PersistGuild, Bincode>;
+pub type PersistGuildContainer = ContainerAsyncWritableLocked<PersistGuild, Cbor>;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PersistGuild {
-  pub connect_four: crate::feature::connect_four::ConnectFourManager
+  pub connect_four: crate::feature::connect_four::Manager
 }
 
 impl PersistGuild {
   pub async fn create(id: GuildId) -> Result<PersistGuildContainer, FileError> {
     tokio::fs::create_dir_all("./data/guilds/").await?;
     let path = PathBuf::from(format!("./data/guilds/{id}.bin"));
-    PersistGuildContainer::create_or_default(path, Bincode).await
+    PersistGuildContainer::create_or_default(path, Cbor).await
   }
 }

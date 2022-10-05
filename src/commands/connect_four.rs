@@ -1,7 +1,8 @@
 use crate::{MelodyError, MelodyResult};
 use crate::blueprint::*;
 use crate::data::*;
-use crate::feature::connect_four::ConnectFourColor;
+use crate::feature::connect_four::{Color, MoveError};
+use crate::utils::{Timestamp, TimestampFormat};
 
 use serenity::client::Context;
 use serenity::model::user::User;
@@ -20,7 +21,9 @@ pub(super) const CONNECT_FOUR: BlueprintCommand = blueprint_command! {
     "/connect-four accept <user>",
     "/connect-four decline <user>",
     "/connect-four play <column>",
+    "/connect-four board",
     "/connect-four resign",
+    "/connect-four claim-win [confirm]",
     "/connect-four stats"
   ],
   examples: [
@@ -41,7 +44,7 @@ pub(super) const CONNECT_FOUR: BlueprintCommand = blueprint_command! {
           required: true
         })
       ],
-      function: connectfour_challenge
+      function: connect_four_challenge
     },
     blueprint_subcommand! {
       name: "accept",
@@ -53,7 +56,7 @@ pub(super) const CONNECT_FOUR: BlueprintCommand = blueprint_command! {
           required: true
         })
       ],
-      function: connectfour_accept
+      function: connect_four_accept
     },
     blueprint_subcommand! {
       name: "decline",
@@ -65,7 +68,7 @@ pub(super) const CONNECT_FOUR: BlueprintCommand = blueprint_command! {
           required: true
         })
       ],
-      function: connectfour_decline
+      function: connect_four_decline
     },
     blueprint_subcommand! {
       name: "play",
@@ -79,25 +82,43 @@ pub(super) const CONNECT_FOUR: BlueprintCommand = blueprint_command! {
           max_value: 7
         })
       ],
-      function: connectfour_play
+      function: connect_four_play
+    },
+    blueprint_subcommand! {
+      name: "board",
+      description: "Display the board of your current game",
+      arguments: [],
+      function: connect_four_board
     },
     blueprint_subcommand! {
       name: "resign",
       description: "Resign your current game",
       arguments: [],
-      function: connectfour_resign
+      function: connect_four_resign
+    },
+    blueprint_subcommand! {
+      name: "claim-win",
+      description: "Claim a win from your opponent if they have taken more than 3 hours on their turn",
+      arguments: [
+        blueprint_argument!(Boolean {
+          name: "confirm",
+          description: "Confirms your choice to claim a win",
+          required: false
+        })
+      ],
+      function: connect_four_claim_win
     },
     blueprint_subcommand! {
       name: "stats",
-      description: "See your wins and loss stats for this server",
+      description: "See your wins and losses for this server",
       arguments: [],
-      function: connectfour_stats
+      function: connect_four_stats
     }
   ]
 };
 
 #[command_attr::hook]
-async fn connectfour_challenge(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
+async fn connect_four_challenge(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::InvalidCommand)?;
   let challenger = args.interaction.user.id;
   let opponent = resolve_arguments::<User>(args.option_values)?;
@@ -120,7 +141,7 @@ async fn connectfour_challenge(ctx: &Context, args: BlueprintCommandArgs) -> Mel
 }
 
 #[command_attr::hook]
-async fn connectfour_accept(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
+async fn connect_four_accept(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::InvalidCommand)?;
   let player = args.interaction.user.id;
   let challenger = resolve_arguments::<User>(args.option_values)?;
@@ -146,7 +167,7 @@ async fn connectfour_accept(ctx: &Context, args: BlueprintCommandArgs) -> Melody
 }
 
 #[command_attr::hook]
-async fn connectfour_decline(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
+async fn connect_four_decline(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::InvalidCommand)?;
   let player = args.interaction.user.id;
   let challenger = resolve_arguments::<User>(args.option_values)?;
@@ -162,7 +183,7 @@ async fn connectfour_decline(ctx: &Context, args: BlueprintCommandArgs) -> Melod
 }
 
 #[command_attr::hook]
-async fn connectfour_play(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
+async fn connect_four_play(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::InvalidCommand)?;
   let player = args.interaction.user.id;
   let response = data_modify_persist_guild(ctx, guild_id, |mut persist_guild| {
@@ -174,12 +195,12 @@ async fn connectfour_play(ctx: &Context, args: BlueprintCommandArgs) -> MelodyRe
           .ok_or(MelodyError::InvalidArguments)?;
 
         match game.make_move(player_color, column) {
-          Some(true) => {
+          Ok(true) => {
             let board = PrintBoard(game.board());
             persist_guild.connect_four.end_game(player, opponent);
             format!("{} has played the winning move against {}!\n\n{board}", Mention::User(player), Mention::User(opponent))
           },
-          Some(false) => {
+          Ok(false) => {
             let board = PrintBoard(game.board());
             if game.is_draw() {
               persist_guild.connect_four.end_game_draw((player, opponent));
@@ -188,7 +209,8 @@ async fn connectfour_play(ctx: &Context, args: BlueprintCommandArgs) -> MelodyRe
               format!("It is {}'s turn to play\n\n{board}", Mention::User(opponent))
             }
           },
-          None => "It is not your turn!".to_owned()
+          Err(MoveError::NotYourTurn) => "It is not your turn!".to_owned(),
+          Err(MoveError::ColumnFull) => "That move is illegal".to_owned()
         }
       },
       None => "You are not currently playing a game!".to_owned()
@@ -200,7 +222,26 @@ async fn connectfour_play(ctx: &Context, args: BlueprintCommandArgs) -> MelodyRe
 }
 
 #[command_attr::hook]
-async fn connectfour_resign(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
+async fn connect_four_board(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
+  let guild_id = args.interaction.guild_id.ok_or(MelodyError::InvalidCommand)?;
+  let player = args.interaction.user.id;
+  let response = data_access_persist_guild(ctx, guild_id, |persist_guild| {
+    Ok(match persist_guild.connect_four.find_game(player) {
+      Some((game, _)) => {
+        let board = PrintBoard(game.board());
+        let current_turn_user = game.current_turn_user();
+        format!("This is your current game's board\nIt is {}'s turn to play\n\n{board}", Mention::User(current_turn_user))
+      },
+      None => "You are not currently playing a game!".to_owned()
+    })
+  }).await?;
+
+  BlueprintCommandResponse::new(response)
+    .send(ctx, &args.interaction).await
+}
+
+#[command_attr::hook]
+async fn connect_four_resign(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::InvalidCommand)?;
   let player = args.interaction.user.id;
   let response = data_modify_persist_guild(ctx, guild_id, |mut persist_guild| {
@@ -218,7 +259,39 @@ async fn connectfour_resign(ctx: &Context, args: BlueprintCommandArgs) -> Melody
 }
 
 #[command_attr::hook]
-async fn connectfour_stats(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
+async fn connect_four_claim_win(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
+  let guild_id = args.interaction.guild_id.ok_or(MelodyError::InvalidCommand)?;
+  let player = args.interaction.user.id;
+  let confirm = resolve_arguments::<Option<bool>>(args.option_values)?.unwrap_or(false);
+  let response = data_modify_persist_guild(ctx, guild_id, |mut persist_guild| {
+    Ok(match persist_guild.connect_four.find_game_mut(player) {
+      Some((game, player_color)) => if game.current_turn() == player_color {
+        "It is your turn!".to_owned()
+      } else {
+        let duration = Timestamp::new(game.last_played(), TimestampFormat::Relative);
+        let &opponent = game.players().other(&player).unwrap();
+        if game.can_claim_win() {
+          if confirm {
+            let board = PrintBoard(game.board());
+            persist_guild.connect_four.end_game(player, opponent);
+            format!("{} has claimed a win against {}\n\n{board}", Mention::User(player), Mention::User(opponent))
+          } else {
+            format!("You can claim a win\nYour opponent's turn started {duration}\nYou can skip with `/connect-four claim-win true`")
+          }
+        } else {
+          format!("You cannot claim a win yet\nYour opponent's turn started {}", duration)
+        }
+      },
+      None => "You are not currently playing a game!".to_owned()
+    })
+  }).await?;
+
+  BlueprintCommandResponse::new(response)
+    .send(ctx, &args.interaction).await
+}
+
+#[command_attr::hook]
+async fn connect_four_stats(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::InvalidCommand)?;
   let player = args.interaction.user.id;
   let response = data_access_persist_guild(ctx, guild_id, |persist_guild| {
@@ -233,7 +306,7 @@ async fn connectfour_stats(ctx: &Context, args: BlueprintCommandArgs) -> MelodyR
 
 
 #[derive(Debug, Clone, Copy)]
-struct PrintBoard([[Option<ConnectFourColor>; 7]; 6]);
+struct PrintBoard([[Option<Color>; 7]; 6]);
 
 impl fmt::Display for PrintBoard {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -251,13 +324,13 @@ impl fmt::Display for PrintBoard {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct PrintPiece(Option<ConnectFourColor>);
+struct PrintPiece(Option<Color>);
 
 impl fmt::Display for PrintPiece {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     f.write_str(match self.0 {
-      Some(ConnectFourColor::Player1) => ":red_circle:",
-      Some(ConnectFourColor::Player2) => ":blue_circle:",
+      Some(Color::Player1) => ":red_circle:",
+      Some(Color::Player2) => ":blue_circle:",
       None => ":black_circle:"
     })
   }
