@@ -194,7 +194,7 @@ async fn connect_four_play(ctx: &Context, args: BlueprintCommandArgs) -> MelodyR
         let column = crate::feature::connect_four::validate_column(column)
           .ok_or(MelodyError::InvalidArguments)?;
 
-        match game.make_move(player_color, column) {
+        match game.play_move(player_color, column) {
           Ok(true) => {
             let board = PrintBoard(game.board());
             persist_guild.connect_four.end_game(player, opponent);

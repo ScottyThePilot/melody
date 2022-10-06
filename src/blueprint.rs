@@ -18,7 +18,6 @@ use serenity::model::application::interaction::application_command::{
 };
 use serenity::model::application::command::{CommandType, CommandOptionType};
 use serenity::model::channel::{Attachment, ChannelType, PartialChannel};
-use serenity::model::id::{ChannelId, UserId, RoleId};
 use serenity::model::permissions::Permissions;
 use serenity::model::guild::{PartialMember, Role};
 use serenity::model::user::User;
@@ -325,18 +324,6 @@ impl BlueprintOptionData {
 }
 
 #[derive(Debug, Clone)]
-pub enum BlueprintOptionValue {
-  String(String),
-  Integer(i64),
-  Number(f64),
-  Boolean(bool),
-  User(UserId),
-  Role(RoleId),
-  Channel(ChannelId),
-  Attachment
-}
-
-#[derive(Debug, Clone)]
 pub struct BlueprintCommandResponse {
   pub tts: bool,
   pub ephemeral: bool,
@@ -429,22 +416,6 @@ pub async fn dispatch(
   }?;
 
   function(ctx, BlueprintCommandArgs { command, subcommands, interaction, option_values }).await
-}
-
-pub async fn dispatch_response_basic(
-  ctx: &Context,
-  interaction: &ApplicationCommandInteraction,
-  content: impl Into<String>
-) -> MelodyResult {
-  BlueprintCommandResponse::new(content).send(ctx, interaction).await
-}
-
-pub async fn dispatch_response(
-  ctx: &Context,
-  interaction: &ApplicationCommandInteraction,
-  response: BlueprintCommandResponse
-) -> MelodyResult {
-  response.send(ctx, interaction).await
 }
 
 /// Returns the name of the command executed, the list of subcommand arguments, and the list of regular arguments

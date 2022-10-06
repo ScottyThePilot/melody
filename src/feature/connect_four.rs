@@ -1,4 +1,5 @@
 use chrono::{DateTime, Duration, Utc};
+use float_ord::FloatOrd;
 use serenity::model::id::UserId;
 use uord::UOrd;
 
@@ -150,20 +151,37 @@ impl Game {
   /// which contains a bool describing whether or not this move won the game
   ///
   /// Panics if column/x >= 7
-  pub fn make_move(&mut self, player: Color, column: usize) -> Result<bool, MoveError> {
-    assert!(column < 7);
-    if self.turn != player {
-      return Err(MoveError::NotYourTurn);
-    };
+  pub fn play_move(&mut self, player: Color, column: usize) -> Result<bool, MoveError> {
+    if self.turn != player { return Err(MoveError::NotYourTurn) };
+    if !self.apply_move(column) { return Err(MoveError::ColumnFull) };
+    Ok(self.is_winning_position(player))
+  }
 
+  fn apply_move(&mut self, column: usize) -> bool {
+    assert!(column < 7);
     let row = self.board.iter_mut()
       .map(move |array| &mut array[column])
-      .rposition(|cell| cell.is_none())
-      .ok_or(MoveError::ColumnFull)?;
-    self.board[row][column] = Some(player);
-    self.turn = player.other();
-    self.last_played = Utc::now();
-    Ok(self.is_winning_position(player))
+      .rposition(|cell| cell.is_none());
+    if let Some(row) = row {
+      self.board[row][column] = Some(self.turn);
+      self.turn = self.turn.other();
+      self.last_played = Utc::now();
+      true
+    } else {
+      false
+    }
+  }
+
+  fn apply_move_new(&self, column: usize) -> Self {
+    let mut game = self.clone();
+    assert!(game.apply_move(column));
+    game
+  }
+
+  pub fn is_move_legal(&self, column: usize) -> bool {
+    self.board.iter()
+      .map(|array| &array[column])
+      .any(|cell| cell.is_none())
   }
 
   pub fn can_claim_win(&self) -> bool {
@@ -226,6 +244,58 @@ impl Game {
 
   pub fn iter_board(&self) -> impl Iterator<Item = Option<Color>> {
     self.board().into_iter().flat_map(<[Option<Color>; 7]>::into_iter)
+  }
+
+  fn iter_legal_moves(&self) -> impl Iterator<Item = usize> + '_ {
+    (0..7).filter(|&column| self.is_move_legal(column))
+  }
+
+  fn iter_potential_positions(&self) -> impl Iterator<Item = (usize, Game)> + '_ {
+    self.iter_legal_moves().map(|column| (column, self.apply_move_new(column)))
+  }
+
+  fn evaluate_best_move(&self, depth: usize) -> Option<(usize, f32)> {
+    let color = self.current_turn();
+    self.iter_potential_positions()
+      .map(|(column, game)| (column, game.evaluate_position(depth, color)))
+      .max_by_key(|&(_, value)| FloatOrd(value))
+  }
+
+  fn evaluate_moves(&self, depth: usize) -> Vec<(usize, f32)> {
+    let color = self.current_turn();
+    let mut evaluated_moves = self.iter_potential_positions()
+      .map(|(column, game)| (column, game.evaluate_position(depth, color)))
+      .collect::<Vec<(usize, f32)>>();
+    evaluated_moves.sort_unstable_by_key(|&(_, value)| FloatOrd(-value));
+    evaluated_moves
+  }
+
+  /// Recursively evaluates a board in reference to the given player
+  /// based on the moves available to the current player
+  fn evaluate_position(&self, depth: usize, color: Color) -> f32 {
+    let turn = self.current_turn();
+    let turn_value = if turn == color { 1.0 } else { -1.0 };
+
+    if depth == 0 {
+      return match self.is_winning_position(turn) {
+        true => turn_value,
+        false => 0.0
+      };
+    };
+
+    let mut sum = 0.0;
+    let mut count: usize = 0;
+    for column in self.iter_legal_moves() {
+      let game = self.apply_move_new(column);
+      if game.is_winning_position(turn) {
+        return turn_value;
+      } else {
+        sum += game.evaluate_position(depth - 1, color);
+        count += 1;
+      };
+    };
+
+    sum / count as f32
   }
 }
 
