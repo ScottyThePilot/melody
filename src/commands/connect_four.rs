@@ -1,15 +1,13 @@
 use crate::{MelodyError, MelodyResult};
 use crate::blueprint::*;
 use crate::data::*;
-use crate::feature::connect_four::{Color, MoveError};
+use crate::feature::connect_four::{Color, GameResult};
 use crate::utils::{Timestamp, TimestampFormat};
 
 use serenity::client::Context;
 use serenity::model::user::User;
 use serenity::model::mention::Mention;
 use serenity::model::application::command::CommandType;
-
-use std::fmt;
 
 
 
@@ -149,7 +147,7 @@ async fn connect_four_accept(ctx: &Context, args: BlueprintCommandArgs) -> Melod
     Ok(match persist_guild.connect_four.accept_challenge(challenger.id, player) {
       Some(game) => {
         let &player = game.players().other(&player).unwrap();
-        let board = PrintBoard(game.board());
+        let board = game.print(print_piece);
         let player_key = "You are :blue_circle:, your opponent is :red_circle:";
 
         format!("You have accepted {}'s challenge\nIt is your turn to play\n{player_key}\n\n{board}", Mention::User(player))
@@ -195,22 +193,22 @@ async fn connect_four_play(ctx: &Context, args: BlueprintCommandArgs) -> MelodyR
           .ok_or(MelodyError::InvalidArguments)?;
 
         match game.play_move(player_color, column) {
-          Ok(true) => {
-            let board = PrintBoard(game.board());
+          GameResult::Victory(board) => {
+            let board = board.print(print_piece);
             persist_guild.connect_four.end_game(player, opponent);
             format!("{} has played the winning move against {}!\n\n{board}", Mention::User(player), Mention::User(opponent))
           },
-          Ok(false) => {
-            let board = PrintBoard(game.board());
-            if game.is_draw() {
-              persist_guild.connect_four.end_game_draw((player, opponent));
-              format!("The game between {} and {} has ended in a draw\n\n{board}", Mention::User(player), Mention::User(opponent))
-            } else {
-              format!("It is {}'s turn to play\n\n{board}", Mention::User(opponent))
-            }
+          GameResult::Continuing(board) => {
+            let board = board.print(print_piece);
+            format!("It is {}'s turn to play\n\n{board}", Mention::User(opponent))
           },
-          Err(MoveError::NotYourTurn) => "It is not your turn!".to_owned(),
-          Err(MoveError::ColumnFull) => "That move is illegal".to_owned()
+          GameResult::Draw(board) => {
+            let board = board.print(print_piece);
+            persist_guild.connect_four.end_game_draw((player, opponent));
+            format!("The game between {} and {} has ended in a draw\n\n{board}", Mention::User(player), Mention::User(opponent))
+          },
+          GameResult::NotYourTurn => "It is not your turn!".to_owned(),
+          GameResult::IllegalMove => "That move is illegal".to_owned()
         }
       },
       None => "You are not currently playing a game!".to_owned()
@@ -228,7 +226,7 @@ async fn connect_four_board(ctx: &Context, args: BlueprintCommandArgs) -> Melody
   let response = data_access_persist_guild(ctx, guild_id, |persist_guild| {
     Ok(match persist_guild.connect_four.find_game(player) {
       Some((game, _)) => {
-        let board = PrintBoard(game.board());
+        let board = game.print(print_piece);
         let current_turn_user = game.current_turn_user();
         format!("This is your current game's board\nIt is {}'s turn to play\n\n{board}", Mention::User(current_turn_user))
       },
@@ -272,7 +270,7 @@ async fn connect_four_claim_win(ctx: &Context, args: BlueprintCommandArgs) -> Me
         let &opponent = game.players().other(&player).unwrap();
         if game.can_claim_win() {
           if confirm {
-            let board = PrintBoard(game.board());
+            let board = game.print(print_piece);
             persist_guild.connect_four.end_game(player, opponent);
             format!("{} has claimed a win against {}\n\n{board}", Mention::User(player), Mention::User(opponent))
           } else {
@@ -303,35 +301,10 @@ async fn connect_four_stats(ctx: &Context, args: BlueprintCommandArgs) -> Melody
     .send(ctx, &args.interaction).await
 }
 
-
-
-#[derive(Debug, Clone, Copy)]
-struct PrintBoard([[Option<Color>; 7]; 6]);
-
-impl fmt::Display for PrintBoard {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    writeln!(f, ":one::two::three::four::five::six::seven:")?;
-    for row in self.0 {
-      for piece in row {
-        write!(f, "{}", PrintPiece(piece))?;
-      };
-
-      writeln!(f)?;
-    };
-
-    Ok(())
-  }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct PrintPiece(Option<Color>);
-
-impl fmt::Display for PrintPiece {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    f.write_str(match self.0 {
-      Some(Color::Player1) => ":red_circle:",
-      Some(Color::Player2) => ":blue_circle:",
-      None => ":black_circle:"
-    })
+fn print_piece(piece: Option<Color>) -> &'static str {
+  match piece {
+    Some(Color::Player1) => ":red_circle:",
+    Some(Color::Player2) => ":blue_circle:",
+    None => ":black_circle:"
   }
 }

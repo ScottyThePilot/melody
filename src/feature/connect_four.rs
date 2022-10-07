@@ -5,6 +5,7 @@ use uord::UOrd;
 
 use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::Entry;
+use std::fmt;
 
 
 
@@ -127,9 +128,7 @@ impl Default for Manager {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Game {
-  turn: Color,
-  // 6 tall x 7 wide
-  board: [[Option<Color>; 7]; 6],
+  board: Board,
   last_played: DateTime<Utc>,
   player1: u64,
   player2: u64
@@ -138,50 +137,30 @@ pub struct Game {
 impl Game {
   pub fn new(player1: UserId, player2: UserId) -> Self {
     Game {
-      // Player 2 (player who was challenged) goes first
-      turn: Color::Player2,
+      board: Board::new(),
       last_played: Utc::now(),
-      board: [[None; 7]; 6],
       player1: player1.into(),
       player2: player2.into()
     }
   }
 
-  /// Returns an option describing whether or not the move succeeded,
-  /// which contains a bool describing whether or not this move won the game
-  ///
-  /// Panics if column/x >= 7
-  pub fn play_move(&mut self, player: Color, column: usize) -> Result<bool, MoveError> {
-    if self.turn != player { return Err(MoveError::NotYourTurn) };
-    if !self.apply_move(column) { return Err(MoveError::ColumnFull) };
-    Ok(self.is_winning_position(player))
-  }
+  pub fn play_move(&mut self, player: Color, column: usize) -> GameResult {
+    if self.board.turn == player {
+      self.board = match self.board.apply_move(column) {
+        Some(board) => board,
+        None => return GameResult::IllegalMove
+      };
 
-  fn apply_move(&mut self, column: usize) -> bool {
-    assert!(column < 7);
-    let row = self.board.iter_mut()
-      .map(move |array| &mut array[column])
-      .rposition(|cell| cell.is_none());
-    if let Some(row) = row {
-      self.board[row][column] = Some(self.turn);
-      self.turn = self.turn.other();
-      self.last_played = Utc::now();
-      true
+      if self.is_winning_position(player) {
+        GameResult::Victory(self.board)
+      } else if self.is_draw() {
+        GameResult::Draw(self.board)
+      } else {
+        GameResult::Continuing(self.board)
+      }
     } else {
-      false
+      GameResult::NotYourTurn
     }
-  }
-
-  fn apply_move_new(&self, column: usize) -> Self {
-    let mut game = self.clone();
-    assert!(game.apply_move(column));
-    game
-  }
-
-  pub fn is_move_legal(&self, column: usize) -> bool {
-    self.board.iter()
-      .map(|array| &array[column])
-      .any(|cell| cell.is_none())
   }
 
   pub fn can_claim_win(&self) -> bool {
@@ -192,12 +171,8 @@ impl Game {
     self.last_played
   }
 
-  pub fn current_turn(&self) -> Color {
-    self.turn
-  }
-
   pub fn current_turn_user(&self) -> UserId {
-    match self.turn {
+    match self.board.turn {
       Color::Player1 => UserId(self.player1),
       Color::Player2 => UserId(self.player2)
     }
@@ -208,11 +183,6 @@ impl Game {
     UOrd::new(self.player1, self.player2).map(UserId)
   }
 
-  /// Panics if column/x >= 7 or row/y >= 6, 0-based
-  pub fn get(&self, column: usize, row: usize) -> Option<Color> {
-    self.board[row][column]
-  }
-
   pub fn player_color(&self, player: UserId) -> Option<Color> {
     match () {
       () if self.player1 == player.0 => Some(Color::Player1),
@@ -221,8 +191,69 @@ impl Game {
     }
   }
 
-  pub fn board(&self) -> [[Option<Color>; 7]; 6] {
-    self.board
+  pub fn print<F>(&self, print_piece: F) -> PrintBoard<F>
+  where F: Fn(Option<Color>) -> &'static str {
+    PrintBoard::new(self.board, print_piece)
+  }
+
+  pub fn current_turn(&self) -> Color {
+    self.board.current_turn()
+  }
+
+  pub fn is_draw(&self) -> bool {
+    self.board.is_draw()
+  }
+
+  pub fn is_winning_position(&self, player: Color) -> bool {
+    self.board.is_winning_position(player)
+  }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Board {
+  // 6 tall x 7 wide
+  matrix: [[Option<Color>; 7]; 6],
+  turn: Color
+}
+
+impl Board {
+  pub fn new() -> Self {
+    Board {
+      matrix: [[None; 7]; 6],
+      // Player 2 (player who was challenged) goes first
+      turn: Color::Player2
+    }
+  }
+
+  /// Panics if column/x >= 7
+  fn apply_move(self, column: usize) -> Option<Self> {
+    assert!(column < 7);
+    let mut board = self;
+    let row = board.matrix.iter_mut()
+      .map(move |array| &mut array[column])
+      .rposition(|cell| cell.is_none())?;
+    board.matrix[row][column] = Some(board.turn);
+    board.turn = board.turn.other();
+    Some(board)
+  }
+
+  pub fn is_move_legal(&self, column: usize) -> bool {
+    self.matrix.iter()
+      .map(|array| &array[column])
+      .any(|cell| cell.is_none())
+  }
+
+  pub fn current_turn(&self) -> Color {
+    self.turn
+  }
+
+  pub fn matrix(&self) -> [[Option<Color>; 7]; 6] {
+    self.matrix
+  }
+
+  /// Panics if column/x > 6 or row/y > 5, 0-based
+  pub fn get(&self, column: usize, row: usize) -> Option<Color> {
+    self.matrix[row][column]
   }
 
   /// Whether or not the game has ended inconclusively (board is full)
@@ -236,22 +267,27 @@ impl Game {
       connect_four(iter.copied().collect::<Vec<Option<Color>>>(), color)
     }
 
-    self.board.iter().any(|slice| connect_four(slice, player)) ||
-    columns(&self.board).any(|iter| connect_four_iter(iter, player)) ||
-    diag1(&self.board).any(|iter| connect_four_iter(iter, player)) ||
-    diag2(&self.board).any(|iter| connect_four_iter(iter, player))
+    self.matrix.iter().any(|slice| connect_four(slice, player)) ||
+    columns(&self.matrix).any(|iter| connect_four_iter(iter, player)) ||
+    diag1(&self.matrix).any(|iter| connect_four_iter(iter, player)) ||
+    diag2(&self.matrix).any(|iter| connect_four_iter(iter, player))
   }
 
-  pub fn iter_board(&self) -> impl Iterator<Item = Option<Color>> {
-    self.board().into_iter().flat_map(<[Option<Color>; 7]>::into_iter)
+  pub fn print<F>(self, print_piece: F) -> PrintBoard<F>
+  where F: Fn(Option<Color>) -> &'static str {
+    PrintBoard::new(self, print_piece)
+  }
+
+  fn iter_board(&self) -> impl Iterator<Item = Option<Color>> {
+    self.matrix().into_iter().flat_map(<[Option<Color>; 7]>::into_iter)
   }
 
   fn iter_legal_moves(&self) -> impl Iterator<Item = usize> + '_ {
     (0..7).filter(|&column| self.is_move_legal(column))
   }
 
-  fn iter_potential_positions(&self) -> impl Iterator<Item = (usize, Game)> + '_ {
-    self.iter_legal_moves().map(|column| (column, self.apply_move_new(column)))
+  fn iter_potential_positions(&self) -> impl Iterator<Item = (usize, Self)> + '_ {
+    (0..7).filter_map(|column| Some((column, self.apply_move(column)?)))
   }
 
   fn evaluate_best_move(&self, depth: usize) -> Option<(usize, f32)> {
@@ -286,7 +322,7 @@ impl Game {
     let mut sum = 0.0;
     let mut count: usize = 0;
     for column in self.iter_legal_moves() {
-      let game = self.apply_move_new(column);
+      let game = self.apply_move(column).unwrap();
       if game.is_winning_position(turn) {
         return turn_value;
       } else {
@@ -321,9 +357,12 @@ impl Color {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MoveError {
+pub enum GameResult {
+  Continuing(Board),
+  Victory(Board),
+  Draw(Board),
   NotYourTurn,
-  ColumnFull
+  IllegalMove
 }
 
 
@@ -359,4 +398,33 @@ fn connect_four(list: impl AsRef<[Option<Color>]>, color: Color) -> bool {
 
 pub fn validate_column(value: i64) -> Option<usize> {
   if let Some(value @ 0..=6) = value.checked_sub(1) { Some(value as usize) } else { None }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct PrintBoard<F> {
+  matrix: [[Option<Color>; 7]; 6],
+  print_piece: F
+}
+
+impl<F> PrintBoard<F>
+where F: Fn(Option<Color>) -> &'static str {
+  pub fn new(board: Board, print_piece: F) -> Self {
+    PrintBoard { matrix: board.matrix, print_piece }
+  }
+}
+
+impl<F> fmt::Display for PrintBoard<F>
+where F: Fn(Option<Color>) -> &'static str {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    writeln!(f, ":one::two::three::four::five::six::seven:")?;
+    for row in self.matrix {
+      for piece in row {
+        f.write_str((self.print_piece)(piece))?;
+      };
+
+      writeln!(f)?;
+    };
+
+    Ok(())
+  }
 }
