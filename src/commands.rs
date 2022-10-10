@@ -25,7 +25,7 @@ pub const fn choice<'a>(string: &'a str) -> (&'a str, &'a str) {
 }
 
 pub async fn bot_color(ctx: &Context) -> Color {
-  data_get_config(ctx).await.access().await.accent_color
+  data_operate_config(ctx, |config| config.accent_color).await
     .or_else(|| ctx.cache.current_user_field(|me| me.accent_colour))
     .unwrap_or(serenity::utils::colours::branding::BLURPLE)
 }

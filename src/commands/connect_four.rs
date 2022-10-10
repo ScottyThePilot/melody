@@ -120,7 +120,7 @@ async fn connect_four_challenge(ctx: &Context, args: BlueprintCommandArgs) -> Me
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::InvalidCommand)?;
   let challenger = args.interaction.user.id;
   let opponent = resolve_arguments::<User>(args.option_values)?;
-  let response = data_modify_persist_guild(ctx, guild_id, |mut persist_guild| {
+  let response = data_operate_persist_guild_commit(ctx, guild_id, |persist_guild| {
     Ok(match persist_guild.connect_four.create_challenge(challenger, opponent.id) {
       true => {
         format!(
@@ -143,7 +143,7 @@ async fn connect_four_accept(ctx: &Context, args: BlueprintCommandArgs) -> Melod
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::InvalidCommand)?;
   let player = args.interaction.user.id;
   let challenger = resolve_arguments::<User>(args.option_values)?;
-  let response = data_modify_persist_guild(ctx, guild_id, |mut persist_guild| {
+  let response = data_operate_persist_guild_commit(ctx, guild_id, |persist_guild| {
     Ok(match persist_guild.connect_four.accept_challenge(challenger.id, player) {
       Some(game) => {
         let &player = game.players().other(&player).unwrap();
@@ -169,7 +169,7 @@ async fn connect_four_decline(ctx: &Context, args: BlueprintCommandArgs) -> Melo
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::InvalidCommand)?;
   let player = args.interaction.user.id;
   let challenger = resolve_arguments::<User>(args.option_values)?;
-  let response = data_modify_persist_guild(ctx, guild_id, |mut persist_guild| {
+  let response = data_operate_persist_guild_commit(ctx, guild_id, |persist_guild| {
     Ok(match persist_guild.connect_four.remove_challenge(challenger.id, player) {
       true => format!("You have declined a challenge from {}", challenger.tag()),
       false => "You do not have a pending challenge from this user".to_owned()
@@ -184,7 +184,7 @@ async fn connect_four_decline(ctx: &Context, args: BlueprintCommandArgs) -> Melo
 async fn connect_four_play(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::InvalidCommand)?;
   let player = args.interaction.user.id;
-  let response = data_modify_persist_guild(ctx, guild_id, |mut persist_guild| {
+  let response = data_operate_persist_guild_commit(ctx, guild_id, |persist_guild| {
     Ok(match persist_guild.connect_four.find_game_mut(player) {
       Some((game, player_color)) => {
         let &opponent = game.players().other(&player).unwrap();
@@ -223,7 +223,7 @@ async fn connect_four_play(ctx: &Context, args: BlueprintCommandArgs) -> MelodyR
 async fn connect_four_board(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::InvalidCommand)?;
   let player = args.interaction.user.id;
-  let response = data_access_persist_guild(ctx, guild_id, |persist_guild| {
+  let response = data_operate_persist_guild(ctx, guild_id, |persist_guild| {
     Ok(match persist_guild.connect_four.find_game(player) {
       Some((game, _)) => {
         let board = game.print(print_piece);
@@ -242,7 +242,7 @@ async fn connect_four_board(ctx: &Context, args: BlueprintCommandArgs) -> Melody
 async fn connect_four_resign(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::InvalidCommand)?;
   let player = args.interaction.user.id;
-  let response = data_modify_persist_guild(ctx, guild_id, |mut persist_guild| {
+  let response = data_operate_persist_guild_commit(ctx, guild_id, |persist_guild| {
     Ok(match persist_guild.connect_four.resign(player) {
       Some(game) => {
         let &opponent = game.players().other(&player).unwrap();
@@ -261,7 +261,7 @@ async fn connect_four_claim_win(ctx: &Context, args: BlueprintCommandArgs) -> Me
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::InvalidCommand)?;
   let player = args.interaction.user.id;
   let confirm = resolve_arguments::<Option<bool>>(args.option_values)?.unwrap_or(false);
-  let response = data_modify_persist_guild(ctx, guild_id, |mut persist_guild| {
+  let response = data_operate_persist_guild_commit(ctx, guild_id, |persist_guild| {
     Ok(match persist_guild.connect_four.find_game_mut(player) {
       Some((game, player_color)) => if game.current_turn() == player_color {
         "It is your turn!".to_owned()
@@ -292,7 +292,7 @@ async fn connect_four_claim_win(ctx: &Context, args: BlueprintCommandArgs) -> Me
 async fn connect_four_stats(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::InvalidCommand)?;
   let player = args.interaction.user.id;
-  let response = data_access_persist_guild(ctx, guild_id, |persist_guild| {
+  let response = data_operate_persist_guild(ctx, guild_id, |persist_guild| {
     let stats = persist_guild.connect_four.get_stats(player);
     Ok(format!("You have won {} games\nYou have lost {} games", stats.wins, stats.losses))
   }).await?;

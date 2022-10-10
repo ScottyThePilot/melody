@@ -27,6 +27,7 @@ pub(crate) mod feature;
 
 use crate::commands::APPLICATION_COMMANDS;
 use crate::data::*;
+use crate::feature::message_chains::MessageChains;
 use crate::utils::{Contextualize, Loggable};
 
 use fern::Dispatch;
@@ -64,10 +65,10 @@ async fn start() -> MelodyResult<bool> {
     .event_handler(Handler).await.context("failed to init client")?;
 
   // Insert data into the shared TypeMap
-  data_insert::<BrainKey>(&client, Brain::create()).await;
   data_insert::<ConfigKey>(&client, config).await;
   data_insert::<PersistKey>(&client, persist).await;
   data_insert::<PersistGuildsKey>(&client, PersistGuilds::create()).await;
+  data_insert::<MessageChainsKey>(&client, MessageChains::create()).await;
   data_insert::<ShardManagerKey>(&client, client.shard_manager.clone()).await;
   data_insert::<PreviousBuildIdKey>(&client, previous_build_id).await;
   data_insert::<RestartKey>(&client, false).await;
@@ -120,13 +121,12 @@ impl EventHandler for Handler {
     let me = ctx.cache.current_user_id();
     if message.author.bot || message.author.id == me || message.content.is_empty() { return };
 
-    let should_contribute = data_access_brain_mut(&ctx, |mut brain| {
-      let should_contribute = brain.observe_message(&message) >= 3 && rand::thread_rng().gen_bool(0.50);
-      if should_contribute { brain.reset_message_chain(message.channel_id) };
-      should_contribute
-    }).await;
+    let contribute = operate_lock(
+      data_get::<MessageChainsKey>(&ctx).await,
+      |message_chains| message_chains.should_contribute(&message)
+    ).await;
 
-    if should_contribute {
+    if contribute {
       info!("Contributing to message chain in channel ({})", message.channel_id);
       message.channel_id.send_message(&ctx, |create| create.content(&message.content))
         .await.context("failed to send message").log();

@@ -1,10 +1,8 @@
-mod brain;
 mod config;
 mod persist;
 
 use crate::MelodyResult;
 use crate::utils::Contextualize;
-pub use self::brain::*;
 pub use self::config::*;
 pub use self::persist::*;
 
@@ -16,7 +14,7 @@ use serde::ser::Serialize;
 use serde::de::DeserializeOwned;
 use singlefile::error::FormatError;
 use singlefile::manager::FileFormat;
-use tokio::sync::{Mutex, RwLockReadGuard, RwLockWriteGuard};
+use tokio::sync::{Mutex, RwLock};
 use xz2::write::XzEncoder;
 use xz2::read::XzDecoder;
 
@@ -89,11 +87,11 @@ macro_rules! key {
   };
 }
 
-key!(pub struct BrainKey, BrainContainer);
 key!(pub struct ConfigKey, ConfigContainer);
 key!(pub struct PersistKey, PersistContainer);
 key!(pub struct PersistGuildsKey, PersistGuildsWrapper);
 key!(pub struct ShardManagerKey, Arc<Mutex<ShardManager>>);
+key!(pub struct MessageChainsKey, crate::feature::message_chains::MessageChainsContainer);
 key!(pub struct PreviousBuildIdKey, u64);
 key!(pub struct RestartKey, bool);
 
@@ -117,6 +115,26 @@ where K: TypeMapKey, K::Value: Clone {
     .clone()
 }
 
+pub async fn operate_lock<T, F, R>(container: Arc<Mutex<T>>, operation: F) -> R
+where F: FnOnce(&mut T) -> R {
+  let mut guard = container.lock().await;
+  operation(&mut *guard)
+}
+
+pub async fn operate_read<T, F, R>(container: Arc<RwLock<T>>, operation: F) -> R
+where F: FnOnce(&T) -> R {
+  let guard = container.read().await;
+  operation(&*guard)
+}
+
+pub async fn operate_write<T, F, R>(container: Arc<RwLock<T>>, operation: F) -> R
+where F: FnOnce(&mut T) -> R {
+  let mut guard = container.write().await;
+  operation(&mut *guard)
+}
+
+
+
 macro_rules! data_get_fn {
   ($vis:vis async fn $function:ident, $Key:ty, $Value:ty) => {
     #[inline]
@@ -126,91 +144,60 @@ macro_rules! data_get_fn {
   };
 }
 
-data_get_fn!(pub async fn data_get_brain, BrainKey, BrainContainer);
 data_get_fn!(pub async fn data_get_config, ConfigKey, ConfigContainer);
 data_get_fn!(pub async fn data_get_persist, PersistKey, PersistContainer);
 
-macro_rules! data_access_fn {
-  ($vis:vis async fn $function:ident, $getter:ident, $access:ident, $Lock:ty) => {
-    #[inline]
-    $vis async fn $function<F, R>(ctx: &Context, f: F) -> R
-    where F: FnOnce($Lock) -> R {
-      f($getter(ctx).await.$access().await)
+macro_rules! data_operate_fn {
+  ($vis:vis async fn $function:ident($($arg:ident: $Arg:ty),*), $getter:ident, $method:ident, $Type:ty) => {
+    $vis async fn $function<F, R>(ctx: &Context, $($arg: $Arg,)* operation: F) -> R
+    where F: FnOnce($Type) -> R {
+      $getter(ctx $(, $arg)*).await.$method(operation).await
+    }
+  };
+  ($vis:vis async fn $function:ident($($arg:ident: $Arg:ty),*), $getter:ident, $method:ident?, $Type:ty, $err:expr) => {
+    $vis async fn $function<F, R>(ctx: &Context, $($arg: $Arg,)* operation: F) -> MelodyResult<R>
+    where F: FnOnce($Type) -> MelodyResult<R> {
+      $getter(ctx $(, $arg)*).await.$method(operation).await.context("failed to save")?
+    }
+  };
+  ($vis:vis async fn $function:ident($($arg:ident: $Arg:ty),*), $getter:ident?, $method:ident, $Type:ty) => {
+    $vis async fn $function<F, R>(ctx: &Context, $($arg: $Arg,)* operation: F) -> MelodyResult<R>
+    where F: FnOnce($Type) -> MelodyResult<R> {
+      $getter(ctx $(, $arg)*).await?.$method(operation).await
+    }
+  };
+  ($vis:vis async fn $function:ident($($arg:ident: $Arg:ty),*), $getter:ident?, $method:ident?, $Type:ty, $err:expr) => {
+    $vis async fn $function<F, R>(ctx: &Context, $($arg: $Arg,)* operation: F) -> MelodyResult<R>
+    where F: FnOnce($Type) -> MelodyResult<R> {
+      $getter(ctx $(, $arg)*).await?.$method(operation).await.context("failed to save")?
     }
   };
 }
 
-data_access_fn!(pub async fn data_access_brain, data_get_brain, read, RwLockReadGuard<Brain>);
-data_access_fn!(pub async fn data_access_brain_mut, data_get_brain, write, RwLockWriteGuard<Brain>);
-data_access_fn!(pub async fn data_access_config, data_get_config, access, RwLockReadGuard<Config>);
-data_access_fn!(pub async fn data_access_config_mut, data_get_config, access_mut, RwLockWriteGuard<Config>);
-data_access_fn!(pub async fn data_access_persist, data_get_persist, access, RwLockReadGuard<Persist>);
-data_access_fn!(pub async fn data_access_persist_mut, data_get_persist, access_mut, RwLockWriteGuard<Persist>);
+data_operate_fn!(pub async fn data_operate_config(), data_get_config, operate, &Config);
+data_operate_fn!(pub async fn data_operate_persist(), data_get_persist, operate, &Persist);
+data_operate_fn!(pub async fn data_operate_persist_mut(), data_get_persist, operate_mut, &mut Persist);
+data_operate_fn!(pub async fn data_operate_persist_guild(id: GuildId), data_get_persist_guild?, operate, &PersistGuild);
+data_operate_fn!(pub async fn data_operate_persist_guild_mut(id: GuildId), data_get_persist_guild?, operate_mut, &mut PersistGuild);
 
-/// Acquires and provides access to the persist state's write lock,
-/// committing its state to disk afterwards.
-pub async fn data_modify_persist<F, R>(ctx: &Context, f: F) -> MelodyResult<R>
-where F: FnOnce(RwLockWriteGuard<Persist>) -> MelodyResult<R> {
-  let container = data_get_persist(ctx).await;
-  let out = f(container.access_mut().await)?;
-  trace!("Saving persist state...");
-  container.commit().await.context("failed to commit persist state to disk")?;
-  Ok(out)
-}
+data_operate_fn!(
+  pub async fn data_operate_persist_commit(),
+  data_get_persist, operate_mut_commit?, &mut Persist,
+  "failed to commit persist state"
+);
 
-#[inline]
-pub async fn data_get_persist_guild(ctx: &Context, id: GuildId) -> Option<PersistGuildContainer> {
-  let persist_guilds = data_get::<PersistGuildsKey>(ctx).await;
-  PersistGuilds::get(persist_guilds, id).await
-}
+data_operate_fn!(
+  pub async fn data_operate_persist_guild_commit(id: GuildId),
+  data_get_persist_guild?, operate_mut_commit?, &mut PersistGuild,
+  "failed to commit persist-guild state"
+);
 
-#[inline]
-pub async fn data_try_get_persist_guild(ctx: &Context, id: GuildId) -> MelodyResult<PersistGuildContainer> {
+pub async fn data_get_persist_guild(ctx: &Context, id: GuildId) -> MelodyResult<PersistGuildContainer> {
   let persist_guilds = data_get::<PersistGuildsKey>(ctx).await;
   PersistGuilds::get_default(persist_guilds, id)
     .await.context("failed to retrieve persist-guild")
 }
 
-#[inline]
-pub async fn data_access_persist_guild<F, R>(ctx: &Context, id: GuildId, f: F) -> MelodyResult<R>
-where F: FnOnce(RwLockReadGuard<PersistGuild>) -> MelodyResult<R> {
-  f(data_try_get_persist_guild(ctx, id).await?.access().await)
-}
-
-#[inline]
-pub async fn data_access_persist_guild_mut<F, R>(ctx: &Context, id: GuildId, f: F) -> MelodyResult<R>
-where F: FnOnce(RwLockWriteGuard<PersistGuild>) -> MelodyResult<R> {
-  f(data_try_get_persist_guild(ctx, id).await?.access_mut().await)
-}
-
-/// Acquires and provides access to a persist-guild state's write lock,
-/// committing its state to disk afterwards.
-pub async fn data_modify_persist_guild<F, R>(ctx: &Context, id: GuildId, f: F) -> MelodyResult<R>
-where F: FnOnce(RwLockWriteGuard<PersistGuild>) -> MelodyResult<R> {
-  let container = data_try_get_persist_guild(ctx, id).await?;
-  let out = f(container.access_mut().await)?;
-  trace!("Saving persist-guild state for guild ({id})...");
-  container.commit().await.context("failed to commit persist-guild state to disk")?;
-  Ok(out)
-}
-
 pub async fn trigger_shutdown(ctx: &Context) {
   data_get::<ShardManagerKey>(ctx).await.lock().await.shutdown_all().await
-}
-
-
-
-pub mod serde_id {
-  use serde::ser::{Serialize, Serializer};
-  use serde::de::{Deserialize, Deserializer};
-
-  pub fn serialize<S, T>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
-  where T: Copy + Into<u64>, S: Serializer {
-    u64::serialize(&value.clone().into(), serializer)
-  }
-
-  pub fn deserialize<'de, D, T>(deserializer: D) -> Result<T, D::Error>
-  where T: From<u64>, D: Deserializer<'de> {
-    u64::deserialize(deserializer).map(T::from)
-  }
 }

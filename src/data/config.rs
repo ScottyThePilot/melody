@@ -3,7 +3,7 @@ use super::Toml;
 use serenity::model::id::{GuildId, UserId};
 use serenity::utils::Color;
 use singlefile::Error as FileError;
-use singlefile::container_tokio::ContainerAsyncReadonly;
+use singlefile::container_shared_async::ContainerAsyncReadonly;
 
 use std::path::PathBuf;
 

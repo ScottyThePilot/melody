@@ -2,7 +2,7 @@ use super::Cbor;
 
 use serenity::model::id::GuildId;
 use singlefile::Error as FileError;
-use singlefile::container_tokio::ContainerAsyncWritableLocked;
+use singlefile::container_shared_async::ContainerAsyncWritableLocked;
 use tokio::sync::RwLock;
 
 use std::collections::{HashMap, HashSet};
