@@ -17,12 +17,10 @@ use serenity::utils::Color;
 pub const APPLICATION_COMMANDS: &[BlueprintCommand] = &[
   self::general::PING,
   self::general::HELP,
+  self::general::AVATAR,
+  self::general::BANNER,
   self::connect_four::CONNECT_FOUR
 ];
-
-pub const fn choice<'a>(string: &'a str) -> (&'a str, &'a str) {
-  (string, string)
-}
 
 pub async fn bot_color(ctx: &Context) -> Color {
   data_operate_config(ctx, |config| config.accent_color).await

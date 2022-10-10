@@ -3,6 +3,7 @@ use crate::blueprint::*;
 
 use rand::Rng;
 use serenity::client::Context;
+use serenity::model::user::User;
 use serenity::model::permissions::Permissions;
 use serenity::model::application::command::CommandType;
 
@@ -37,8 +38,11 @@ pub(super) const HELP: BlueprintCommand = blueprint_command! {
       description: "A specific command to get help for, otherwise returns the command list",
       required: false,
       choices: [
-        super::choice("help"),
-        super::choice("connect-four")
+        ("ping", "ping"),
+        ("help", "help"),
+        ("avatar", "avatar"),
+        ("banner", "banner"),
+        ("connect-four", "connect-four")
       ]
     })
   ],
@@ -63,6 +67,62 @@ async fn help(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
         command_list_embed(super::APPLICATION_COMMANDS, permissions, color)
       ])
     }
+  };
+
+  response.send(ctx, &args.interaction).await
+}
+
+pub const AVATAR: BlueprintCommand = blueprint_command! {
+  name: "avatar",
+  description: "Gets another user's avatar",
+  usage: ["/avatar [user]"],
+  examples: ["/avatar", "/avatar @Nanachi"],
+  allow_in_dms: true,
+  arguments: [
+    blueprint_argument!(User {
+      name: "user",
+      description: "The user whose avatar should be retrieved, defaults to the caller if not set",
+      required: false
+    })
+  ],
+  function: avatar
+};
+
+#[command_attr::hook]
+async fn avatar(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
+  let user = resolve_arguments::<Option<User>>(args.option_values)?
+    .unwrap_or_else(|| args.interaction.user.clone());
+  let response = match user.avatar_url() {
+    Some(avatar_url) => BlueprintCommandResponse::new_ephemeral(avatar_url),
+    None => BlueprintCommandResponse::new_ephemeral("Failed to get that user's avatar")
+  };
+
+  response.send(ctx, &args.interaction).await
+}
+
+pub const BANNER: BlueprintCommand = blueprint_command! {
+  name: "banner",
+  description: "Gets another user's banner",
+  usage: ["/banner [user]"],
+  examples: ["/banner", "/banner @Nanachi"],
+  allow_in_dms: true,
+  arguments: [
+    blueprint_argument!(User {
+      name: "user",
+      description: "The user whose banner should be retrieved, defaults to the caller if not set",
+      required: false
+    })
+  ],
+  function: banner
+};
+
+#[command_attr::hook]
+async fn banner(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
+  let user = resolve_arguments::<Option<User>>(args.option_values)?
+    .unwrap_or_else(|| args.interaction.user.clone());
+  let response = match user.banner_url() {
+    Some(banner_url) => BlueprintCommandResponse::new_ephemeral(banner_url),
+    None => BlueprintCommandResponse::new_ephemeral("Failed to get that user's banner")
   };
 
   response.send(ctx, &args.interaction).await

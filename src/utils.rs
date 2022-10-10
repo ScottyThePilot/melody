@@ -1,7 +1,7 @@
+use crate::{MelodyError, MelodyResult};
+
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
-
-use crate::{MelodyError, MelodyResult};
 
 use std::error::Error;
 use std::fmt;
@@ -49,6 +49,7 @@ impl fmt::Display for Timestamp {
   }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 pub enum TimestampFormat {
   ShortTime,
