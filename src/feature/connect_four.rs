@@ -1,5 +1,7 @@
 use chrono::{DateTime, Duration, Utc};
 use float_ord::FloatOrd;
+use rand::Rng;
+use rand::seq::SliceRandom;
 use serenity::model::id::UserId;
 use uord::UOrd;
 
@@ -290,6 +292,35 @@ impl Board {
     (0..7).filter_map(|column| Some((column, self.apply_move(column)?)))
   }
 
+  /// Picks a move out of all possible moves based on one of four difficulty presets, and a random number generator.
+  pub fn evaluate_move_difficulty(&self, rng: &mut impl Rng, difficulty: Difficulty) -> Option<(usize, f32)> {
+    let depth = difficulty.evaluation_depth();
+    let (min, max, losing_move_discount) = match difficulty.parameters() {
+      None => return self.evaluate_best_move(depth),
+      Some(parameters) => parameters
+    };
+
+    let mut moveset = self.evaluate_moves(depth);
+    if moveset.is_empty() { return None };
+    if moveset.len() == 1 { return Some(moveset[0]) };
+    // Count the number of moves that will allow the other player to win on the next turn
+    let losing_moves = moveset.iter().filter(|&&(_, eval)| eval == -1.0).count().min(6);
+    let remaining_moves = moveset.len().checked_sub(losing_move_discount.min(losing_moves));
+    moveset.truncate(match remaining_moves {
+      // If the proposed discount by would leave 1 or 0 moves, just take the best move
+      Some(0 | 1) | None => return Some(moveset[0]),
+      // The returned value should never be 0
+      Some(remaining_moves) => remaining_moves
+    });
+
+    let min = f32::ceil(min * moveset.len() as f32) as usize;
+    let max = f32::floor(max * moveset.len() as f32) as usize;
+    let m = moveset[min..max].choose(rng).cloned()
+      .unwrap_or_else(|| moveset[0]);
+    Some(m)
+  }
+
+  /// Evaluate the best move at the given position.
   fn evaluate_best_move(&self, depth: usize) -> Option<(usize, f32)> {
     let color = self.current_turn();
     self.iter_potential_positions()
@@ -297,6 +328,7 @@ impl Board {
       .max_by_key(|&(_, value)| FloatOrd(value))
   }
 
+  /// Evaluate all possible moves, returning them in order with their evaluation scores.
   fn evaluate_moves(&self, depth: usize) -> Vec<(usize, f32)> {
     let color = self.current_turn();
     let mut evaluated_moves = self.iter_potential_positions()
@@ -352,6 +384,45 @@ impl Color {
     match self {
       Color::Player1 => Color::Player2,
       Color::Player2 => Color::Player1
+    }
+  }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum Difficulty {
+  // Always picks the best possible move
+  // Evaluation depth 7
+  Maxmimum,
+  // Only plays moves above 50%
+  // Never plays losing moves
+  // Evaluation depth 5
+  Hard,
+  // Only plays moves above 25% and belov 75%
+  // Eliminates 4 losing moves from moveset
+  // Evaluation depth 4
+  Medium,
+  // Only plays moves below 50%
+  // Eliminates 2 losing moves from moveset
+  // Evaluation depth 4
+  Easy
+}
+
+impl Difficulty {
+  pub fn evaluation_depth(self) -> usize {
+    match self {
+      Difficulty::Maxmimum => 7,
+      Difficulty::Hard => 5,
+      Difficulty::Medium => 4,
+      Difficulty::Easy => 4
+    }
+  }
+
+  pub fn parameters(self) -> Option<(f32, f32, usize)> {
+    match self {
+      Difficulty::Maxmimum => None,
+      Difficulty::Hard => Some((0.00, 0.50, 6)),
+      Difficulty::Medium => Some((0.25, 0.75, 4)),
+      Difficulty::Easy => Some((0.50, 0.00, 2))
     }
   }
 }
