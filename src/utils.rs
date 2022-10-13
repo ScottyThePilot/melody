@@ -2,6 +2,7 @@ use crate::{MelodyError, MelodyResult};
 
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
+use singlefile::error::{SingleFileError, SingleFileUserError};
 
 use std::error::Error;
 use std::fmt;
@@ -78,22 +79,45 @@ impl fmt::Display for TimestampFormat {
 pub trait Contextualize {
   type Output;
 
-  fn context(self, context: &'static str) -> Self::Output;
+  fn context(self, context: impl Into<String>) -> Self::Output;
 }
 
-impl<T> Contextualize for Result<T, singlefile::Error> {
+impl<T> Contextualize for std::io::Result<T> {
   type Output = MelodyResult<T>;
 
-  fn context(self, context: &'static str) -> Self::Output {
-    self.map_err(|error| MelodyError::FileError(error, context))
+  fn context(self, context: impl Into<String>) -> Self::Output {
+    self.map_err(|error| MelodyError::FileError(SingleFileError::Io(error), context.into()))
+  }
+}
+
+impl<T> Contextualize for Result<T, SingleFileError> {
+  type Output = MelodyResult<T>;
+
+  fn context(self, context: impl Into<String>) -> Self::Output {
+    self.map_err(|error| MelodyError::FileError(error, context.into()))
+  }
+}
+
+impl<T> Contextualize for Result<T, SingleFileUserError<MelodyError>> {
+  type Output = MelodyResult<T>;
+
+  fn context(self, context: impl Into<String>) -> Self::Output {
+    let error = match self {
+      Ok(value) => return Ok(value),
+      Err(SingleFileUserError::User(error)) => return Err(error),
+      Err(SingleFileUserError::Format(error)) => SingleFileError::Format(error),
+      Err(SingleFileUserError::Io(error)) => SingleFileError::Io(error)
+    };
+
+    Err(MelodyError::FileError(error, context.into()))
   }
 }
 
 impl<T> Contextualize for Result<T, serenity::Error> {
   type Output = MelodyResult<T>;
 
-  fn context(self, context: &'static str) -> Self::Output {
-    self.map_err(|error| MelodyError::SerenityError(error, context))
+  fn context(self, context: impl Into<String>) -> Self::Output {
+    self.map_err(|error| MelodyError::SerenityError(error, context.into()))
   }
 }
 

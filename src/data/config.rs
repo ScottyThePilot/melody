@@ -1,8 +1,9 @@
+use crate::MelodyResult;
+use crate::utils::Contextualize;
 use super::Toml;
 
 use serenity::model::id::{GuildId, UserId};
 use serenity::utils::Color;
-use singlefile::Error as FileError;
 use singlefile::container_shared_async::ContainerAsyncReadonly;
 
 use std::path::PathBuf;
@@ -21,8 +22,11 @@ pub struct Config {
 
 impl Config {
   #[inline]
-  pub async fn create() -> Result<ConfigContainer, FileError> {
+  pub async fn create() -> MelodyResult<ConfigContainer> {
     let path = PathBuf::from(format!("./config.toml"));
-    ConfigContainer::create_or_default(path, Toml).await
+    let container = ConfigContainer::create_or_default(path, Toml)
+      .await.context("failed to load config.toml")?;
+    trace!("loaded config.toml");
+    Ok(container)
   }
 }

@@ -13,15 +13,17 @@ float-ord = "0.3.2"
 itertools = "0.10"
 log = "0.4"
 once_cell = "1.14"
-rand = "0.8"
+rand = { version = "0.8", features = ["small_rng"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_cbor = "0.11.2"
-singlefile = { git = "https://github.com/ScottyThePilot/singlefile", features = ["shared-async"] }
 thiserror = "1.0"
 tokio = { version = "1.21", features = ["full"] }
 toml = "0.5"
-uord = { git = "https://github.com/ScottyThePilot/misc-crates", features = ["serde"] }
 xz2 = "0.1"
+
+[dependencies.singlefile]
+git = "https://github.com/ScottyThePilot/singlefile"
+features = ["shared-async"]
 
 [dependencies.serenity]
 version = "0.11"
@@ -32,3 +34,7 @@ features = [
   "gateway", "model", "http",
   "unstable_discord_api"
 ]
+
+[dependencies.uord]
+git = "https://github.com/ScottyThePilot/misc-crates"
+features = ["serde"]

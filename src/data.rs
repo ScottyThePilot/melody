@@ -91,7 +91,7 @@ key!(pub struct ConfigKey, ConfigContainer);
 key!(pub struct PersistKey, PersistContainer);
 key!(pub struct PersistGuildsKey, PersistGuildsWrapper);
 key!(pub struct ShardManagerKey, Arc<Mutex<ShardManager>>);
-key!(pub struct MessageChainsKey, crate::feature::message_chains::MessageChainsContainer);
+key!(pub struct MessageChainsKey, crate::feature::message_chains::MessageChainsWrapper);
 key!(pub struct PreviousBuildIdKey, u64);
 key!(pub struct RestartKey, bool);
 
@@ -147,6 +147,10 @@ macro_rules! data_get_fn {
 data_get_fn!(pub async fn data_get_config, ConfigKey, ConfigContainer);
 data_get_fn!(pub async fn data_get_persist, PersistKey, PersistContainer);
 
+macro_rules! context {
+  ($function:ident) => (concat!("failed to save state in ", stringify!($function)));
+}
+
 macro_rules! data_operate_fn {
   ($vis:vis async fn $function:ident($($arg:ident: $Arg:ty),*), $getter:ident, $method:ident, $Type:ty) => {
     $vis async fn $function<F, R>(ctx: &Context, $($arg: $Arg,)* operation: F) -> R
@@ -157,7 +161,7 @@ macro_rules! data_operate_fn {
   ($vis:vis async fn $function:ident($($arg:ident: $Arg:ty),*), $getter:ident, $method:ident?, $Type:ty, $err:expr) => {
     $vis async fn $function<F, R>(ctx: &Context, $($arg: $Arg,)* operation: F) -> MelodyResult<R>
     where F: FnOnce($Type) -> MelodyResult<R> {
-      $getter(ctx $(, $arg)*).await.$method(operation).await.context("failed to save")?
+      $getter(ctx $(, $arg)*).await.$method(operation).await.context(context!($function))
     }
   };
   ($vis:vis async fn $function:ident($($arg:ident: $Arg:ty),*), $getter:ident?, $method:ident, $Type:ty) => {
@@ -169,7 +173,7 @@ macro_rules! data_operate_fn {
   ($vis:vis async fn $function:ident($($arg:ident: $Arg:ty),*), $getter:ident?, $method:ident?, $Type:ty, $err:expr) => {
     $vis async fn $function<F, R>(ctx: &Context, $($arg: $Arg,)* operation: F) -> MelodyResult<R>
     where F: FnOnce($Type) -> MelodyResult<R> {
-      $getter(ctx $(, $arg)*).await?.$method(operation).await.context("failed to save")?
+      $getter(ctx $(, $arg)*).await?.$method(operation).await.context(context!($function))
     }
   };
 }
@@ -194,8 +198,7 @@ data_operate_fn!(
 
 pub async fn data_get_persist_guild(ctx: &Context, id: GuildId) -> MelodyResult<PersistGuildContainer> {
   let persist_guilds = data_get::<PersistGuildsKey>(ctx).await;
-  PersistGuilds::get_default(persist_guilds, id)
-    .await.context("failed to retrieve persist-guild")
+  PersistGuilds::get_default(persist_guilds, id).await
 }
 
 pub async fn trigger_shutdown(ctx: &Context) {

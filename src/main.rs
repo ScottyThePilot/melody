@@ -1,20 +1,21 @@
 #![warn(missing_debug_implementations)]
+#[macro_use] extern crate log;
+#[macro_use] extern crate serde;
+#[macro_use] extern crate thiserror;
 extern crate ahash;
 extern crate chrono;
 extern crate command_attr;
 extern crate fern;
-#[macro_use]
-extern crate log;
+extern crate float_ord;
+extern crate itertools;
 extern crate once_cell;
+extern crate rand;
 extern crate serenity;
-extern crate singlefile;
-#[macro_use]
-extern crate serde;
 extern crate serde_cbor;
-#[macro_use]
-extern crate thiserror;
+extern crate singlefile;
 extern crate tokio;
 extern crate toml;
+extern crate xz2;
 
 #[macro_use]
 pub(crate) mod utils;
@@ -25,8 +26,9 @@ pub(crate) mod commands;
 pub(crate) mod data;
 pub(crate) mod feature;
 pub(crate) mod handler;
+pub(crate) mod ratelimiter;
 
-use fern::Dispatch;
+use singlefile::error::SingleFileError;
 
 #[tokio::main]
 async fn main() {
@@ -46,9 +48,9 @@ pub type MelodyResult<T = ()> = Result<T, MelodyError>;
 #[derive(Debug, Error)]
 pub enum MelodyError {
   #[error("File Error: {1} ({0})")]
-  FileError(singlefile::Error, &'static str),
+  FileError(SingleFileError, String),
   #[error("Serenity Error: {1} ({0})")]
-  SerenityError(serenity::Error, &'static str),
+  SerenityError(serenity::Error, String),
   #[error("Invalid command")]
   InvalidCommand,
   #[error("Invalid arguments")]
@@ -56,7 +58,7 @@ pub enum MelodyError {
 }
 
 fn setup_logger() -> Result<(), fern::InitError> {
-  Dispatch::new()
+  fern::Dispatch::new()
     .format(move |out, message, record| {
       out.finish(format_args!(
         "{}[{}]({}) {}",

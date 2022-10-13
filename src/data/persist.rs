@@ -1,7 +1,8 @@
+use crate::MelodyResult;
+use crate::utils::Contextualize;
 use super::Cbor;
 
 use serenity::model::id::GuildId;
-use singlefile::Error as FileError;
 use singlefile::container_shared_async::ContainerAsyncWritableLocked;
 use tokio::sync::RwLock;
 
@@ -20,10 +21,14 @@ pub struct Persist {
 }
 
 impl Persist {
-  pub async fn create() -> Result<PersistContainer, FileError> {
-    tokio::fs::create_dir_all("./data/").await?;
+  pub async fn create() -> MelodyResult<PersistContainer> {
+    tokio::fs::create_dir_all("./data/")
+      .await.context("failed to create data/guilds/")?;
     let path = PathBuf::from(format!("./data/persist.bin"));
-    PersistContainer::create_or_default(path, Cbor).await
+    let container = PersistContainer::create_or_default(path, Cbor)
+      .await.context("failed to load data/persist.bin")?;
+    trace!("loaded data/persist.bin");
+    Ok(container)
   }
 
   pub async fn swap_build_id(container: &PersistContainer) -> u64 {
@@ -66,19 +71,37 @@ pub struct PersistGuilds {
 
 impl PersistGuilds {
   #[inline]
-  pub fn create() -> PersistGuildsWrapper {
-    Arc::new(RwLock::new(Self::default()))
+  pub async fn create() -> MelodyResult<PersistGuilds> {
+    let mut guilds = HashMap::new();
+    let mut read_dir = tokio::fs::read_dir("./data/guilds/")
+      .await.context("failed to read dir")?;
+    while let Some(entry) = read_dir.next_entry().await.context("failed to read dir")? {
+      let file_type = entry.file_type().await.context("failed to read dir")?;
+      if !file_type.is_dir() { continue };
+      if let Some(id) = parse_file_name(&entry.file_name()).map(GuildId) {
+        let persist_guild = PersistGuild::create(id).await?;
+        guilds.insert(id, persist_guild);
+      };
+    };
+
+    Ok(PersistGuilds { guilds })
   }
 
   pub async fn get(wrapper: PersistGuildsWrapper, id: GuildId) -> Option<PersistGuildContainer> {
     wrapper.read().await.guilds.get(&id).cloned()
   }
 
-  pub async fn get_default(wrapper: PersistGuildsWrapper, id: GuildId) -> Result<PersistGuildContainer, FileError> {
+  pub async fn get_default(wrapper: PersistGuildsWrapper, id: GuildId) -> MelodyResult<PersistGuildContainer> {
     match wrapper.write().await.guilds.entry(id) {
       Entry::Occupied(occupied) => Ok(occupied.get().clone()),
       Entry::Vacant(vacant) => Ok(vacant.insert(PersistGuild::create(id).await?).clone())
     }
+  }
+}
+
+impl From<PersistGuilds> for PersistGuildsWrapper {
+  fn from(persist_guilds: PersistGuilds) -> Self {
+    Arc::new(RwLock::new(persist_guilds))
   }
 }
 
@@ -91,9 +114,17 @@ pub struct PersistGuild {
 }
 
 impl PersistGuild {
-  pub async fn create(id: GuildId) -> Result<PersistGuildContainer, FileError> {
-    tokio::fs::create_dir_all("./data/guilds/").await?;
+  pub async fn create(id: GuildId) -> MelodyResult<PersistGuildContainer> {
+    tokio::fs::create_dir_all("./data/guilds/")
+      .await.context("failed to create data/guilds/")?;
     let path = PathBuf::from(format!("./data/guilds/{id}.bin"));
-    PersistGuildContainer::create_or_default(path, Cbor).await
+    let container = PersistGuildContainer::create_or_default(path, Cbor)
+      .await.context(format!("failed to load data/guilds/{id}.bin"))?;
+    trace!("loaded data/guilds/{id}.bin");
+    Ok(container)
   }
+}
+
+fn parse_file_name(path: &std::ffi::OsStr) -> Option<u64> {
+  path.to_str().and_then(|path| path.parse().ok())
 }

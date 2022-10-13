@@ -8,7 +8,13 @@ use std::sync::Arc;
 
 
 
-pub type MessageChainsContainer = Arc<Mutex<MessageChains>>;
+pub type MessageChainsWrapper = Arc<Mutex<MessageChains>>;
+
+impl From<MessageChains> for MessageChainsWrapper {
+  fn from(message_chains: MessageChains) -> Self {
+    Arc::new(Mutex::new(message_chains))
+  }
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct MessageChains {
@@ -19,8 +25,8 @@ impl MessageChains {
   const ACTIVATION_THRESHOLD: usize = 3;
   const ACTIVATION_CHANCE: f64 = 0.50;
 
-  pub fn create() -> MessageChainsContainer {
-    Arc::new(Mutex::new(Self::default()))
+  pub fn new() -> MessageChains {
+    Self::default()
   }
 
   pub fn should_contribute(&mut self, message: &Message) -> bool {

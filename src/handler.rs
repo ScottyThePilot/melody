@@ -17,8 +17,9 @@ use std::time::Duration;
 
 /// Performs a clean launch of the bot, returning true if the bot expects to be restarted, and false if not.
 pub async fn launch() -> MelodyResult<bool> {
-  let config = Config::create().await.context("failed to load config.toml")?;
-  let persist = Persist::create().await.context("failed to load data/persist.bin")?;
+  let config = Config::create().await?;
+  let persist = Persist::create().await?;
+  let persist_guilds = PersistGuilds::create().await?;
 
   let previous_build_id = Persist::swap_build_id(&persist).await;
   let token = config.access().await.token.clone();
@@ -28,8 +29,8 @@ pub async fn launch() -> MelodyResult<bool> {
   // Insert data into the shared TypeMap
   data_insert::<ConfigKey>(&client, config).await;
   data_insert::<PersistKey>(&client, persist).await;
-  data_insert::<PersistGuildsKey>(&client, PersistGuilds::create()).await;
-  data_insert::<MessageChainsKey>(&client, MessageChains::create()).await;
+  data_insert::<PersistGuildsKey>(&client, persist_guilds.into()).await;
+  data_insert::<MessageChainsKey>(&client, MessageChains::new().into()).await;
   data_insert::<ShardManagerKey>(&client, client.shard_manager.clone()).await;
   data_insert::<PreviousBuildIdKey>(&client, previous_build_id).await;
   data_insert::<RestartKey>(&client, false).await;
