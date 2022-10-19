@@ -1,21 +1,23 @@
-use ahash::AHasher;
+use ahash::random_state::RandomState;
 use once_cell::sync::Lazy;
 
 use std::env::current_exe;
-use std::hash::Hasher;
+use std::hash::{BuildHasher, Hasher};
 use std::fs::File;
 use std::io;
 
 
 
-static BUILD_ID: Lazy<u64> = Lazy::new(|| {
-  let mut hasher = HashWriter(AHasher::default());
-  let mut binary = current_exe()
+static BUILD_ID: Lazy<u64> = Lazy::new(|| -> u64 {
+  let hasher = RandomState::with_seeds(0, 0, 0, 0)
+    .build_hasher();
+  let mut writer = HashWriter(hasher);
+  let mut reader = current_exe()
     .and_then(File::open)
     .map(io::BufReader::new)
     .unwrap();
-  io::copy(&mut binary, &mut hasher).unwrap();
-  let build_id = hasher.0.finish();
+  io::copy(&mut reader, &mut writer).unwrap();
+  let build_id = writer.0.finish();
 	trace!("Build ID: {build_id}");
 	build_id
 });
