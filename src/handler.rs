@@ -2,6 +2,11 @@ use crate::MelodyResult;
 use crate::commands::APPLICATION_COMMANDS;
 use crate::data::*;
 use crate::feature::message_chains::MessageChains;
+use crate::terminal::interrupt::{
+  set_handler as set_interrupt_handler,
+  reset_handler as reset_interrupt_handler,
+  kill as kill_terminal
+};
 use crate::utils::{Contextualize, Loggable};
 
 use rand::Rng;
@@ -36,15 +41,17 @@ pub async fn launch() -> MelodyResult<bool> {
   data_insert::<RestartKey>(&client, false).await;
 
   let shard_manager = client.shard_manager.clone();
-  let ctrl_c = tokio::spawn(async move {
-    tokio::signal::ctrl_c().await.unwrap();
-    shard_manager.lock().await.shutdown_all().await;
-    info!("Manual shutdown...");
+  set_interrupt_handler(move || {
+    kill_terminal();
+    tokio::spawn(async move {
+      shard_manager.lock().await.shutdown_all().await;
+      info!("Manual shutdown...");
+    });
   });
 
   client.start().await.context("failed to start client")?;
-  ctrl_c.abort();
 
+  reset_interrupt_handler();
   if data_take::<RestartKey>(&client).await {
     info!("Restarting in 10 seconds...");
     tokio::time::sleep(Duration::from_secs(10)).await;

@@ -25,18 +25,27 @@ pub(crate) mod data;
 pub(crate) mod feature;
 pub(crate) mod handler;
 pub(crate) mod ratelimiter;
+pub(crate) mod terminal;
+
+use crate::terminal::interrupt::was_killed;
+
+fn main() {
+  crate::terminal::run(run, terminal_input);
+}
 
 #[tokio::main]
-async fn main() {
-  setup_logger().unwrap();
-
+async fn run() {
   loop {
     match crate::handler::launch().await {
-      Ok(true) => continue,
-      Ok(false) => break,
+      Ok(true) if !was_killed() => continue,
+      Ok(false | true) => break,
       Err(error) => return error!("{error}")
     };
   };
+}
+
+fn terminal_input(line: String) {
+  info!("Command: {line}");
 }
 
 pub type MelodyResult<T = ()> = Result<T, MelodyError>;
@@ -61,26 +70,4 @@ pub enum MelodyFileError {
   Toml(#[from] singlefile::Error<crate::data::TomlError>),
   #[error(transparent)]
   Cbor(#[from] singlefile::Error<crate::data::CborError>)
-}
-
-fn setup_logger() -> Result<(), fern::InitError> {
-  fern::Dispatch::new()
-    .format(move |out, message, record| {
-      out.finish(format_args!(
-        "{}[{}]({}) {}",
-        chrono::Local::now().format("[%H:%M:%S]"),
-        record.level(),
-        record.target(),
-        message
-      ))
-    })
-    .level(log::LevelFilter::Warn)
-    .level_for("melody", log::LevelFilter::Trace)
-    .chain(std::io::stdout())
-    .chain({
-      std::fs::create_dir_all("./data/")?;
-      fern::log_file("./data/latest.log")?
-    })
-    .apply()?;
-  Ok(())
 }
