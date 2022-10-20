@@ -12,7 +12,6 @@ use serenity::model::id::GuildId;
 use serenity::prelude::TypeMapKey;
 use serde::ser::Serialize;
 use serde::de::DeserializeOwned;
-use singlefile::error::FormatError;
 use singlefile::manager::FileFormat;
 use tokio::sync::{Mutex, RwLock};
 use xz2::write::XzEncoder;
@@ -23,19 +22,37 @@ use std::sync::Arc;
 
 
 
+#[derive(Debug, Error)]
+pub enum TomlError {
+  #[error(transparent)]
+  Io(#[from] std::io::Error),
+  #[error(transparent)]
+  De(#[from] toml::de::Error),
+  #[error(transparent)]
+  Ser(#[from] toml::ser::Error)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Toml;
 
-impl FileFormat for Toml {
-  fn from_reader<R, T>(&self, mut reader: R) -> Result<T, FormatError>
-  where R: Read, T: DeserializeOwned {
+impl<T> FileFormat<T> for Toml
+where T: Serialize + DeserializeOwned {
+  type FormatError = TomlError;
+
+  fn from_reader<R: Read>(&self, mut reader: R) -> Result<T, Self::FormatError> {
     let mut buf = String::new();
     reader.read_to_string(&mut buf)?;
     toml::from_str(&buf).map_err(From::from)
   }
 
-  fn to_writer<W, T>(&self, mut writer: W, value: &T) -> Result<(), FormatError>
-  where W: Write, T: Serialize {
+  fn to_buf(&self, value: &T) -> Result<Vec<u8>, Self::FormatError> {
+    match toml::to_string_pretty(value) {
+      Ok(buf) => Ok(buf.into_bytes()),
+      Err(error) => Err(error.into())
+    }
+  }
+
+  fn to_writer<W: Write>(&self, mut writer: W, value: &T) -> Result<(), Self::FormatError> {
     let buf = toml::to_string_pretty(value)?;
     writer.write_all(buf.as_bytes())?;
     Ok(())
@@ -44,17 +61,20 @@ impl FileFormat for Toml {
 
 
 
+pub type CborError = serde_cbor::Error;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Cbor;
 
-impl FileFormat for Cbor {
-  fn from_reader<R, T>(&self, reader: R) -> Result<T, FormatError>
-  where R: Read, T: DeserializeOwned {
+impl<T> FileFormat<T> for Cbor
+where T: Serialize + DeserializeOwned {
+  type FormatError = serde_cbor::Error;
+
+  fn from_reader<R: Read>(&self, reader: R) -> Result<T, Self::FormatError> {
     serde_cbor::from_reader(reader).map_err(From::from)
   }
 
-  fn to_writer<W, T>(&self, writer: W, value: &T) -> Result<(), FormatError>
-  where W: Write, T: Serialize {
+  fn to_writer<W: Write>(&self, writer: W, value: &T) -> Result<(), Self::FormatError> {
     serde_cbor::to_writer(writer, value).map_err(From::from)
   }
 }
@@ -62,14 +82,15 @@ impl FileFormat for Cbor {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CborXz;
 
-impl FileFormat for CborXz {
-  fn from_reader<R, T>(&self, reader: R) -> Result<T, FormatError>
-  where R: Read, T: DeserializeOwned {
+impl<T> FileFormat<T> for CborXz
+where T: Serialize + DeserializeOwned {
+  type FormatError = serde_cbor::Error;
+
+  fn from_reader<R: Read>(&self, reader: R) -> Result<T, Self::FormatError> {
     serde_cbor::from_reader(XzDecoder::new(reader)).map_err(From::from)
   }
 
-  fn to_writer<W, T>(&self, writer: W, value: &T) -> Result<(), FormatError>
-  where W: Write, T: Serialize {
+  fn to_writer<W: Write>(&self, writer: W, value: &T) -> Result<(), Self::FormatError> {
     serde_cbor::to_writer(XzEncoder::new(writer, 9), value).map_err(From::from)
   }
 }

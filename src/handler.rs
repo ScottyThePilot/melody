@@ -21,7 +21,7 @@ pub async fn launch() -> MelodyResult<bool> {
   let persist = Persist::create().await?;
   let persist_guilds = PersistGuilds::create().await?;
 
-  let previous_build_id = Persist::swap_build_id(&persist).await;
+  let previous_build_id = persist.operate_mut(|persist| persist.swap_build_id()).await;
   let token = config.access().await.token.clone();
   let mut client = Client::builder(&token, intents())
     .event_handler(Handler).await.context("failed to init client")?;
@@ -60,8 +60,12 @@ struct Handler;
 
 #[serenity::async_trait]
 impl EventHandler for Handler {
-  async fn ready(&self, _ctx: Context, ready_info: Ready) {
+  async fn ready(&self, ctx: Context, ready_info: Ready) {
     info!("Bot connected: {} ({})", ready_info.user.tag(), ready_info.user.id);
+    if let Some(test_guild_id) = data_operate_config(&ctx, |config| config.test_guild).await {
+      data_operate_persist_mut(&ctx, |persist| persist.add_guild_plugin(test_guild_id, "test")).await;
+      debug!("Guild ({test_guild_id}) is test guild");
+    };
   }
 
   async fn cache_ready(&self, ctx: Context, guilds: Vec<GuildId>) {

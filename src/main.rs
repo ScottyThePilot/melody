@@ -17,18 +17,14 @@ extern crate tokio;
 extern crate toml;
 extern crate xz2;
 
-#[macro_use]
-pub(crate) mod utils;
-#[macro_use]
-pub(crate) mod blueprint;
+#[macro_use] pub(crate) mod utils;
+#[macro_use] pub(crate) mod blueprint;
 pub(crate) mod build_id;
 pub(crate) mod commands;
 pub(crate) mod data;
 pub(crate) mod feature;
 pub(crate) mod handler;
 pub(crate) mod ratelimiter;
-
-use singlefile::error::SingleFileError;
 
 #[tokio::main]
 async fn main() {
@@ -48,13 +44,23 @@ pub type MelodyResult<T = ()> = Result<T, MelodyError>;
 #[derive(Debug, Error)]
 pub enum MelodyError {
   #[error("File Error: {1} ({0})")]
-  FileError(SingleFileError, String),
+  FileError(MelodyFileError, String),
   #[error("Serenity Error: {1} ({0})")]
   SerenityError(serenity::Error, String),
   #[error("Invalid command")]
   InvalidCommand,
   #[error("Invalid arguments")]
   InvalidArguments
+}
+
+#[derive(Debug, Error)]
+pub enum MelodyFileError {
+  #[error(transparent)]
+  Io(#[from] std::io::Error),
+  #[error(transparent)]
+  Toml(#[from] singlefile::Error<crate::data::TomlError>),
+  #[error(transparent)]
+  Cbor(#[from] singlefile::Error<crate::data::CborError>)
 }
 
 fn setup_logger() -> Result<(), fern::InitError> {

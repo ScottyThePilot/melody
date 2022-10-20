@@ -16,7 +16,7 @@ pub(super) const CONNECT_FOUR: BlueprintCommand = blueprint_command! {
   description: "Play connect-four",
   usage: [
     "/connect-four challenge <user>",
-    "/connect-four challenge-computer <difficulty>",
+    "/connect-four challenge-computer <hard|medium|easy>",
     "/connect-four accept <user>",
     "/connect-four decline <user>",
     "/connect-four play <column>",
@@ -53,7 +53,7 @@ pub(super) const CONNECT_FOUR: BlueprintCommand = blueprint_command! {
           name: "difficulty",
           description: "The difficulty level the computer should use (defaults to medium)",
           choices: [
-            ("impossible", "maximum"),
+            //("impossible", "maximum"),
             ("hard", "hard"),
             ("medium", "medium"),
             ("easy", "easy")
@@ -235,14 +235,14 @@ async fn connect_four_play(ctx: &Context, args: BlueprintCommandArgs) -> MelodyR
   let persist_guild_container = data_get_persist_guild(ctx, guild_id).await?;
   let mut persist_guild = persist_guild_container.access_owned_mut().await;
 
-  let response = match persist_guild.connect_four.find_game_mut(player) {
+  let (deferred, response) = match persist_guild.connect_four.find_game_mut(player) {
     Some(GameQuery::UserGame(game, player_color)) => {
       let &opponent = game.players().other(&player).unwrap();
       let column = resolve_arguments::<i64>(args.option_values)?;
       let column = crate::feature::connect_four::validate_column(column)
         .ok_or(MelodyError::InvalidArguments)?;
 
-      match game.play_move(player_color, column) {
+      (false, match game.play_move(player_color, column) {
         UserGameResult::Victory(board) => {
           let board = board.print(print_piece);
           persist_guild.connect_four.end_user_game(player, opponent);
@@ -259,14 +259,16 @@ async fn connect_four_play(ctx: &Context, args: BlueprintCommandArgs) -> MelodyR
         },
         UserGameResult::NotYourTurn => "It is not your turn!".to_owned(),
         UserGameResult::IllegalMove => "That move is illegal".to_owned()
-      }
+      })
     },
     Some(GameQuery::ComputerGame(game)) => {
       let column = resolve_arguments::<i64>(args.option_values)?;
       let column = crate::feature::connect_four::validate_column(column)
         .ok_or(MelodyError::InvalidArguments)?;
 
-      match game.play_move(column).await {
+      args.interaction.defer(ctx).await.context("failed to defer message")?;
+
+      (true, match game.play_move(column).await {
         ComputerGameResult::Continuing(board, computer_move) => {
           let board = board.print(print_piece);
           let computer_move = computer_move + 1;
@@ -288,16 +290,23 @@ async fn connect_four_play(ctx: &Context, args: BlueprintCommandArgs) -> MelodyR
           format!("The game between you and the computer player has ended in a draw\n\n{board}")
         },
         ComputerGameResult::IllegalMove => "That move is illegal".to_owned()
-      }
+      })
     },
-    None => "You are not currently playing a game!".to_owned()
+    None => (false, "You are not currently playing a game!".to_owned())
   };
 
   persist_guild_container.commit_guard(persist_guild.downgrade())
     .await.context("failed to save")?;
 
-  BlueprintCommandResponse::new(response)
-    .send(ctx, &args.interaction).await
+  if deferred {
+    BlueprintCommandResponseEdit::new(response)
+      .send(ctx, &args.interaction).await?;
+  } else {
+    BlueprintCommandResponse::new(response)
+      .send(ctx, &args.interaction).await?;
+  };
+
+  Ok(())
 }
 
 #[command_attr::hook]
@@ -351,25 +360,29 @@ async fn connect_four_claim_win(ctx: &Context, args: BlueprintCommandArgs) -> Me
   let player = args.interaction.user.id;
   let confirm = resolve_arguments::<Option<bool>>(args.option_values)?.unwrap_or(false);
   let response = data_operate_persist_guild_commit(ctx, guild_id, |persist_guild| {
-    Ok(match persist_guild.connect_four.find_user_game_mut(player) {
-      Some((game, player_color)) => if game.current_turn() == player_color {
-        "It is your turn!".to_owned()
-      } else {
-        let duration = Timestamp::new(game.last_played(), TimestampFormat::Relative);
-        let &opponent = game.players().other(&player).unwrap();
-        if game.can_claim_win() {
-          if confirm {
-            let board = game.print(print_piece);
-            persist_guild.connect_four.end_user_game(player, opponent);
-            format!("{} has claimed a win against {}\n\n{board}", Mention::User(player), Mention::User(opponent))
-          } else {
-            format!("You can claim a win\nYour opponent's turn started {duration}\nYou can skip with `/connect-four claim-win true`")
-          }
+    Ok(if persist_guild.connect_four.is_playing_computer(player) {
+      "You cannot claim a win against the computer player".to_owned()
+    } else {
+      match persist_guild.connect_four.find_user_game_mut(player) {
+        Some((game, player_color)) => if game.current_turn() == player_color {
+          "It is your turn!".to_owned()
         } else {
-          format!("You cannot claim a win yet\nYour opponent's turn started {}", duration)
-        }
-      },
-      None => "You are not currently playing a game!".to_owned()
+          let timestamp = Timestamp::new(game.last_played(), TimestampFormat::Relative);
+          let &opponent = game.players().other(&player).unwrap();
+          if game.can_claim_win() {
+            if confirm {
+              let board = game.print(print_piece);
+              persist_guild.connect_four.end_user_game(player, opponent);
+              format!("{} has claimed a win against {}\n\n{board}", Mention::User(player), Mention::User(opponent))
+            } else {
+              format!("You can claim a win\nYour opponent's turn started {timestamp}\nYou can skip with `/connect-four claim-win true`")
+            }
+          } else {
+            format!("You cannot claim a win yet\nYour opponent's turn started {}", timestamp)
+          }
+        },
+        None => "You are not currently playing a game!".to_owned()
+      }
     })
   }).await?;
 

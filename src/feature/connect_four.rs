@@ -18,7 +18,9 @@ use std::fmt;
 pub struct Manager {
   challenges: HashMap<u64, HashSet<u64>>,
   stats: HashMap<u64, Stats>,
+  #[serde(default)]
   user_games: HashMap<UOrd<u64>, UserGame>,
+  #[serde(default)]
   computer_games: HashMap<u64, ComputerGame>
 }
 
@@ -506,6 +508,7 @@ impl Board {
 
   /// Recursively evaluates a board in reference to the given player
   /// based on the moves available to the current player
+  // TODO: Revise evaluation code, `evaluate_best_move` doesn't actually make near-perfect moves
   fn evaluate_position(&self, depth: usize, color: Color) -> f32 {
     let turn = self.current_turn();
     let turn_value = if turn == color { 1.0 } else { -1.0 };
@@ -580,7 +583,7 @@ pub enum Difficulty {
 impl Difficulty {
   pub fn evaluation_depth(self) -> usize {
     match self {
-      Difficulty::Maxmimum => 7,
+      Difficulty::Maxmimum => 6,
       Difficulty::Hard => 5,
       Difficulty::Medium => 4,
       Difficulty::Easy => 4

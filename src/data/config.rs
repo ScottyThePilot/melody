@@ -26,7 +26,7 @@ impl Config {
     let path = PathBuf::from(format!("./config.toml"));
     let container = ConfigContainer::create_or_default(path, Toml)
       .await.context("failed to load config.toml")?;
-    trace!("loaded config.toml");
+    trace!("Loaded config.toml");
     Ok(container)
   }
 }

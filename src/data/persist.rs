@@ -2,11 +2,11 @@ use crate::MelodyResult;
 use crate::utils::Contextualize;
 use super::Cbor;
 
+use std::collections::{HashMap, HashSet};
 use serenity::model::id::GuildId;
 use singlefile::container_shared_async::ContainerAsyncWritableLocked;
 use tokio::sync::RwLock;
 
-use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::Entry;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -27,29 +27,24 @@ impl Persist {
     let path = PathBuf::from(format!("./data/persist.bin"));
     let container = PersistContainer::create_or_default(path, Cbor)
       .await.context("failed to load data/persist.bin")?;
-    trace!("loaded data/persist.bin");
+    trace!("Loaded data/persist.bin");
     Ok(container)
   }
 
-  pub async fn swap_build_id(container: &PersistContainer) -> u64 {
-    std::mem::replace(&mut container.access_mut().await.build_id, crate::build_id::get())
+  pub fn swap_build_id(&mut self) -> u64 {
+    std::mem::replace(&mut self.build_id, crate::build_id::get())
   }
 
-  pub async fn get_guild_plugins(container: &PersistContainer, id: GuildId) -> HashSet<String> {
-    Self::guild_plugins_mut(container, id, |plugins| plugins.clone()).await
+  pub fn get_guild_plugins(&self, id: GuildId) -> HashSet<String> {
+    self.guild_plugins.get(&id.0).map_or_else(HashSet::new, HashSet::clone)
   }
 
-  pub async fn add_guild_plugin(container: &PersistContainer, id: GuildId, plugin: impl Into<String>) -> bool {
-    Self::guild_plugins_mut(container, id, |plugins| plugins.insert(plugin.into())).await
+  pub fn add_guild_plugin(&mut self, id: GuildId, plugin: impl Into<String>) -> bool {
+    self.guild_plugins.entry(id.into()).or_default().insert(plugin.into())
   }
 
-  pub async fn remove_guild_plugin(container: &PersistContainer, id: GuildId, plugin: impl AsRef<str>) -> bool {
-    Self::guild_plugins_mut(container, id, |plugins| plugins.remove(plugin.as_ref())).await
-  }
-
-  async fn guild_plugins_mut<F, R>(container: &PersistContainer, id: GuildId, f: F) -> R
-  where F: FnOnce(&mut HashSet<String>) -> R {
-    f(container.access_mut().await.guild_plugins.entry(id.into()).or_default())
+  pub fn remove_guild_plugin(&mut self, id: GuildId, plugin: impl AsRef<str>) -> bool {
+    self.guild_plugins.entry(id.into()).or_default().remove(plugin.as_ref())
   }
 }
 
@@ -77,7 +72,7 @@ impl PersistGuilds {
       .await.context("failed to read dir")?;
     while let Some(entry) = read_dir.next_entry().await.context("failed to read dir")? {
       let file_type = entry.file_type().await.context("failed to read dir")?;
-      if !file_type.is_dir() { continue };
+      if !file_type.is_file() { continue };
       if let Some(id) = parse_file_name(&entry.file_name()).map(GuildId) {
         let persist_guild = PersistGuild::create(id).await?;
         guilds.insert(id, persist_guild);
@@ -120,11 +115,11 @@ impl PersistGuild {
     let path = PathBuf::from(format!("./data/guilds/{id}.bin"));
     let container = PersistGuildContainer::create_or_default(path, Cbor)
       .await.context(format!("failed to load data/guilds/{id}.bin"))?;
-    trace!("loaded data/guilds/{id}.bin");
+    trace!("Loaded data/guilds/{id}.bin");
     Ok(container)
   }
 }
 
 fn parse_file_name(path: &std::ffi::OsStr) -> Option<u64> {
-  path.to_str().and_then(|path| path.parse().ok())
+  path.to_str().and_then(|path| path.strip_suffix(".bin")?.parse().ok())
 }

@@ -40,7 +40,7 @@ pub async fn register_commands(ctx: &Context, guilds: &[GuildId]) -> MelodyResul
     info!("Discovered guild: {guild_name} ({guild_id})");
 
     if exclusive_commands.is_empty() { continue };
-    let plugins = Persist::get_guild_plugins(&data_get_persist(ctx).await, guild_id).await;
+    let plugins = data_operate_persist(ctx, |persist| persist.get_guild_plugins(guild_id)).await;
 
     let guild_commands = exclusive_commands.iter().cloned()
       .filter(|&blueprint| blueprint.is_enabled(&plugins))

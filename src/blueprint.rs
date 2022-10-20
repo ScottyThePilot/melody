@@ -9,7 +9,8 @@ use serenity::builder::{
   CreateApplicationCommandOption,
   CreateInteractionResponse,
   CreateInteractionResponseData,
-  CreateEmbed
+  CreateEmbed,
+  EditInteractionResponse
 };
 use serenity::client::Context;
 use serenity::model::application::interaction::InteractionResponseType;
@@ -19,6 +20,7 @@ use serenity::model::application::interaction::application_command::{
 use serenity::model::application::command::{CommandType, CommandOptionType};
 use serenity::model::channel::{Attachment, ChannelType, PartialChannel};
 use serenity::model::permissions::Permissions;
+use serenity::model::channel::Message;
 use serenity::model::guild::{PartialMember, Role};
 use serenity::model::user::User;
 use serenity::utils::Color;
@@ -396,11 +398,48 @@ impl Default for BlueprintCommandResponse {
   }
 }
 
+#[derive(Debug, Clone)]
+pub struct BlueprintCommandResponseEdit {
+  pub content: Option<String>,
+  pub embeds: Vec<CreateEmbed>
+}
+
+impl BlueprintCommandResponseEdit {
+  pub fn new(content: impl Into<String>) -> Self {
+    BlueprintCommandResponseEdit { content: Some(content.into()), embeds: Vec::new() }
+  }
+
+  pub fn with_embeds(embeds: Vec<CreateEmbed>) -> Self {
+    BlueprintCommandResponseEdit { content: None, embeds }
+  }
+
+  fn build(self, builder: &mut EditInteractionResponse) {
+    if let Some(content) = self.content {
+      builder.content(content);
+    };
+    if !self.embeds.is_empty() {
+      builder.set_embeds(self.embeds);
+    };
+  }
+
+  pub async fn send(self, ctx: &Context, interaction: &ApplicationCommandInteraction) -> MelodyResult<Message> {
+    interaction.edit_original_interaction_response(&ctx, builder!(self))
+      .await.context("failed to edit interaction response")
+  }
+}
+
 pub struct BlueprintCommandArgs {
   pub command: String,
   pub subcommands: Vec<String>,
   pub interaction: ApplicationCommandInteraction,
   pub option_values: Vec<CommandDataOptionValue>
+}
+
+impl BlueprintCommandArgs {
+  pub fn resolve_arguments<R: ResolveArgumentsValues>(&mut self) -> MelodyResult<R> {
+    let option_values = std::mem::take(&mut self.option_values);
+    R::resolve_values(option_values).ok_or(MelodyError::InvalidArguments)
+  }
 }
 
 pub type BlueprintChoices<T> = &'static [(&'static str, T)];
@@ -497,10 +536,7 @@ impl_resolve_argument_value!(Attachment, CommandDataOptionValue::Attachment(valu
 
 impl<T: ResolveArgumentValue> ResolveArgumentValue for Option<T> {
   fn resolve_value(option_value: Option<CommandDataOptionValue>) -> Option<Option<T>> {
-    match option_value {
-      None => Some(None),
-      Some(option_value) => T::resolve_value(Some(option_value)).map(Some)
-    }
+    Some(option_value.and_then(|option_value| T::resolve_value(Some(option_value))))
   }
 }
 
@@ -519,13 +555,6 @@ pub trait ResolveArgumentsValues {
   fn resolve_values(option_values: Vec<CommandDataOptionValue>) -> Option<Self> where Self: Sized;
 }
 
-impl<T: ResolveArgumentValue> ResolveArgumentsValues for T {
-  fn resolve_values(option_values: Vec<CommandDataOptionValue>) -> Option<Self> where Self: Sized {
-    let mut option_values = option_values.into_iter();
-    T::resolve_value(option_values.next())
-  }
-}
-
 impl_resolve_arguments_values!(A, B);
 impl_resolve_arguments_values!(A, B, C);
 impl_resolve_arguments_values!(A, B, C, D);
@@ -533,6 +562,15 @@ impl_resolve_arguments_values!(A, B, C, D, E);
 impl_resolve_arguments_values!(A, B, C, D, E, F);
 impl_resolve_arguments_values!(A, B, C, D, E, F, G);
 impl_resolve_arguments_values!(A, B, C, D, E, F, G, H);
+
+impl<T: ResolveArgumentValue> ResolveArgumentsValues for T {
+  fn resolve_values(option_values: Vec<CommandDataOptionValue>) -> Option<Self> where Self: Sized {
+    let mut option_values = option_values.into_iter();
+    T::resolve_value(option_values.next())
+  }
+}
+
+
 
 pub fn resolve_arguments<R: ResolveArgumentsValues>(option_values: Vec<CommandDataOptionValue>) -> MelodyResult<R> {
   R::resolve_values(option_values).ok_or(MelodyError::InvalidArguments)
@@ -549,11 +587,11 @@ macro_rules! default_expr {
 #[macro_export]
 macro_rules! blueprint_command {
   {
-    name: $name:literal,
-    description: $description:literal,
+    name: $name:expr,
+    description: $description:expr,
     $(usage: [$($usage:expr),+ $(,)?],)?
     $(examples: [$($examples:expr),+ $(,)?],)?
-    $(plugin: $plugin:literal,)?
+    $(plugin: $plugin:expr,)?
     $(command_type: $command_type:expr,)?
     $(allow_in_dms: $allow_in_dms:expr,)?
     $(default_permissions: $default_permissions:expr,)?
@@ -572,11 +610,11 @@ macro_rules! blueprint_command {
     }
   });
   {
-    name: $name:literal,
-    description: $description:literal,
+    name: $name:expr,
+    description: $description:expr,
     $(usage: [$($usage:expr),+ $(,)?],)?
     $(examples: [$($examples:expr),+ $(,)?],)?
-    $(plugin: $plugin:literal,)?
+    $(plugin: $plugin:expr,)?
     $(command_type: $command_type:expr,)?
     $(allow_in_dms: $allow_in_dms:expr,)?
     $(default_permissions: $default_permissions:expr,)?
@@ -601,8 +639,8 @@ macro_rules! blueprint_command {
 #[macro_export]
 macro_rules! blueprint_subcommand {
   {
-    name: $name:literal,
-    description: $description:literal,
+    name: $name:expr,
+    description: $description:expr,
     subcommands: [$($subcommand:expr),+ $(,)?]
   } => ($crate::blueprint::BlueprintSubcommand {
     name: $name,
@@ -612,8 +650,8 @@ macro_rules! blueprint_subcommand {
     }
   });
   {
-    name: $name:literal,
-    description: $description:literal,
+    name: $name:expr,
+    description: $description:expr,
     arguments: [$($option:expr),* $(,)?],
     function: $function:expr
   } => ($crate::blueprint::BlueprintSubcommand {
@@ -629,8 +667,8 @@ macro_rules! blueprint_subcommand {
 #[macro_export]
 macro_rules! blueprint_argument {
   (String {
-    name: $name:literal,
-    description: $description:literal
+    name: $name:expr,
+    description: $description:expr
     $(, required: $required:expr)?
     $(, min_length: $min_length:expr)?
     $(, max_length: $max_length:expr)?
@@ -646,8 +684,8 @@ macro_rules! blueprint_argument {
     }
   });
   (Integer {
-    name: $name:literal,
-    description: $description:literal
+    name: $name:expr,
+    description: $description:expr
     $(, required: $required:expr)?
     $(, min_value: $min_value:expr)?
     $(, max_value: $max_value:expr)?
@@ -663,8 +701,8 @@ macro_rules! blueprint_argument {
     }
   });
   (Number {
-    name: $name:literal,
-    description: $description:literal
+    name: $name:expr,
+    description: $description:expr
     $(, required: $required:expr)?
     $(, min_value: $min_value:expr)?
     $(, max_value: $max_value:expr)?
@@ -680,8 +718,8 @@ macro_rules! blueprint_argument {
     }
   });
   (Boolean {
-    name: $name:literal,
-    description: $description:literal
+    name: $name:expr,
+    description: $description:expr
     $(, required: $required:expr)?
   }) => ($crate::blueprint::BlueprintOption {
     name: $name,
@@ -690,8 +728,8 @@ macro_rules! blueprint_argument {
     data: $crate::blueprint::BlueprintOptionData::Boolean
   });
   (User {
-    name: $name:literal,
-    description: $description:literal
+    name: $name:expr,
+    description: $description:expr
     $(, required: $required:expr)?
   }) => ($crate::blueprint::BlueprintOption {
     name: $name,
@@ -700,8 +738,8 @@ macro_rules! blueprint_argument {
     data: $crate::blueprint::BlueprintOptionData::User
   });
   (Role {
-    name: $name:literal,
-    description: $description:literal
+    name: $name:expr,
+    description: $description:expr
     $(, required: $required:expr)?
   }) => ($crate::blueprint::BlueprintOption {
     name: $name,
@@ -710,8 +748,8 @@ macro_rules! blueprint_argument {
     data: $crate::blueprint::BlueprintOptionData::Role
   });
   (Mentionable {
-    name: $name:literal,
-    description: $description:literal
+    name: $name:expr,
+    description: $description:expr
     $(, required: $required:expr)?
   }) => ($crate::blueprint::BlueprintOption {
     name: $name,
@@ -720,8 +758,8 @@ macro_rules! blueprint_argument {
     data: $crate::blueprint::BlueprintOptionData::Mentionable
   });
   (Channel {
-    name: $name:literal,
-    description: $description:literal,
+    name: $name:expr,
+    description: $description:expr,
     $(, required: $required:expr)?
     $(, channel_types: [$($channel_type:expr),+ $(,)?])?
   }) => ($crate::blueprint::BlueprintOption {
@@ -733,8 +771,8 @@ macro_rules! blueprint_argument {
     }
   });
   (Attachment {
-    name: $name:literal,
-    description: $description:literal
+    name: $name:expr,
+    description: $description:expr
     $(, required: $required:expr)?
   }) => ($crate::blueprint::BlueprintOption {
     name: $name,

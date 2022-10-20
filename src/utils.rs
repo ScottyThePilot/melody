@@ -1,8 +1,7 @@
-use crate::{MelodyError, MelodyResult};
+use crate::{MelodyError, MelodyFileError, MelodyResult};
 
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
-use singlefile::error::{SingleFileError, SingleFileUserError};
 
 use std::error::Error;
 use std::fmt;
@@ -86,30 +85,35 @@ impl<T> Contextualize for std::io::Result<T> {
   type Output = MelodyResult<T>;
 
   fn context(self, context: impl Into<String>) -> Self::Output {
-    self.map_err(|error| MelodyError::FileError(SingleFileError::Io(error), context.into()))
+    self.map_err(|error| {
+      MelodyError::FileError(MelodyFileError::Io(error), context.into())
+    })
   }
 }
 
-impl<T> Contextualize for Result<T, SingleFileError> {
+impl<T, FE> Contextualize for Result<T, singlefile::Error<FE>>
+where singlefile::Error<FE>: Into<MelodyFileError> {
   type Output = MelodyResult<T>;
 
   fn context(self, context: impl Into<String>) -> Self::Output {
-    self.map_err(|error| MelodyError::FileError(error, context.into()))
+    self.map_err(|error| {
+      MelodyError::FileError(error.into(), context.into())
+    })
   }
 }
 
-impl<T> Contextualize for Result<T, SingleFileUserError<MelodyError>> {
+impl<T, FE> Contextualize for Result<T, singlefile::UserError<FE, MelodyError>>
+where singlefile::Error<FE>: Into<MelodyFileError> {
   type Output = MelodyResult<T>;
 
   fn context(self, context: impl Into<String>) -> Self::Output {
-    let error = match self {
-      Ok(value) => return Ok(value),
-      Err(SingleFileUserError::User(error)) => return Err(error),
-      Err(SingleFileUserError::Format(error)) => SingleFileError::Format(error),
-      Err(SingleFileUserError::Io(error)) => SingleFileError::Io(error)
-    };
-
-    Err(MelodyError::FileError(error, context.into()))
+    self.map_err(|error| {
+      MelodyError::FileError(match error {
+        singlefile::UserError::Format(error) => singlefile::Error::Format(error).into(),
+        singlefile::UserError::Io(error) => singlefile::Error::Io(error).into(),
+        singlefile::UserError::User(error) => return error
+      }, context.into())
+    })
   }
 }
 
