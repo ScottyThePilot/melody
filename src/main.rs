@@ -29,23 +29,30 @@ pub(crate) mod terminal;
 
 use crate::terminal::interrupt::was_killed;
 
+use tokio::sync::Mutex;
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
+
+use std::sync::Arc;
+
 fn main() {
-  crate::terminal::run(run, terminal_input);
+  let (input_sender, input_receiver) = unbounded_channel();
+  crate::terminal::run(
+    move || run(input_receiver),
+    move |line| input_sender.send(line).unwrap()
+  );
 }
 
 #[tokio::main]
-async fn run() {
+async fn run(input: UnboundedReceiver<String>) {
+  let input = Arc::new(Mutex::new(input));
+
   loop {
-    match crate::handler::launch().await {
+    match crate::handler::launch(input.clone()).await {
       Ok(true) if !was_killed() => continue,
       Ok(false | true) => break,
       Err(error) => return error!("{error}")
     };
   };
-}
-
-fn terminal_input(line: String) {
-  info!("Command: {line}");
 }
 
 pub type MelodyResult<T = ()> = Result<T, MelodyError>;

@@ -15,13 +15,16 @@ use serenity::model::channel::Message;
 use serenity::client::{Context, Client, EventHandler};
 use serenity::model::gateway::{GatewayIntents, Ready};
 use serenity::model::id::GuildId;
+use tokio::sync::Mutex;
+use tokio::sync::mpsc::UnboundedReceiver;
 
+use std::sync::Arc;
 use std::time::Duration;
 
 
 
 /// Performs a clean launch of the bot, returning true if the bot expects to be restarted, and false if not.
-pub async fn launch() -> MelodyResult<bool> {
+pub async fn launch(input: Arc<Mutex<UnboundedReceiver<String>>>) -> MelodyResult<bool> {
   let config = Config::create().await?;
   let persist = Persist::create().await?;
   let persist_guilds = PersistGuilds::create().await?;
@@ -40,6 +43,15 @@ pub async fn launch() -> MelodyResult<bool> {
   data_insert::<PreviousBuildIdKey>(&client, previous_build_id).await;
   data_insert::<RestartKey>(&client, false).await;
 
+  // Handles command-line input from the terminal wrapper
+  let input_task = tokio::spawn(async move {
+    let mut input = input.lock().await;
+    while let Some(line) = input.recv().await {
+      info!("Terminal command: {line}");
+    };
+  });
+
+  // Handles an interrupt signal from the terminal wrapper
   let shard_manager = client.shard_manager.clone();
   set_interrupt_handler(move || {
     kill_terminal();
@@ -52,6 +64,7 @@ pub async fn launch() -> MelodyResult<bool> {
   client.start().await.context("failed to start client")?;
 
   reset_interrupt_handler();
+  input_task.abort();
   if data_take::<RestartKey>(&client).await {
     info!("Restarting in 10 seconds...");
     tokio::time::sleep(Duration::from_secs(10)).await;

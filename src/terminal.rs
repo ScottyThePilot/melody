@@ -4,7 +4,7 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 use std::sync::mpsc::{channel, Sender, Receiver};
 
-pub fn run(body: fn(), input: fn(String)) {
+pub fn run(body: impl FnOnce() + Send + 'static, input: impl Fn(String) + Send + 'static) {
   let (sender, receiver) = channel();
   setup_logger(sender).unwrap();
 
@@ -38,7 +38,7 @@ fn setup_logger(sender: Sender<String>) -> Result<(), fern::InitError> {
   Ok(())
 }
 
-fn run_terminal(receiver: Receiver<String>, input: fn(String), body_handle: &JoinHandle<()>) {
+fn run_terminal(receiver: Receiver<String>, input: impl Fn(String) + Send + 'static, body_handle: &JoinHandle<()>) {
   let interface = Interface::new(env!("CARGO_PKG_NAME")).unwrap();
   interface.set_prompt("> ").unwrap();
   interface.set_report_signal(Signal::Break, true);
@@ -79,7 +79,7 @@ pub mod interrupt {
   use parking_lot::{const_mutex, Mutex};
   use std::sync::atomic::{AtomicBool, Ordering};
 
-  pub type HandlerFunction = Box<dyn FnOnce() + Send + Sync + 'static>;
+  pub type HandlerFunction = Box<dyn FnOnce() + Send + 'static>;
 
   static KILL: AtomicBool = AtomicBool::new(false);
   static HANDLER: Mutex<Option<HandlerFunction>> = const_mutex(None);
@@ -92,7 +92,7 @@ pub mod interrupt {
     *HANDLER.lock() = None;
   }
 
-  pub fn set_handler(handler: impl FnOnce() + Send + Sync + 'static) {
+  pub fn set_handler(handler: impl FnOnce() + Send + 'static) {
     *HANDLER.lock() = Some(Box::new(handler) as HandlerFunction);
   }
 
