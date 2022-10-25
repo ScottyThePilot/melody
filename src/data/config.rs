@@ -2,7 +2,7 @@ use crate::MelodyResult;
 use crate::utils::Contextualize;
 use super::Toml;
 
-use serenity::model::id::{GuildId, UserId};
+use serenity::model::id::UserId;
 use serenity::utils::Color;
 use singlefile::container_shared_async::ContainerAsyncReadonly;
 
@@ -14,8 +14,6 @@ pub type ConfigContainer = ContainerAsyncReadonly<Config, Toml>;
 pub struct Config {
   pub token: String,
   pub owner_id: UserId,
-  #[serde(default)]
-  pub test_guild: Option<GuildId>,
   #[serde(default)]
   pub accent_color: Option<Color>
 }

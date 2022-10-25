@@ -2,16 +2,27 @@ use linefeed::{Interface, DefaultTerminal, ReadResult, Signal};
 
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Sender, Receiver};
 
-pub fn run(body: impl FnOnce() + Send + 'static, input: impl Fn(String) + Send + 'static) {
+pub fn run(
+  body: impl FnOnce(Flag) + Send + 'static,
+  terminate: impl FnOnce(Flag) + Send + 'static,
+  input: impl Fn(String) + Send + 'static
+) {
+  let kill_flag = Flag::new();
   let (sender, receiver) = channel();
   setup_logger(sender).unwrap();
 
   // Body function is spawned in another thread while
   // the terminal runs on this thread
-  let body_handle = thread::spawn(body);
-  run_terminal(receiver, input, &body_handle);
+  let body_handle = {
+    let kill_flag = kill_flag.clone();
+    thread::spawn(move || body(kill_flag))
+  };
+
+  run_terminal(receiver, input, terminate, kill_flag, &body_handle);
   body_handle.join().unwrap();
 }
 
@@ -38,14 +49,16 @@ fn setup_logger(sender: Sender<String>) -> Result<(), fern::InitError> {
   Ok(())
 }
 
-fn run_terminal(receiver: Receiver<String>, input: impl Fn(String) + Send + 'static, body_handle: &JoinHandle<()>) {
+fn run_terminal(
+  receiver: Receiver<String>,
+  input: impl Fn(String) + Send + 'static,
+  terminate: impl FnOnce(Flag) + Send + 'static,
+  kill_flag: Flag,
+  body_handle: &JoinHandle<()>
+) {
   let interface = Interface::new(env!("CARGO_PKG_NAME")).unwrap();
   interface.set_prompt("> ").unwrap();
-  interface.set_report_signal(Signal::Break, true);
-  interface.set_report_signal(Signal::Continue, true);
   interface.set_report_signal(Signal::Interrupt, true);
-  interface.set_report_signal(Signal::Suspend, true);
-  interface.set_report_signal(Signal::Quit, true);
 
   let timeout = Duration::from_secs_f32(1.0 / 30.0);
 
@@ -55,14 +68,16 @@ fn run_terminal(receiver: Receiver<String>, input: impl Fn(String) + Send + 'sta
     };
   }
 
+  let mut terminate = Some(terminate);
+
   loop {
-    if self::interrupt::was_killed() { break };
+    if kill_flag.get() { break };
     if body_handle.is_finished() { return };
     match interface.read_line_step(Some(timeout)).unwrap() {
       Some(ReadResult::Eof) | None => (),
       Some(ReadResult::Input(line)) => input(line),
       Some(ReadResult::Signal(signal)) => match signal {
-        Signal::Interrupt => self::interrupt::take_handler()(),
+        Signal::Interrupt => terminate_handler(&kill_flag, &mut terminate),
         signal => println!("Signal: {signal:?}")
       }
     };
@@ -75,32 +90,28 @@ fn run_terminal(receiver: Receiver<String>, input: impl Fn(String) + Send + 'sta
   };
 }
 
-pub mod interrupt {
-  use parking_lot::{const_mutex, Mutex};
-  use std::sync::atomic::{AtomicBool, Ordering};
+fn terminate_handler(kill_flag: &Flag, terminate: &mut Option<impl FnOnce(Flag)>) {
+  if let Some(terminate) = terminate.take() {
+    terminate(kill_flag.clone())
+  } else {
+    kill_flag.set();
+  };
+}
 
-  pub type HandlerFunction = Box<dyn FnOnce() + Send + 'static>;
+#[repr(transparent)]
+#[derive(Debug, Clone)]
+pub struct Flag(Arc<AtomicBool>);
 
-  static KILL: AtomicBool = AtomicBool::new(false);
-  static HANDLER: Mutex<Option<HandlerFunction>> = const_mutex(None);
-
-  pub(super) fn take_handler() -> HandlerFunction {
-    HANDLER.lock().take().unwrap_or_else(|| Box::new(kill))
+impl Flag {
+  pub fn new() -> Self {
+    Flag(Arc::new(AtomicBool::new(false)))
   }
 
-  pub fn reset_handler() {
-    *HANDLER.lock() = None;
+  pub fn get(&self) -> bool {
+    self.0.load(Ordering::Relaxed)
   }
 
-  pub fn set_handler(handler: impl FnOnce() + Send + 'static) {
-    *HANDLER.lock() = Some(Box::new(handler) as HandlerFunction);
-  }
-
-  pub fn kill() {
-    KILL.store(true, Ordering::Relaxed);
-  }
-
-  pub fn was_killed() -> bool {
-    KILL.load(Ordering::Relaxed)
+  pub fn set(&self) {
+    self.0.store(true, Ordering::Relaxed);
   }
 }

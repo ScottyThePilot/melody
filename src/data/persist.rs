@@ -35,16 +35,12 @@ impl Persist {
     std::mem::replace(&mut self.build_id, crate::build_id::get())
   }
 
+  pub fn get_guild_plugins_mut(&mut self, id: GuildId) -> &mut HashSet<String> {
+    self.guild_plugins.entry(id.into()).or_default()
+  }
+
   pub fn get_guild_plugins(&self, id: GuildId) -> HashSet<String> {
     self.guild_plugins.get(&id.0).map_or_else(HashSet::new, HashSet::clone)
-  }
-
-  pub fn add_guild_plugin(&mut self, id: GuildId, plugin: impl Into<String>) -> bool {
-    self.guild_plugins.entry(id.into()).or_default().insert(plugin.into())
-  }
-
-  pub fn remove_guild_plugin(&mut self, id: GuildId, plugin: impl AsRef<str>) -> bool {
-    self.guild_plugins.entry(id.into()).or_default().remove(plugin.as_ref())
   }
 }
 

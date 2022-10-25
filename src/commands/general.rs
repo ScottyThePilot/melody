@@ -1,8 +1,8 @@
 use crate::MelodyResult;
 use crate::blueprint::*;
+use crate::data::Core;
 
 use rand::Rng;
-use serenity::client::Context;
 use serenity::model::user::User;
 use serenity::model::permissions::Permissions;
 use serenity::model::application::command::CommandType;
@@ -20,10 +20,10 @@ pub(super) const PING: BlueprintCommand = blueprint_command! {
 };
 
 #[command_attr::hook]
-async fn ping(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
+async fn ping(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let response = if rand::thread_rng().gen_bool(0.01) { "Pog" } else { "Pong" };
   BlueprintCommandResponse::new(response)
-    .send(ctx, &args.interaction).await
+    .send(&core, &args.interaction).await
 }
 
 pub(super) const HELP: BlueprintCommand = blueprint_command! {
@@ -50,8 +50,8 @@ pub(super) const HELP: BlueprintCommand = blueprint_command! {
 };
 
 #[command_attr::hook]
-async fn help(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
-  let color = super::bot_color(ctx).await;
+async fn help(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
+  let color = super::bot_color(&core).await;
   let response = match resolve_arguments::<Option<String>>(args.option_values)? {
     // User provided a command, return help for that command
     Some(command_name) => match find_command(super::APPLICATION_COMMANDS, &command_name) {
@@ -69,7 +69,7 @@ async fn help(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
     }
   };
 
-  response.send(ctx, &args.interaction).await
+  response.send(&core, &args.interaction).await
 }
 
 pub const AVATAR: BlueprintCommand = blueprint_command! {
@@ -89,7 +89,7 @@ pub const AVATAR: BlueprintCommand = blueprint_command! {
 };
 
 #[command_attr::hook]
-async fn avatar(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
+async fn avatar(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let user = resolve_arguments::<Option<User>>(args.option_values)?
     .unwrap_or_else(|| args.interaction.user.clone());
   let response = match user.avatar_url() {
@@ -97,7 +97,7 @@ async fn avatar(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
     None => BlueprintCommandResponse::new_ephemeral("Failed to get that user's avatar")
   };
 
-  response.send(ctx, &args.interaction).await
+  response.send(&core, &args.interaction).await
 }
 
 pub const BANNER: BlueprintCommand = blueprint_command! {
@@ -117,7 +117,7 @@ pub const BANNER: BlueprintCommand = blueprint_command! {
 };
 
 #[command_attr::hook]
-async fn banner(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
+async fn banner(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let user = resolve_arguments::<Option<User>>(args.option_values)?
     .unwrap_or_else(|| args.interaction.user.clone());
   let response = match user.banner_url() {
@@ -125,5 +125,5 @@ async fn banner(ctx: &Context, args: BlueprintCommandArgs) -> MelodyResult {
     None => BlueprintCommandResponse::new_ephemeral("Failed to get that user's banner")
   };
 
-  response.send(ctx, &args.interaction).await
+  response.send(&core, &args.interaction).await
 }

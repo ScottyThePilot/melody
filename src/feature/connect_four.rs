@@ -565,7 +565,7 @@ impl Color {
 pub enum Difficulty {
   // Always picks the best possible move
   // Evaluation depth 7
-  Maxmimum,
+  Maximum,
   // Only plays moves above 50%
   // Never plays losing moves
   // Evaluation depth 5
@@ -583,7 +583,7 @@ pub enum Difficulty {
 impl Difficulty {
   pub fn evaluation_depth(self) -> usize {
     match self {
-      Difficulty::Maxmimum => 6,
+      Difficulty::Maximum => 6,
       Difficulty::Hard => 5,
       Difficulty::Medium => 4,
       Difficulty::Easy => 4
@@ -592,7 +592,7 @@ impl Difficulty {
 
   pub fn parameters(self) -> Option<(f32, f32, usize)> {
     match self {
-      Difficulty::Maxmimum => None,
+      Difficulty::Maximum => None,
       Difficulty::Hard => Some((0.00, 0.50, 6)),
       Difficulty::Medium => Some((0.25, 0.75, 4)),
       Difficulty::Easy => Some((0.50, 1.00, 2))
@@ -601,18 +601,22 @@ impl Difficulty {
 }
 
 impl FromStr for Difficulty {
-  type Err = ();
+  type Err = DifficultyParseError;
 
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     match s {
-      "maximum" => Ok(Difficulty::Maxmimum),
+      "maximum" => Ok(Difficulty::Maximum),
       "hard" => Ok(Difficulty::Hard),
       "medium" => Ok(Difficulty::Medium),
       "easy" => Ok(Difficulty::Easy),
-      _ => Err(())
+      _ => Err(DifficultyParseError)
     }
   }
 }
+
+#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
+#[error("expected one of \"maximum\", \"hard\", \"medium\", or \"easy\"")]
+pub struct DifficultyParseError;
 
 
 

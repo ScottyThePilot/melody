@@ -17,9 +17,7 @@ static BUILD_ID: Lazy<u64> = Lazy::new(|| -> u64 {
     .map(io::BufReader::new)
     .unwrap();
   io::copy(&mut reader, &mut writer).unwrap();
-  let build_id = writer.0.finish();
-	trace!("Build ID: {build_id}");
-	build_id
+  writer.0.finish()
 });
 
 pub fn get() -> u64 {
@@ -30,17 +28,17 @@ pub fn get() -> u64 {
 struct HashWriter<T: Hasher>(T);
 
 impl<T: Hasher> io::Write for HashWriter<T> {
-	fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-		self.0.write(buf);
-		Ok(buf.len())
-	}
+  fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+    self.0.write(buf);
+    Ok(buf.len())
+  }
 
-	fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
-		self.0.write(buf);
+  fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+    self.0.write(buf);
     Ok(())
-	}
+  }
 
-	fn flush(&mut self) -> io::Result<()> {
-		Ok(())
-	}
+  fn flush(&mut self) -> io::Result<()> {
+    Ok(())
+  }
 }

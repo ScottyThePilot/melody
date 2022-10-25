@@ -1,5 +1,6 @@
 #![allow(missing_debug_implementations)]
-use crate::{MelodyError, MelodyResult};
+use crate::{MelodyError, MelodyCommandError, MelodyResult};
+use crate::data::Core;
 use crate::utils::{Blockify, Contextualize};
 
 use itertools::Itertools;
@@ -12,7 +13,7 @@ use serenity::builder::{
   CreateEmbed,
   EditInteractionResponse
 };
-use serenity::client::Context;
+use serenity::http::Http;
 use serenity::model::application::interaction::InteractionResponseType;
 use serenity::model::application::interaction::application_command::{
   ApplicationCommandInteraction, CommandData, CommandDataOption, CommandDataOptionValue
@@ -28,6 +29,7 @@ pub use serenity::futures::future::BoxFuture;
 
 use std::collections::HashSet;
 use std::fmt;
+use std::str::FromStr;
 
 macro_rules! when {
   ($ident:ident, $expr:expr) => {
@@ -381,8 +383,8 @@ impl BlueprintCommandResponse {
     builder.interaction_response_data(builder!(self, build_data));
   }
 
-  pub async fn send(self, ctx: &Context, interaction: &ApplicationCommandInteraction) -> MelodyResult {
-    interaction.create_interaction_response(&ctx, builder!(self))
+  pub async fn send(self, http: impl AsRef<Http>, interaction: &ApplicationCommandInteraction) -> MelodyResult {
+    interaction.create_interaction_response(http, builder!(self))
       .await.context("failed to send interaction response")
   }
 }
@@ -422,8 +424,8 @@ impl BlueprintCommandResponseEdit {
     };
   }
 
-  pub async fn send(self, ctx: &Context, interaction: &ApplicationCommandInteraction) -> MelodyResult<Message> {
-    interaction.edit_original_interaction_response(&ctx, builder!(self))
+  pub async fn send(self, http: impl AsRef<Http>, interaction: &ApplicationCommandInteraction) -> MelodyResult<Message> {
+    interaction.edit_original_interaction_response(http, builder!(self))
       .await.context("failed to edit interaction response")
   }
 }
@@ -435,27 +437,19 @@ pub struct BlueprintCommandArgs {
   pub option_values: Vec<CommandDataOptionValue>
 }
 
-impl BlueprintCommandArgs {
-  pub fn resolve_arguments<R: ResolveArgumentsValues>(&mut self) -> MelodyResult<R> {
-    let option_values = std::mem::take(&mut self.option_values);
-    R::resolve_values(option_values).ok_or(MelodyError::InvalidArguments)
-  }
-}
-
 pub type BlueprintChoices<T> = &'static [(&'static str, T)];
 
-pub type CommandFn<T = ()> = for<'f> fn(&'f Context, BlueprintCommandArgs) -> BoxFuture<'f, MelodyResult<T>>;
+pub type CommandFn<T = ()> = fn(Core, BlueprintCommandArgs) -> BoxFuture<'static, MelodyResult<T>>;
 
 pub async fn dispatch(
-  ctx: &Context,
+  core: Core,
   interaction: ApplicationCommandInteraction,
   blueprint_commands: &'static [BlueprintCommand]
 ) -> MelodyResult {
-  let (command, subcommands, option_values, function) = {
-    decompose_command(blueprint_commands, &interaction.data).ok_or(MelodyError::InvalidCommand)
-  }?;
-
-  function(ctx, BlueprintCommandArgs { command, subcommands, interaction, option_values }).await
+  let decomposed = decompose_command(blueprint_commands, &interaction.data)
+    .ok_or(MelodyError::COMMAND_FAILED_TO_PARSE)?;
+  let (command, subcommands, option_values, function) = decomposed;
+  function(core, BlueprintCommandArgs { command, subcommands, interaction, option_values }).await
 }
 
 /// Returns the name of the command executed, the list of subcommand arguments, and the list of regular arguments
@@ -572,8 +566,15 @@ impl<T: ResolveArgumentValue> ResolveArgumentsValues for T {
 
 
 
+pub fn parse_argument<P>(option_value: &str) -> MelodyResult<P>
+where P: FromStr, P::Err: fmt::Display {
+  option_value.parse::<P>().map_err(|err| {
+    MelodyError::CommandError(MelodyCommandError::InvalidArguments(err.to_string()))
+  })
+}
+
 pub fn resolve_arguments<R: ResolveArgumentsValues>(option_values: Vec<CommandDataOptionValue>) -> MelodyResult<R> {
-  R::resolve_values(option_values).ok_or(MelodyError::InvalidArguments)
+  R::resolve_values(option_values).ok_or(MelodyError::COMMAND_INVALID_ARGUMENTS_STRUCTURE)
 }
 
 // Avert your eyes
