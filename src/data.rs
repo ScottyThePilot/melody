@@ -50,17 +50,17 @@ where T: Serialize + DeserializeOwned {
     toml::from_str(&buf).map_err(From::from)
   }
 
-  fn to_buf(&self, value: &T) -> Result<Vec<u8>, Self::FormatError> {
-    match toml::to_string_pretty(value) {
-      Ok(buf) => Ok(buf.into_bytes()),
-      Err(error) => Err(error.into())
-    }
-  }
-
   fn to_writer<W: Write>(&self, mut writer: W, value: &T) -> Result<(), Self::FormatError> {
     let buf = toml::to_string_pretty(value)?;
     writer.write_all(buf.as_bytes())?;
     Ok(())
+  }
+
+  fn to_buffer(&self, value: &T) -> Result<Vec<u8>, Self::FormatError> {
+    match toml::to_string_pretty(value) {
+      Ok(buf) => Ok(buf.into_bytes()),
+      Err(error) => Err(error.into())
+    }
   }
 }
 
