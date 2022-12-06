@@ -63,7 +63,7 @@ pub fn find_subcommand(subcommands: &'static [BlueprintSubcommand], name: &str) 
 
 pub fn command_embed(command: &'static BlueprintCommand, color: Color) -> CreateEmbed {
   let mut builder = CreateEmbed::default();
-  builder.title(crate::utils::capitalize_words(command.name));
+  builder.title(crate::utils::kebab_case_to_words(command.name));
   builder.description(command.description);
   builder.color(color);
   builder.field("Usage", command.stringify_usage(), false);

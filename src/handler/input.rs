@@ -1,14 +1,25 @@
 use crate::MelodyResult;
 use crate::data::Core;
-use crate::utils::List;
+use crate::utils::{Loggable, List};
 
 use serenity::model::id::GuildId;
+use tokio::sync::Mutex;
+use tokio::sync::mpsc::UnboundedReceiver as MpscReceiver;
 
 use std::collections::HashSet;
 use std::error::Error;
 use std::str::FromStr;
+use std::sync::Arc;
 
 
+
+pub async fn input_task(input: Arc<Mutex<MpscReceiver<String>>>, core: Core) {
+  let agent = InputAgent::new(core);
+  let mut input = input.lock().await;
+  while let Some(line) = input.recv().await {
+    agent.line(line).await.log();
+  };
+}
 
 #[derive(Debug)]
 enum InputCommand<'a> {

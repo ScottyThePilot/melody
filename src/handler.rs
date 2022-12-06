@@ -1,23 +1,25 @@
 //! Items and functions associated with launching the bot and handling discord events
 mod input;
 
-use self::input::InputAgent;
 use crate::MelodyResult;
 use crate::commands::APPLICATION_COMMANDS;
 use crate::data::*;
+use crate::feature::message_chains::MessageChains;
 use crate::terminal::Flag;
 use crate::utils::{Contextualize, Loggable};
 
+use chrono::Utc;
 use rand::Rng;
 use serenity::model::application::interaction::Interaction;
 use serenity::model::channel::Message;
 use serenity::client::{Context, Client, EventHandler};
+use serenity::client::bridge::gateway::ShardManager;
 use serenity::model::gateway::{GatewayIntents, Ready};
 use serenity::model::id::GuildId;
 use tokio::sync::Mutex;
 
-use tokio::sync::mpsc::{UnboundedReceiver as MpscReceiver};
-use tokio::sync::oneshot::{Receiver as OneshotReceiver};
+use tokio::sync::mpsc::{unbounded_channel as mpsc_channel, UnboundedReceiver as MpscReceiver};
+use tokio::sync::oneshot::Receiver as OneshotReceiver;
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -37,36 +39,31 @@ pub async fn launch(
   let mut client = Client::builder(&token, intents())
     .event_handler(Handler).await.context("failed to init client")?;
   let core = Core::from(&client);
+
   // Insert data into the shared TypeMap
-  core.insert_all(CoreData {
-    config, persist, persist_guilds,
-    shard_manager: client.shard_manager.clone()
+  let previous_build_id = persist.operate_mut(|persist| persist.swap_build_id()).await;
+  core.init(|data| {
+    data.insert::<ConfigKey>(config);
+    data.insert::<PersistKey>(persist);
+    data.insert::<PersistGuildsKey>(persist_guilds.into());
+    data.insert::<MessageChainsKey>(MessageChains::new().into());
+    data.insert::<ShardManagerKey>(client.shard_manager.clone());
+    data.insert::<PreviousBuildIdKey>(previous_build_id);
+    data.insert::<RestartKey>(false);
   }).await;
 
   // Handles command-line input from the terminal wrapper
-  let agent = InputAgent::new(core);
-  let input_task = tokio::spawn(async move {
-    let mut input = input.lock().await;
-    while let Some(line) = input.recv().await {
-      agent.line(line).await.log();
-    };
-  });
-
+  let input_task = tokio::spawn(self::input::input_task(input, core.clone()));
   // Handles an interrupt signal from the terminal wrapper
-  let shard_manager = client.shard_manager.clone();
-  let terminate_task = tokio::spawn(async move {
-    let mut terminate = terminate.lock().await;
-    let kill_flag = (&mut *terminate).await.unwrap();
-
-    kill_flag.set();
-    shard_manager.lock().await.shutdown_all().await;
-  });
+  let termination_task = tokio::spawn(termination_task(terminate, client.shard_manager.clone()));
 
   client.start().await.context("failed to start client")?;
 
+  core.abort().await;
+
   input_task.abort();
-  terminate_task.abort();
-  if data_take::<RestartKey>(&client.data).await {
+  termination_task.abort();
+  if core.take::<RestartKey>().await {
     info!("Restarting in 3 seconds...");
     tokio::time::sleep(Duration::from_secs(3)).await;
 
@@ -81,7 +78,9 @@ struct Handler;
 
 #[serenity::async_trait]
 impl EventHandler for Handler {
-  async fn ready(&self, _: Context, ready_info: Ready) {
+  async fn ready(&self, ctx: Context, ready_info: Ready) {
+    let core = Core::from(ctx);
+
     info!("Bot connected: {} ({})", ready_info.user.tag(), ready_info.user.id);
   }
 
@@ -142,4 +141,15 @@ fn intents() -> GatewayIntents {
   GatewayIntents::GUILD_MESSAGES |
   GatewayIntents::GUILD_MESSAGE_REACTIONS |
   GatewayIntents::MESSAGE_CONTENT
+}
+
+async fn termination_task(
+  terminate: Arc<Mutex<OneshotReceiver<Flag>>>,
+  shard_manager: Arc<Mutex<ShardManager>>
+) {
+  let mut terminate = terminate.lock().await;
+  let kill_flag = (&mut *terminate).await.unwrap();
+
+  kill_flag.set();
+  shard_manager.lock().await.shutdown_all().await;
 }

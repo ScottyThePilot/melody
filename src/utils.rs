@@ -15,7 +15,7 @@ pub fn capitalize(s: impl AsRef<str>) -> String {
   })
 }
 
-pub fn capitalize_words(s: impl AsRef<str>) -> String {
+pub fn kebab_case_to_words(s: impl AsRef<str>) -> String {
   s.as_ref().split("-").map(capitalize).join(" ")
 }
 

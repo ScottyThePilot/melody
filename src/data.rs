@@ -3,7 +3,6 @@ mod config;
 mod persist;
 
 use crate::MelodyResult;
-use crate::feature::message_chains::MessageChains;
 use crate::utils::Contextualize;
 pub use self::config::*;
 pub use self::persist::*;
@@ -131,19 +130,22 @@ pub struct Core {
 }
 
 impl Core {
-  pub async fn insert_all(&self, core_data: CoreData) {
-    let previous_build_id = core_data.persist.operate_mut(|persist| {
-      persist.swap_build_id()
-    }).await;
-
+  /// Gives the caller mutable access to the `TypeMap` so that they can initialize it.
+  pub async fn init<F>(&self, operation: F)
+  where F: FnOnce(&mut TypeMap) {
     let mut type_map = self.data.write().await;
-    type_map.insert::<ConfigKey>(core_data.config);
-    type_map.insert::<PersistKey>(core_data.persist);
-    type_map.insert::<PersistGuildsKey>(core_data.persist_guilds.into());
-    type_map.insert::<MessageChainsKey>(MessageChains::new().into());
-    type_map.insert::<ShardManagerKey>(core_data.shard_manager);
-    type_map.insert::<PreviousBuildIdKey>(previous_build_id);
-    type_map.insert::<RestartKey>(false);
+    operation(&mut *type_map)
+  }
+
+  #[inline]
+  pub async fn take_checked<K>(&self) -> Option<K::Value> where K: TypeMapKey {
+    self.data.write().await.remove::<K>()
+  }
+
+  /// Takes a value from the `TypeMap`, cloning it. Panics if it is not present.
+  #[inline]
+  pub async fn take<K>(&self) -> K::Value where K: TypeMapKey {
+    self.take_checked::<K>().await.expect("failed to take value from typemap")
   }
 
   #[inline]
@@ -152,6 +154,7 @@ impl Core {
     self.data.read().await.get::<K>().cloned()
   }
 
+  /// Gets a value from the `TypeMap`, cloning it. Panics if it is not present.
   #[inline]
   pub async fn get<K>(&self) -> K::Value
   where K: TypeMapKey, K::Value: Clone {
@@ -178,6 +181,11 @@ impl Core {
   pub async fn trigger_shutdown_restart(&self) {
     self.trigger_shutdown().await;
     self.data.write().await.insert::<RestartKey>(true)
+  }
+
+  /// Aborts all tasks that this core might be responsible for
+  pub async fn abort(&self) {
+
   }
 }
 
@@ -230,6 +238,12 @@ impl From<&Client> for Core {
       cache: client.cache_and_http.cache.clone(),
       http: client.cache_and_http.http.clone()
     }
+  }
+}
+
+impl From<&Core> for Core {
+  fn from(core: &Core) -> Self {
+    core.clone()
   }
 }
 
@@ -300,6 +314,17 @@ where F: FnOnce(&mut T) -> R {
   operation(&mut *guard)
 }
 
-pub async fn data_take<K: TypeMapKey>(data: &Arc<RwLock<TypeMap>>) -> K::Value {
-  data.write().await.remove::<K>().expect("failed to take value from typemap")
+pub mod serde_id {
+  use serde::ser::{Serialize, Serializer};
+  use serde::de::{Deserialize, Deserializer};
+
+  pub fn serialize<S, T>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
+  where T: Copy + Into<u64>, S: Serializer {
+    u64::serialize(&value.clone().into(), serializer)
+  }
+
+  pub fn deserialize<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+  where T: From<u64>, D: Deserializer<'de> {
+    u64::deserialize(deserializer).map(T::from)
+  }
 }
