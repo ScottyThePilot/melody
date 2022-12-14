@@ -8,7 +8,6 @@ use crate::feature::message_chains::MessageChains;
 use crate::terminal::Flag;
 use crate::utils::{Contextualize, Loggable};
 
-use chrono::Utc;
 use rand::Rng;
 use serenity::model::application::interaction::Interaction;
 use serenity::model::channel::Message;
@@ -18,7 +17,7 @@ use serenity::model::gateway::{GatewayIntents, Ready};
 use serenity::model::id::GuildId;
 use tokio::sync::Mutex;
 
-use tokio::sync::mpsc::{unbounded_channel as mpsc_channel, UnboundedReceiver as MpscReceiver};
+use tokio::sync::mpsc::{UnboundedReceiver as MpscReceiver};
 use tokio::sync::oneshot::Receiver as OneshotReceiver;
 
 use std::sync::Arc;

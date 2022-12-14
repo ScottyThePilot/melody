@@ -7,11 +7,20 @@ use std::sync::Arc;
 
 
 
+#[derive(Debug, Clone)]
 pub struct RateLimiter {
   inner: Arc<RateLimiterInner>
 }
 
 impl RateLimiter {
+  pub fn new(delay: Duration) -> Self {
+    RateLimiter {
+      inner: Arc::new(RateLimiterInner {
+        delay, deadline: Mutex::new(None)
+      })
+    }
+  }
+
   /// Waits to acquire a lock and to exhaust the current deadline.
   pub async fn get(&self) -> TimeSlice {
     let mut guard = self.inner.deadline.lock().await;
@@ -28,6 +37,7 @@ impl RateLimiter {
   }
 }
 
+#[derive(Debug)]
 struct RateLimiterInner {
   delay: Duration,
   deadline: Mutex<Option<Instant>>

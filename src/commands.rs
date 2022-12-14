@@ -1,5 +1,6 @@
 mod connect_four;
 mod general;
+mod role_playing;
 
 use crate::MelodyResult;
 use crate::blueprint::*;
@@ -21,7 +22,8 @@ pub const APPLICATION_COMMANDS: &[BlueprintCommand] = &[
   self::general::HELP,
   self::general::AVATAR,
   self::general::BANNER,
-  self::connect_four::CONNECT_FOUR
+  self::connect_four::CONNECT_FOUR,
+  self::role_playing::ROLL
 ];
 
 pub async fn bot_color(core: &Core) -> Color {

@@ -42,7 +42,8 @@ pub(super) const HELP: BlueprintCommand = blueprint_command! {
         ("help", "help"),
         ("avatar", "avatar"),
         ("banner", "banner"),
-        ("connect-four", "connect-four")
+        ("connect-four", "connect-four"),
+        ("roll", "roll")
       ]
     })
   ],
