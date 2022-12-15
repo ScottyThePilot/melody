@@ -27,14 +27,22 @@ pub struct ExecutedRoll {
 impl fmt::Display for ExecutedRoll {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     if let Ok([dice_result]) = <[u32; 1]>::try_from(&self.dice_results[..]) {
-      write!(f, "{}", RollResult { dice_result, modifier: self.roll.modifier })?;
+      let value = dice_result as i64 + self.roll.modifier as i64;
+      match self.roll.modifier {
+        0 => write!(f, "**{dice_result}**")?,
+        m => write!(f, "({dice_result}){} = **{value}**", DisplayModifier(m))?
+      };
     } else {
       write!(f, "[")?;
       let mut values = Vec::with_capacity(self.dice_results.len());
       for (i, &dice_result) in self.dice_results.iter().enumerate() {
         if i != 0 { write!(f, ", ")? };
-        write!(f, "{}", RollResult { dice_result, modifier: self.roll.modifier })?;
         let value = dice_result as i64 + self.roll.modifier as i64;
+        match self.roll.modifier {
+          0 => write!(f, "{dice_result}")?,
+          m => write!(f, "({dice_result}){} = {value}", DisplayModifier(m))?
+        };
+
         values.push(value);
       };
       write!(f, "]")?;
@@ -56,23 +64,6 @@ impl fmt::Display for ExecutedRoll {
     };
 
     Ok(())
-  }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct RollResult {
-  dice_result: u32,
-  modifier: i16
-}
-
-impl fmt::Display for RollResult {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    let value = self.dice_result as i64 + self.modifier as i64;
-    match self.modifier {
-      1..=i16::MAX => write!(f, "({}) + {} = {value}", self.dice_result, self.modifier.abs()),
-      i16::MIN..=-1 => write!(f, "({}) - {} = {value}", self.dice_result, self.modifier.abs()),
-      0 => write!(f, "{}", self.dice_result),
-    }
   }
 }
 
@@ -107,14 +98,7 @@ impl Roll {
 impl fmt::Display for Roll {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     if self.dice > 1 { write!(f, "{}", self.dice)? };
-    write!(f, "d{}", self.sides)?;
-
-    match self.modifier {
-      1..=i16::MAX => write!(f, " + {}", self.modifier.abs())?,
-      i16::MIN..=-1 => write!(f, " - {}", self.modifier.abs())?,
-      0 => (),
-    };
-
+    write!(f, "d{}{}", self.sides, DisplayModifier(self.modifier))?;
     match self.mode {
       Some(Mode(mt, 1)) if self.dice == 2 => match mt {
         ModeType::Max => write!(f, " adv")?,
@@ -283,5 +267,21 @@ fn valid_int<I: Copy + Ord + fmt::Display>(min: I)
   move |v, span, emit| {
     if v < min { emit(Simple::custom(span, format!("int may not be less than {min}"))) };
     v
+  }
+}
+
+
+
+#[derive(Debug, Clone, Copy)]
+struct DisplayModifier(i16);
+
+impl fmt::Display for DisplayModifier {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    let modifier = (self.0 as i32).abs() as u16;
+    if self.0.is_positive() {
+      write!(f, " + {modifier}")
+    } else {
+      write!(f, " - {modifier}")
+    }
   }
 }
