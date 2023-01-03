@@ -5,7 +5,6 @@ use crate::data::Core;
 use rand::Rng;
 use serenity::model::user::User;
 use serenity::model::permissions::Permissions;
-use serenity::model::application::command::CommandType;
 
 
 

@@ -6,7 +6,6 @@ use crate::utils::{Contextualize, Timestamp, TimestampFormat};
 
 use serenity::model::user::User;
 use serenity::model::mention::Mention;
-use serenity::model::application::command::CommandType;
 
 
 

@@ -4,7 +4,7 @@ use crate::data::Core;
 use crate::feature::dice_roll::Roll;
 use crate::utils::Blockify;
 
-use serenity::model::application::command::CommandType;
+
 
 pub(super) const ROLL: BlueprintCommand = blueprint_command! {
   name: "roll",

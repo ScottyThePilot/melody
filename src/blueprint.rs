@@ -579,6 +579,8 @@ pub fn resolve_arguments<R: ResolveArgumentsValues>(option_values: Vec<CommandDa
 
 // Avert your eyes
 
+pub const DEFAULT_COMMAND_TYPE: CommandType = CommandType::ChatInput;
+
 #[macro_export]
 macro_rules! default_expr {
   ($default:expr, $expr:expr) => ($expr);
@@ -603,7 +605,7 @@ macro_rules! blueprint_command {
     usage: $crate::default_expr!(None, $(Some(&[$($usage),*]))?),
     examples: $crate::default_expr!(None, $(Some(&[$($examples),*]))?),
     plugin: $crate::default_expr!(None, $(Some($plugin))?),
-    command_type: $crate::default_expr!(CommandType::ChatInput, $($command_type)?),
+    command_type: $crate::default_expr!($crate::blueprint::DEFAULT_COMMAND_TYPE, $($command_type)?),
     allow_in_dms: $crate::default_expr!(false, $($allow_in_dms)?),
     default_permissions: $crate::default_expr!(None, $(Some($default_permissions))?),
     root: $crate::blueprint::BlueprintRoot::CommandContainer {
@@ -627,12 +629,12 @@ macro_rules! blueprint_command {
     usage: $crate::default_expr!(None, $(Some(&[$($usage),*]))?),
     examples: $crate::default_expr!(None, $(Some(&[$($examples),*]))?),
     plugin: $crate::default_expr!(None, $(Some($plugin))?),
-    command_type: $crate::default_expr!(CommandType::ChatInput, $($command_type)?),
+    command_type: $crate::default_expr!($crate::blueprint::DEFAULT_COMMAND_TYPE, $($command_type)?),
     allow_in_dms: $crate::default_expr!(false, $($allow_in_dms)?),
     default_permissions: $crate::default_expr!(None, $(Some($default_permissions))?),
     root: $crate::blueprint::BlueprintRoot::Command {
       function: $function,
-      options: &[$($option)*]
+      options: &[$($option,)*]
     }
   });
 }
@@ -760,7 +762,7 @@ macro_rules! blueprint_argument {
   });
   (Channel {
     name: $name:expr,
-    description: $description:expr,
+    description: $description:expr
     $(, required: $required:expr)?
     $(, channel_types: [$($channel_type:expr),+ $(,)?])?
   }) => ($crate::blueprint::BlueprintOption {
@@ -768,7 +770,7 @@ macro_rules! blueprint_argument {
     description: $description,
     required: $crate::default_expr!(false, $($required)?),
     data: $crate::blueprint::BlueprintOptionData::Channel {
-      channel_types: &[$($channel_type,)+]
+      channel_types: $crate::default_expr!(&[], $(&[$($channel_type,)+])?)
     }
   });
   (Attachment {
