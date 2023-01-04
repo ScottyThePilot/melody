@@ -8,19 +8,22 @@ pub use self::config::*;
 pub use self::persist::*;
 
 use serenity::client::{Client, Context};
-use serenity::client::bridge::gateway::ShardManager;
+use serenity::client::bridge::gateway::{ShardManager, ShardId, ShardRunnerInfo};
 use serenity::model::id::GuildId;
+use serenity::model::gateway::Activity;
 use serenity::cache::Cache;
-use serenity::http::Http;
+use serenity::http::{CacheHttp, Http};
 use serenity::prelude::{TypeMap, TypeMapKey};
 use serde::ser::Serialize;
 use serde::de::DeserializeOwned;
 use singlefile::manager::FileFormat;
 use tokio::sync::{Mutex, RwLock};
+use tokio::task::JoinHandle;
 use xz2::write::XzEncoder;
 use xz2::read::XzDecoder;
 
 use std::fmt;
+use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::sync::Arc;
 
@@ -101,6 +104,8 @@ where T: Serialize + DeserializeOwned {
 
 
 
+pub type ShardRunners = HashMap<ShardId, ShardRunnerInfo>;
+
 macro_rules! key {
   ($vis:vis struct $Key:ident, $Value:ty) => {
     #[derive(Debug, Clone, Copy)]
@@ -117,10 +122,34 @@ key!(pub struct PersistKey, PersistContainer);
 key!(pub struct PersistGuildsKey, PersistGuildsWrapper);
 key!(pub struct ShardManagerKey, Arc<Mutex<ShardManager>>);
 key!(pub struct MessageChainsKey, crate::feature::message_chains::MessageChainsWrapper);
+key!(pub struct TasksKey, TasksWrapper);
 key!(pub struct PreviousBuildIdKey, u64);
 key!(pub struct RestartKey, bool);
 
 
+
+pub type TasksWrapper = Arc<Mutex<Tasks>>;
+
+#[derive(Debug)]
+pub struct Tasks {
+  pub cycle_activities: Option<JoinHandle<()>>
+}
+
+impl Tasks {
+  pub fn abort(&self) {
+    if let Some(task) = &self.cycle_activities {
+      task.abort();
+    };
+  }
+}
+
+impl Default for Tasks {
+  fn default() -> Self {
+    Tasks {
+      cycle_activities: None
+    }
+  }
+}
 
 #[derive(Clone)]
 pub struct Core {
@@ -161,6 +190,16 @@ impl Core {
     self.get_checked::<K>().await.expect("failed to get value from typemap")
   }
 
+  #[inline]
+  pub async fn get_default<K>(&self) -> K::Value
+  where K: TypeMapKey, K::Value: Default + Clone {
+    self.data.write().await.entry::<K>().or_default().clone()
+  }
+
+  pub async fn get_shard_runners(&self) -> Arc<Mutex<ShardRunners>> {
+    self.get::<ShardManagerKey>().await.lock().await.runners.clone()
+  }
+
   pub async fn get_config(&self) -> ConfigContainer {
     self.get::<ConfigKey>().await
   }
@@ -183,9 +222,20 @@ impl Core {
     self.data.write().await.insert::<RestartKey>(true)
   }
 
+  pub async fn set_activities<F>(&self, mut f: F)
+  where F: FnMut(ShardId) -> Option<Activity> {
+    operate_lock(self.get_shard_runners().await, |shard_runners| {
+      for (&shard_id, shard_runner) in shard_runners.iter() {
+        shard_runner.runner_tx.set_activity(f(shard_id));
+      };
+    }).await
+  }
+
   /// Aborts all tasks that this core might be responsible for
   pub async fn abort(&self) {
-
+    if let Some(tasks) = self.get_checked::<TasksKey>().await {
+      tasks.lock().await.abort();
+    };
   }
 }
 
@@ -207,6 +257,16 @@ impl AsRef<Cache> for Core {
 
 impl AsRef<Http> for Core {
   fn as_ref(&self) -> &Http {
+    &self.http
+  }
+}
+
+impl CacheHttp for Core {
+  fn cache(&self) -> Option<&Arc<Cache>> {
+    Some(&self.cache)
+  }
+
+  fn http(&self) -> &Http {
     &self.http
   }
 }
@@ -288,14 +348,6 @@ impl Core {
   }
 }
 
-#[derive(Debug)]
-pub struct CoreData {
-  pub config: ConfigContainer,
-  pub persist: PersistContainer,
-  pub persist_guilds: PersistGuilds,
-  pub shard_manager: Arc<Mutex<ShardManager>>
-}
-
 pub async fn operate_lock<T, F, R>(container: Arc<Mutex<T>>, operation: F) -> R
 where F: FnOnce(&mut T) -> R {
   let mut guard = container.lock().await;
@@ -312,19 +364,4 @@ pub async fn operate_write<T, F, R>(container: Arc<RwLock<T>>, operation: F) -> 
 where F: FnOnce(&mut T) -> R {
   let mut guard = container.write().await;
   operation(&mut *guard)
-}
-
-pub mod serde_id {
-  use serde::ser::{Serialize, Serializer};
-  use serde::de::{Deserialize, Deserializer};
-
-  pub fn serialize<S, T>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
-  where T: Copy + Into<u64>, S: Serializer {
-    u64::serialize(&value.clone().into(), serializer)
-  }
-
-  pub fn deserialize<'de, D, T>(deserializer: D) -> Result<T, D::Error>
-  where T: From<u64>, D: Deserializer<'de> {
-    u64::deserialize(deserializer).map(T::from)
-  }
 }

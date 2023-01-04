@@ -2,9 +2,15 @@ use crate::{MelodyError, MelodyFileError, MelodyResult};
 
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
+use rand::SeedableRng;
+use rand::rngs::SmallRng;
 
 use std::error::Error;
 use std::fmt;
+
+pub fn create_rng() -> SmallRng {
+  SmallRng::from_rng(rand::thread_rng()).expect("failed to seed smallrng")
+}
 
 pub fn capitalize(s: impl AsRef<str>) -> String {
   let mut chars = s.as_ref().chars();

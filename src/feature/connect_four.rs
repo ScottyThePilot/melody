@@ -1,6 +1,8 @@
+use crate::utils::create_rng;
+
 use chrono::{DateTime, Duration, Utc};
 use float_ord::FloatOrd;
-use rand::{Rng, SeedableRng};
+use rand::Rng;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use serenity::model::id::UserId;
@@ -364,10 +366,6 @@ pub enum ComputerGameResult {
   /// Game was a draw
   Draw(Board),
   IllegalMove
-}
-
-fn create_rng() -> SmallRng {
-  SmallRng::from_rng(rand::thread_rng()).expect("failed to seed smallrng")
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

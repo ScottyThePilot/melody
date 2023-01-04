@@ -9,16 +9,17 @@ use crate::terminal::Flag;
 use crate::utils::{Contextualize, Loggable};
 
 use rand::Rng;
+use rand::seq::SliceRandom;
 use serenity::model::application::interaction::Interaction;
 use serenity::model::channel::Message;
 use serenity::client::{Context, Client, EventHandler};
 use serenity::client::bridge::gateway::ShardManager;
-use serenity::model::gateway::{GatewayIntents, Ready};
+use serenity::model::gateway::{Activity, GatewayIntents, Ready};
 use serenity::model::id::GuildId;
 use tokio::sync::Mutex;
-
 use tokio::sync::mpsc::{UnboundedReceiver as MpscReceiver};
 use tokio::sync::oneshot::Receiver as OneshotReceiver;
+use tokio::time::MissedTickBehavior;
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -77,14 +78,19 @@ struct Handler;
 
 #[serenity::async_trait]
 impl EventHandler for Handler {
-  async fn ready(&self, ctx: Context, ready_info: Ready) {
-    let core = Core::from(ctx);
-
+  async fn ready(&self, _ctx: Context, ready_info: Ready) {
     info!("Bot connected: {} ({})", ready_info.user.tag(), ready_info.user.id);
   }
 
   async fn cache_ready(&self, ctx: Context, guilds: Vec<GuildId>) {
     let core = Core::from(ctx);
+
+    operate_lock(core.get_default::<TasksKey>().await, |tasks| {
+      // Spawn the task for cycling activity status unless it's already been spawned
+      tasks.cycle_activities.get_or_insert_with(|| {
+        tokio::spawn(cycle_activity_task(core.clone()))
+      });
+    }).await;
 
     for (guild_id, guild_name) in crate::commands::iter_guilds(&core, &guilds) {
       info!("Discovered guild: {guild_name} ({guild_id})");
@@ -151,4 +157,32 @@ async fn termination_task(
 
   kill_flag.set();
   shard_manager.lock().await.shutdown_all().await;
+}
+
+
+
+async fn cycle_activity_task(core: Core) {
+  const ACTIVITY_CYCLE_TIME: Duration = Duration::from_secs(120);
+  const ACTIVITIES: &[fn(&Core) -> Activity] = &[
+    |_| Activity::playing("Minecraft 2"),
+    |_| Activity::playing("Portal 3"),
+    |_| Activity::playing("Pokemon\u{2122} Gun"),
+    |_| Activity::watching("you"),
+    |core| Activity::watching(format!("{} guilds", core.cache.guild_count())),
+    |core| Activity::watching(format!("{} users", core.cache.user_count())),
+    |_| Activity::watching("Bocchi the Rock!"),
+    |_| Activity::watching("Lucky\u{2606}Star"),
+    |_| Activity::competing("big balls competition")
+  ];
+
+  let mut rng = crate::utils::create_rng();
+  let mut interval = tokio::time::interval(ACTIVITY_CYCLE_TIME);
+  interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
+  loop {
+    interval.tick().await;
+    core.set_activities(|_| {
+      ACTIVITIES.choose(&mut rng).map(|f| f(&core))
+    }).await;
+  };
 }
