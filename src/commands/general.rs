@@ -1,10 +1,13 @@
-use crate::MelodyResult;
+use crate::{MelodyError, MelodyResult};
 use crate::blueprint::*;
 use crate::data::Core;
 
+use chrono::{Utc, Duration};
 use rand::Rng;
 use serenity::model::user::User;
+use serenity::model::timestamp::Timestamp;
 use serenity::model::permissions::Permissions;
+use serenity::model::mention::Mention;
 
 
 
@@ -70,6 +73,29 @@ async fn help(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   };
 
   response.send(&core, &args.interaction).await
+}
+
+pub(super) const TROLL: BlueprintCommand = blueprint_command! {
+  name: "troll",
+  description: "Conducts epic trollage",
+  usage: ["/troll"],
+  examples: ["/troll"],
+  allow_in_dms: false,
+  arguments: [],
+  function: troll
+};
+
+#[command_attr::hook]
+async fn troll(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
+  let mut member = args.interaction.member.clone().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+  let time = Timestamp::from(Utc::now() + Duration::seconds(60));
+  let response = match member.disable_communication_until_datetime(&core, time).await {
+    Ok(()) => format!("{} has been trolled.", Mention::User(member.user.id)),
+    Err(..) => "Sorry, I cannot do that.".to_owned()
+  };
+
+  BlueprintCommandResponse::new(response)
+    .send(&core, &args.interaction).await
 }
 
 pub const AVATAR: BlueprintCommand = blueprint_command! {

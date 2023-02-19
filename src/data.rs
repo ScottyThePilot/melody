@@ -128,6 +128,12 @@ key!(pub struct RestartKey, bool);
 
 
 
+macro_rules! for_each_some {
+  ([$($value:expr),* $(,)?], $pat:pat => $expr:expr) => {
+    $(if let Some($pat) = $value { $expr };)*
+  };
+}
+
 pub type TasksWrapper = Arc<Mutex<Tasks>>;
 
 #[derive(Debug)]
@@ -137,9 +143,7 @@ pub struct Tasks {
 
 impl Tasks {
   pub fn abort(&self) {
-    if let Some(task) = &self.cycle_activities {
-      task.abort();
-    };
+    for_each_some!([&self.cycle_activities], task => task.abort());
   }
 }
 
@@ -348,18 +352,21 @@ impl Core {
   }
 }
 
+#[allow(dead_code)]
 pub async fn operate_lock<T, F, R>(container: Arc<Mutex<T>>, operation: F) -> R
 where F: FnOnce(&mut T) -> R {
   let mut guard = container.lock().await;
   operation(&mut *guard)
 }
 
+#[allow(dead_code)]
 pub async fn operate_read<T, F, R>(container: Arc<RwLock<T>>, operation: F) -> R
 where F: FnOnce(&T) -> R {
   let guard = container.read().await;
   operation(&*guard)
 }
 
+#[allow(dead_code)]
 pub async fn operate_write<T, F, R>(container: Arc<RwLock<T>>, operation: F) -> R
 where F: FnOnce(&mut T) -> R {
   let mut guard = container.write().await;

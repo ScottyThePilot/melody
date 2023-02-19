@@ -80,6 +80,10 @@ impl MelodyError {
   pub const COMMAND_NOT_IN_GUILD: Self = MelodyError::CommandError(MelodyCommandError::NotInGuild);
   pub const COMMAND_FAILED_TO_PARSE: Self = MelodyError::CommandError(MelodyCommandError::FailedToParse);
   pub const COMMAND_INVALID_ARGUMENTS_STRUCTURE: Self = MelodyError::CommandError(MelodyCommandError::InvalidArgumentsStructure);
+
+  pub const fn command_cache_failure(message: &'static str) -> Self {
+    MelodyError::CommandError(MelodyCommandError::CacheFailure(message))
+  }
 }
 
 /// An error that can be caused by trying to read or parse a file.
@@ -102,5 +106,7 @@ pub enum MelodyCommandError {
   #[error("invalid arguments structure")]
   InvalidArgumentsStructure,
   #[error("invalid arguments: {0}")]
-  InvalidArguments(String)
+  InvalidArguments(String),
+  #[error("data not cached: {0}")]
+  CacheFailure(&'static str)
 }
