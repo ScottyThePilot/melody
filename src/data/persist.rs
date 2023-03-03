@@ -3,7 +3,7 @@ use crate::utils::Contextualize;
 use super::Cbor;
 
 use std::collections::{HashMap, HashSet};
-use serenity::model::id::GuildId;
+use serenity::model::id::{GuildId, UserId};
 use singlefile::container_shared_async::ContainerAsyncWritableLocked;
 use tokio::sync::RwLock;
 
@@ -17,7 +17,9 @@ pub type PersistContainer = ContainerAsyncWritableLocked<Persist, Cbor>;
 #[serde(default)]
 pub struct Persist {
   build_id: u64,
-  guild_plugins: HashMap<u64, HashSet<String>>
+  guild_plugins: HashMap<u64, HashSet<String>>,
+  /// List of users who have been notified that chatbot messages from Melody are from CleverBot.
+  cleverbot_notified_users: HashSet<u64>
 }
 
 impl Persist {
@@ -35,6 +37,10 @@ impl Persist {
     std::mem::replace(&mut self.build_id, crate::build_id::get())
   }
 
+  pub fn cleverbot_notify(&mut self, user_id: UserId) -> bool {
+    self.cleverbot_notified_users.insert(user_id.into())
+  }
+
   pub fn get_guild_plugins_mut(&mut self, id: GuildId) -> &mut HashSet<String> {
     self.guild_plugins.entry(id.into()).or_default()
   }
@@ -48,7 +54,8 @@ impl Default for Persist {
   fn default() -> Self {
     Persist {
       build_id: 0,
-      guild_plugins: HashMap::new()
+      guild_plugins: HashMap::new(),
+      cleverbot_notified_users: HashSet::new()
     }
   }
 }

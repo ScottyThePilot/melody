@@ -1,6 +1,7 @@
 use crate::{MelodyError, MelodyResult};
 use crate::blueprint::*;
 use crate::data::Core;
+use crate::utils::Loggable;
 
 use chrono::{Utc, Duration};
 use rand::Rng;
@@ -81,17 +82,53 @@ pub(super) const TROLL: BlueprintCommand = blueprint_command! {
   usage: ["/troll"],
   examples: ["/troll"],
   allow_in_dms: false,
-  arguments: [],
+  arguments: [
+    blueprint_argument!(User {
+      name: "victim",
+      description: "The user to be trolled, if so desired",
+      required: false
+    })
+  ],
   function: troll
 };
 
 #[command_attr::hook]
 async fn troll(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let mut member = args.interaction.member.clone().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let time = Timestamp::from(Utc::now() + Duration::seconds(60));
-  let response = match member.disable_communication_until_datetime(&core, time).await {
-    Ok(()) => format!("{} has been trolled.", Mention::User(member.user.id)),
-    Err(..) => "Sorry, I cannot do that.".to_owned()
+  let target = resolve_arguments::<Option<User>>(args.option_values)?;
+  let time = Timestamp::from(Utc::now() + Duration::minutes(1));
+  let response = match target {
+    Some(target) => {
+      if target.id == core.cache.current_user_id() {
+        // Shadows `time`, changing it to be 5 minutes instead of 1.
+        let time = Timestamp::from(Utc::now() + Duration::minutes(5));
+        match member.disable_communication_until_datetime(&core, time).await.log_some() {
+          Some(()) => "Impossible. Heresy. Unspeakable. Heresy. Heresy. Silence.".to_owned(),
+          None => "Not happening, buddy.".to_owned()
+        }
+      } else {
+        if rand::thread_rng().gen_bool(0.01) {
+          let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+          let mut target_member = core.cache.member(guild_id, target.id)
+            .ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+          match target_member.disable_communication_until_datetime(&core, time).await.log_some() {
+            Some(()) => format!("{} has successfully trolled {}.", Mention::User(member.user.id), Mention::User(target.id)),
+            None => "Sorry, even though you succeeded, I don't have permission to do that.".to_owned()
+          }
+        } else {
+          match member.disable_communication_until_datetime(&core, time).await.log_some() {
+            Some(()) => format!("{}'s attempt at trollage was a royal failure.", Mention::User(member.user.id)),
+            None => "Sorry, I cannot do that.".to_owned()
+          }
+        }
+      }
+    },
+    None => {
+      match member.disable_communication_until_datetime(&core, time).await.log_some() {
+        Some(()) => format!("{} has been trolled.", Mention::User(member.user.id)),
+        None => "Sorry, I cannot do that.".to_owned()
+      }
+    }
   };
 
   BlueprintCommandResponse::new(response)

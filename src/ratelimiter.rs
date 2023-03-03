@@ -1,59 +1,83 @@
 use tokio::sync::{Mutex, MutexGuard};
 use tokio::time::Instant;
 
-use std::future::Future;
+use std::ops::{Deref, DerefMut};
 use std::time::Duration;
 use std::sync::Arc;
 
-
-
-#[derive(Debug, Clone)]
-pub struct RateLimiter {
-  inner: Arc<RateLimiterInner>
+#[derive(Debug)]
+pub struct RateLimiter<T> {
+  inner: Arc<RateLimiterInner<T>>
 }
 
-impl RateLimiter {
-  pub fn new(delay: Duration) -> Self {
+impl<T> RateLimiter<T> {
+  pub fn new(value: T, delay: Duration) -> Self {
     RateLimiter {
       inner: Arc::new(RateLimiterInner {
-        delay, deadline: Mutex::new(None)
+        resource: Mutex::new(Resource {
+          value, deadline: Instant::now()
+        }),
+        delay
       })
     }
   }
 
-  /// Waits to acquire a lock and to exhaust the current deadline.
-  pub async fn get(&self) -> TimeSlice {
-    let mut guard = self.inner.deadline.lock().await;
-    if let Some(deadline) = guard.take() {
-      tokio::time::sleep_until(deadline).await;
-    };
-
-    TimeSlice { guard }
+  pub async fn get(&self) -> TimeSlice<T> {
+    let guard = self.inner.resource.lock().await;
+    tokio::time::sleep_until(guard.deadline).await;
+    TimeSlice { guard, delay: self.inner.delay }
   }
 
-  pub async fn get_consume<F, Fut, R>(&self, operation: F) -> R
-  where F: FnOnce() -> Fut, Fut: Future<Output = R> {
-    self.get().await.consume(operation()).await
+  pub fn try_get(&self) -> Option<TimeSlice<T>> {
+    let guard = self.inner.resource.try_lock().ok()?;
+    if guard.deadline.elapsed() <= Duration::ZERO {
+      Some(TimeSlice { guard, delay: self.inner.delay })
+    } else {
+      None
+    }
+  }
+}
+
+impl<T> Clone for RateLimiter<T> {
+  fn clone(&self) -> Self {
+    RateLimiter { inner: self.inner.clone() }
   }
 }
 
 #[derive(Debug)]
-struct RateLimiterInner {
-  delay: Duration,
-  deadline: Mutex<Option<Instant>>
+struct RateLimiterInner<T> {
+  resource: Mutex<Resource<T>>,
+  delay: Duration
 }
 
-pub struct TimeSlice<'a> {
-  guard: MutexGuard<'a, Option<Instant>>
+#[derive(Debug)]
+struct Resource<T> {
+  value: T,
+  deadline: Instant
 }
 
-impl<'a> TimeSlice<'a> {
-  /// Destroys this timeline, resetting it after the given future completes.
-  pub async fn consume<Fut, R>(mut self, operation: Fut) -> R
-  where Fut: Future<Output = R> {
-    let ret = operation.await;
-    *self.guard = Some(Instant::now());
-    std::mem::drop(self.guard);
-    ret
+#[derive(Debug)]
+pub struct TimeSlice<'t, T> {
+  guard: MutexGuard<'t, Resource<T>>,
+  delay: Duration
+}
+
+impl<'t, T> Deref for TimeSlice<'t, T> {
+  type Target = T;
+
+  fn deref(&self) -> &Self::Target {
+    &self.guard.value
+  }
+}
+
+impl<'t, T> DerefMut for TimeSlice<'t, T> {
+  fn deref_mut(&mut self) -> &mut Self::Target {
+    &mut self.guard.value
+  }
+}
+
+impl<'t, T> Drop for TimeSlice<'t, T> {
+  fn drop(&mut self) {
+    self.guard.deadline = Instant::now() + self.delay;
   }
 }

@@ -121,6 +121,7 @@ key!(pub struct ConfigKey, ConfigContainer);
 key!(pub struct PersistKey, PersistContainer);
 key!(pub struct PersistGuildsKey, PersistGuildsWrapper);
 key!(pub struct ShardManagerKey, Arc<Mutex<ShardManager>>);
+key!(pub struct CleverBotKey, crate::feature::cleverbot::CleverBotWrapper);
 key!(pub struct MessageChainsKey, crate::feature::message_chains::MessageChainsWrapper);
 key!(pub struct TasksKey, TasksWrapper);
 key!(pub struct PreviousBuildIdKey, u64);

@@ -4,20 +4,21 @@ mod input;
 use crate::MelodyResult;
 use crate::commands::APPLICATION_COMMANDS;
 use crate::data::*;
+use crate::feature::cleverbot::CleverBotManager;
 use crate::feature::message_chains::MessageChains;
 use crate::terminal::Flag;
 use crate::utils::{Contextualize, Loggable};
 
-use rand::Rng;
 use rand::seq::SliceRandom;
 use serenity::model::application::interaction::Interaction;
 use serenity::model::channel::Message;
 use serenity::client::{Context, Client, EventHandler};
 use serenity::client::bridge::gateway::ShardManager;
 use serenity::model::gateway::{Activity, GatewayIntents, Ready};
-use serenity::model::id::GuildId;
+use serenity::model::id::{GuildId, UserId};
+use serenity::utils::{content_safe, ContentSafeOptions};
 use tokio::sync::Mutex;
-use tokio::sync::mpsc::{UnboundedReceiver as MpscReceiver};
+use tokio::sync::mpsc::UnboundedReceiver as MpscReceiver;
 use tokio::sync::oneshot::Receiver as OneshotReceiver;
 use tokio::time::MissedTickBehavior;
 
@@ -46,6 +47,7 @@ pub async fn launch(
     data.insert::<ConfigKey>(config);
     data.insert::<PersistKey>(persist);
     data.insert::<PersistGuildsKey>(persist_guilds.into());
+    data.insert::<CleverBotKey>(CleverBotManager::new().into());
     data.insert::<MessageChainsKey>(MessageChains::new().into());
     data.insert::<ShardManagerKey>(client.shard_manager.clone());
     data.insert::<PreviousBuildIdKey>(previous_build_id);
@@ -128,9 +130,23 @@ impl EventHandler for Handler {
         .await.context_log("failed to send message");
     };
 
-    if message.mentions_user_id(me) && rand::thread_rng().gen_bool(0.10) {
-      message.channel_id.send_message(&core, |create| create.content("What?"))
-        .await.context_log("failed to send message");
+    if let Some(content) = get_message_replying_to(&message, me) {
+      let options = ContentSafeOptions::new();
+      let content = content_safe(&core, content, &options, &[]);
+
+      info!("Recieved message for cleverbot: {content:?}");
+      match core.get::<CleverBotKey>().await.send(message.channel_id, &content).await {
+        Ok(reply) => {
+          info!("Recieved reply from cleverbot: {reply:?}");
+          let reply = content_safe(&core, reply, &options, &[]);
+          crate::feature::cleverbot::send_reply(&core, &message, &reply).await.log();
+        },
+        Err(error) => {
+          message.reply(&core, "There was an error getting a reply from cleverbot").await
+            .context_log("failed to send cleverbot failure message");
+          error!("Unable to get reply from cleverbot: {error}");
+        }
+      };
     };
   }
 }
@@ -146,6 +162,15 @@ fn intents() -> GatewayIntents {
   GatewayIntents::GUILD_MESSAGES |
   GatewayIntents::GUILD_MESSAGE_REACTIONS |
   GatewayIntents::MESSAGE_CONTENT
+}
+
+/// Gets the remaining content of a message if it either replies to the
+/// given user, or begins with a mention of the given user.
+fn get_message_replying_to(message: &Message, who: UserId) -> Option<&str> {
+  match &message.referenced_message {
+    Some(referenced_message) if referenced_message.author.id == who => Some(&message.content),
+    Some(..) | None => crate::utils::strip_user_mention(&message.content, who)
+  }
 }
 
 async fn termination_task(

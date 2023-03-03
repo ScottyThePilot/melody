@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use itertools::Itertools;
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
+use serenity::model::id::UserId;
 
 use std::error::Error;
 use std::fmt;
@@ -23,6 +24,16 @@ pub fn capitalize(s: impl AsRef<str>) -> String {
 
 pub fn kebab_case_to_words(s: impl AsRef<str>) -> String {
   s.as_ref().split("-").map(capitalize).join(" ")
+}
+
+/// Takes message content and a user ID, returning the remainder of the message if the string
+/// mentioned the user at the start of it.
+pub fn strip_user_mention(msg: &str, user_id: UserId) -> Option<&str> {
+  let msg = msg.trim().strip_prefix("<@")?;
+  let msg = msg.strip_prefix("!").unwrap_or(msg);
+  let msg = msg.strip_prefix(&user_id.to_string())?;
+  let msg = msg.strip_prefix(">")?.trim_start();
+  Some(msg)
 }
 
 #[derive(Debug, Clone, Copy)]
