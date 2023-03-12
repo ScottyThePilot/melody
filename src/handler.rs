@@ -42,7 +42,9 @@ pub async fn launch(
   let core = Core::from(&client);
 
   // Insert data into the shared TypeMap
-  let previous_build_id = persist.operate_mut(|persist| persist.swap_build_id()).await;
+  let previous_build_id = persist.operate_mut_commit(|persist| Ok(persist.swap_build_id()))
+    .await.context("failed to commit persist-guild state for build id")?;
+
   core.init(|data| {
     data.insert::<ConfigKey>(config);
     data.insert::<PersistKey>(persist);
@@ -184,20 +186,35 @@ async fn termination_task(
   shard_manager.lock().await.shutdown_all().await;
 }
 
-
-
 async fn cycle_activity_task(core: Core) {
   const ACTIVITY_CYCLE_TIME: Duration = Duration::from_secs(120);
   const ACTIVITIES: &[fn(&Core) -> Activity] = &[
     |_| Activity::playing("Minecraft 2"),
     |_| Activity::playing("Portal 3"),
     |_| Activity::playing("Pokemon\u{2122} Gun"),
+    |_| Activity::playing("Artifact"),
+    |_| Activity::playing("Group Fortification: The Sequel"),
+    |_| Activity::playing("Arma 4"),
+    |_| Activity::playing("Farming Simulator 23"),
+    |_| Activity::playing("League of Legends"),
+    |_| {
+      let mut rng = crate::utils::create_rng();
+      let number = ['1', '2', '3'].choose(&mut rng).unwrap();
+      let fraction = ['\u{00bc}', '\u{00bd}', '\u{00be}', '\u{215b}', '\u{215c}', '\u{215d}', '\u{215e}'].choose(&mut rng).unwrap();
+      Activity::playing(format!("Overwatch {number}{fraction}"))
+    },
     |_| Activity::watching("you"),
     |core| Activity::watching(format!("{} guilds", core.cache.guild_count())),
     |core| Activity::watching(format!("{} users", core.cache.user_count())),
     |_| Activity::watching("Bocchi the Rock!"),
     |_| Activity::watching("Lucky\u{2606}Star"),
-    |_| Activity::competing("big balls competition")
+    |_| Activity::watching("Chainsaw Man"),
+    |_| Activity::watching("Made In Abyss"),
+    |_| Activity::listening("the screams"),
+    |_| Activity::listening("the intrusive thoughts"),
+    |_| Activity::listening("soft loli breathing 10 hours"),
+    |_| Activity::competing("big balls competition"),
+    |_| Activity::competing("taco eating competition")
   ];
 
   let mut rng = crate::utils::create_rng();

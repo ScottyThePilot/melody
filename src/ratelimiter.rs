@@ -22,12 +22,14 @@ impl<T> RateLimiter<T> {
     }
   }
 
+  /// Gets a time-slice from this ratelimiter, when possible.
   pub async fn get(&self) -> TimeSlice<T> {
     let guard = self.inner.resource.lock().await;
     tokio::time::sleep_until(guard.deadline).await;
     TimeSlice { guard, delay: self.inner.delay }
   }
 
+  /// Gets a time-slice from the ratelimiter, only if possible immediately.
   pub fn try_get(&self) -> Option<TimeSlice<T>> {
     let guard = self.inner.resource.try_lock().ok()?;
     if guard.deadline.elapsed() <= Duration::ZERO {
@@ -56,10 +58,20 @@ struct Resource<T> {
   deadline: Instant
 }
 
+/// A time-slice from a ratelimiter.
+/// Represents permission granted by the ratelimiter for the user to perform some operation.
+/// Once a value of this type is discarded, a delay will be imposed on the next instance being requested.
 #[derive(Debug)]
 pub struct TimeSlice<'t, T> {
   guard: MutexGuard<'t, Resource<T>>,
   delay: Duration
+}
+
+impl<'t, T> TimeSlice<'t, T> {
+  /// Discards this time-slice without invoking a delay on the next request.
+  pub fn cancel(mut self) {
+    self.delay = Duration::ZERO;
+  }
 }
 
 impl<'t, T> Deref for TimeSlice<'t, T> {
