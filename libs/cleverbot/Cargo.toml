@@ -4,13 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-chrono = "0.4.23"
+chrono = "0.4"
 md5 = "0.7.0"
 percent-encoding = "2.2.0"
-reqwest = "0.11.14"
-thiserror = "1.0.38"
-
-[dev-dependencies.tokio]
-version = "1.22"
-default-features = false
-features = ["rt", "rt-multi-thread", "macros"]
+reqwest = "0.11"
+thiserror = "1.0"
