@@ -50,9 +50,9 @@ impl CleverBotManager {
 
 pub async fn send_reply(core: &Core, message: &Message, content: impl AsRef<str>) -> MelodyResult {
   // whether or not to notify the user that this message is from cleverbot
-  let notify = core.operate_persist_mut(|persist| {
-    persist.cleverbot_notify(message.author.id)
-  }).await;
+  let notify = core.operate_persist_commit(|persist| {
+    Ok(persist.cleverbot_notify(message.author.id))
+  }).await?;
 
   message.channel_id
     .send_message(&core, |builder| {
