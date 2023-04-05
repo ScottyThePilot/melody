@@ -4,22 +4,26 @@
 #[macro_use] extern crate thiserror;
 extern crate ahash;
 extern crate chrono;
+extern crate chumsky;
+extern crate cleverbot;
 extern crate command_attr;
+extern crate const_random;
 extern crate fern;
 extern crate float_ord;
 extern crate itertools;
+extern crate linefeed;
 extern crate once_cell;
 extern crate rand;
-extern crate serenity;
 extern crate serde_cbor;
+extern crate serenity;
 extern crate singlefile;
 extern crate tokio;
 extern crate toml;
+extern crate uord;
 extern crate xz2;
 
 #[macro_use] pub(crate) mod utils;
 #[macro_use] pub(crate) mod blueprint;
-pub(crate) mod build_id;
 pub(crate) mod commands;
 pub(crate) mod data;
 pub(crate) mod feature;
@@ -35,6 +39,8 @@ use tokio::sync::mpsc::{unbounded_channel as mpsc_channel, UnboundedReceiver as 
 use tokio::sync::oneshot::{channel as oneshot_channel, Receiver as OneshotReceiver};
 
 use std::sync::Arc;
+
+pub const BUILD_ID: u64 = const_random::const_random!(u64);
 
 fn main() {
   let (terminate_sender, terminate_receiver) = oneshot_channel();

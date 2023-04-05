@@ -100,7 +100,7 @@ impl EventHandler for Handler {
       info!("Discovered guild: {guild_name} ({guild_id})");
     };
 
-    if core.get::<PreviousBuildIdKey>().await != crate::build_id::get() {
+    if core.is_new_build().await {
       info!("New build detected, registering commands");
       crate::commands::register_commands(&core, &guilds).await.log();
     } else {

@@ -34,7 +34,7 @@ impl Persist {
   }
 
   pub fn swap_build_id(&mut self) -> u64 {
-    std::mem::replace(&mut self.build_id, crate::build_id::get())
+    std::mem::replace(&mut self.build_id, crate::BUILD_ID)
   }
 
   pub fn cleverbot_notify(&mut self, user_id: UserId) -> bool {

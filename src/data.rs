@@ -236,6 +236,10 @@ impl Core {
     }).await
   }
 
+  pub async fn is_new_build(&self) -> bool {
+    self.get::<PreviousBuildIdKey>().await != crate::BUILD_ID
+  }
+
   /// Aborts all tasks that this core might be responsible for
   pub async fn abort(&self) {
     if let Some(tasks) = self.get_checked::<TasksKey>().await {
