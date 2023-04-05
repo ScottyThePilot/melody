@@ -1,9 +1,11 @@
+use ahash::AHasher;
 use rand::Rng;
 use serenity::model::id::{ChannelId, UserId};
 use serenity::model::channel::Message;
 use tokio::sync::Mutex;
 
 use std::collections::HashMap;
+use std::hash::{Hasher, Hash};
 use std::sync::Arc;
 
 
@@ -23,7 +25,7 @@ pub struct MessageChains {
 
 impl MessageChains {
   const ACTIVATION_THRESHOLD: usize = 3;
-  const ACTIVATION_CHANCE: f64 = 0.50;
+  const ACTIVATION_CHANCE: f64 = 0.375;
 
   pub fn new() -> MessageChains {
     Self::default()
@@ -40,11 +42,11 @@ impl MessageChains {
   }
 
   fn observe_message(&mut self, message: &Message) -> usize {
-    if message.content.is_empty() { return 0 };
-    let content = message.content.to_lowercase();
-    let chain = self.chains.entry(message.channel_id)
-      .and_modify(|chain| chain.advance(&content, message.author.id))
-      .or_insert_with(|| MessageChain::new(&content, message.author.id));
+    let message_content = message.content.trim();
+    if message_content.is_empty() { return 0 };
+    let previous = self.chains.get(&message.channel_id).copied();
+    let chain = MessageChain::new(message_content, message.author.id, previous);
+    self.chains.insert(message.channel_id, chain);
     chain.len
   }
 
@@ -53,26 +55,32 @@ impl MessageChains {
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 struct MessageChain {
-  content: String,
+  hash: u64,
   user: UserId,
   len: usize
 }
 
 impl MessageChain {
-  fn new(content: &str, user: UserId) -> Self {
-    MessageChain { content: content.into(), user, len: 1 }
+  fn new(content: &str, user: UserId, previous: Option<Self>) -> Self {
+    let hash = get_content_hash(content);
+    let len = match previous {
+      Some(prev) if prev.continues(hash, user) => prev.len + 1,
+      Some(..) | None => 1
+    };
+
+    MessageChain { hash, user, len }
   }
 
-  fn advance(&mut self, content: &str, user: UserId) {
-    if self.content == content && self.user != user {
-      self.user = user;
-      self.len += 1;
-    } else {
-      self.content = content.to_owned();
-      self.user = user;
-      self.len = 0;
-    }
+  /// Whether or not the next message continues the chain
+  fn continues(self, hash: u64, user: UserId) -> bool {
+    self.hash == hash && self.user != user
   }
+}
+
+fn get_content_hash(content: &str) -> u64 {
+  let mut hasher = AHasher::default();
+  content.trim().to_lowercase().hash(&mut hasher);
+  hasher.finish()
 }
