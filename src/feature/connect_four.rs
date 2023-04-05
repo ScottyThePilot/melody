@@ -18,17 +18,17 @@ use std::fmt;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Manager {
-  challenges: HashMap<u64, HashSet<u64>>,
-  stats: HashMap<u64, Stats>,
+  challenges: HashMap<UserId, HashSet<UserId>>,
+  stats: HashMap<UserId, Stats>,
   #[serde(default)]
-  user_games: HashMap<UOrd<u64>, UserGame>,
+  user_games: HashMap<UOrd<UserId>, UserGame>,
   #[serde(default)]
-  computer_games: HashMap<u64, ComputerGame>
+  computer_games: HashMap<UserId, ComputerGame>
 }
 
 impl Manager {
   pub fn get_stats(&self, player: UserId) -> Stats {
-    self.stats.get(&player.0).copied().unwrap_or_default()
+    self.stats.get(&player).copied().unwrap_or_default()
   }
 
   pub fn is_playing(&self, player: UserId) -> bool {
@@ -37,17 +37,17 @@ impl Manager {
 
   /// Whether the player has a game in progress currently.
   pub fn is_playing_user(&self, player: UserId) -> bool {
-    self.user_games.keys().any(|players| players.contains(&player.0))
+    self.user_games.keys().any(|players| players.contains(&player))
   }
 
   pub fn is_playing_computer(&self, player: UserId) -> bool {
-    self.computer_games.contains_key(&player.0)
+    self.computer_games.contains_key(&player)
   }
 
   /// Creates a game against a computer player, returning the game and the move the computer made if it went first.
   pub fn challenge_computer(&mut self, player: UserId, difficulty: Difficulty) -> Option<(&mut ComputerGame, Option<usize>)> {
     if !self.is_playing(player) {
-      match self.computer_games.entry(player.0) {
+      match self.computer_games.entry(player) {
         Entry::Vacant(entry) => Some({
           let game = entry.insert(ComputerGame::new(player, difficulty));
           // If the computer got the first move, kick it back to the player immediately
@@ -67,15 +67,15 @@ impl Manager {
 
   /// Whether or not a given player is challenging a given opponent.
   pub fn is_challenging(&self, challenger: UserId, opponent: UserId) -> bool {
-    self.challenges.get(&challenger.0).map_or(false, |challenges| {
-      challenges.contains(&opponent.0)
+    self.challenges.get(&challenger).map_or(false, |challenges| {
+      challenges.contains(&opponent)
     })
   }
 
   /// Attempts to delete the given challenge, returning whether or not the challenge existed.
   pub fn remove_challenge(&mut self, challenger: UserId, opponent: UserId) -> bool {
-    self.challenges.get_mut(&challenger.0).map_or(false, |challenges| {
-      challenges.remove(&opponent.0)
+    self.challenges.get_mut(&challenger).map_or(false, |challenges| {
+      challenges.remove(&opponent)
     })
   }
 
@@ -83,7 +83,7 @@ impl Manager {
   pub fn create_challenge(&mut self, challenger: UserId, opponent: UserId) -> bool {
     // Cannot challenge self and cannot challenge while playing
     if challenger != opponent && !self.is_playing_user(challenger) {
-      self.challenges.entry(challenger.0).or_default().insert(opponent.0)
+      self.challenges.entry(challenger).or_default().insert(opponent)
     } else {
       false
     }
@@ -95,7 +95,7 @@ impl Manager {
     let valid = challenger != opponent && !self.is_playing(challenger) && !self.is_playing(opponent);
     // Challenge must also exist
     if valid && self.remove_challenge(challenger, opponent) {
-      match self.user_games.entry(UOrd::new(opponent.0, challenger.0)) {
+      match self.user_games.entry(UOrd::new(opponent, challenger)) {
         Entry::Vacant(entry) => Some(entry.insert(UserGame::new(challenger, opponent))),
         // Previous clauses should have eliminated the possibility of this branch's existence
         Entry::Occupied(..) => unreachable!("tried to create a game that already exists")
@@ -106,19 +106,19 @@ impl Manager {
   }
 
   pub fn get_user_game(&self, players: impl Into<UOrd<UserId>>) -> Option<&UserGame> {
-    self.user_games.get(&players.into().map(|v| v.0))
+    self.user_games.get(&players.into().map(|v| v))
   }
 
   pub fn get_user_game_mut(&mut self, players: impl Into<UOrd<UserId>>) -> Option<&mut UserGame> {
-    self.user_games.get_mut(&players.into().map(|v| v.0))
+    self.user_games.get_mut(&players.into().map(|v| v))
   }
 
   pub fn get_computer_game(&self, player: UserId) -> Option<&ComputerGame> {
-    self.computer_games.get(&player.0)
+    self.computer_games.get(&player)
   }
 
   pub fn get_computer_game_mut(&mut self, player: UserId) -> Option<&mut ComputerGame> {
-    self.computer_games.get_mut(&player.0)
+    self.computer_games.get_mut(&player)
   }
 
   pub fn find_user_game(&self, player: UserId) -> Option<(&UserGame, Color)> {
@@ -143,7 +143,7 @@ impl Manager {
       game.player_color(player).map(|color| (game, color))
     });
 
-    let computer_game = self.computer_games.get_mut(&player.0);
+    let computer_game = self.computer_games.get_mut(&player);
 
     match (user_game, computer_game) {
       (None, None) => None,
@@ -163,15 +163,15 @@ impl Manager {
   /// Counts as a loss for the resigning player and a win for their opponent.
   pub fn resign_user_game(&mut self, player: UserId) -> Option<UserGame> {
     self.user_games.keys()
-      .find_map(|players| players.other(&player.0).copied())
-      .map(|opponent| self.end_user_game(UserId(opponent), player).unwrap())
+      .find_map(|players| players.other(&player).copied())
+      .map(|opponent| self.end_user_game(opponent, player).unwrap())
   }
 
   /// Concludes a game with a winner and a loser, applying win and loss stats.
   pub fn end_user_game(&mut self, winner: UserId, loser: UserId) -> Option<UserGame> {
     if let Some(game) = self.end_user_game_draw(UOrd::new(winner, loser)) {
-      self.stats.entry(winner.0).or_default().wins += 1;
-      self.stats.entry(loser.0).or_default().losses += 1;
+      self.stats.entry(winner).or_default().wins += 1;
+      self.stats.entry(loser).or_default().losses += 1;
       Some(game)
     } else {
       None
@@ -180,11 +180,11 @@ impl Manager {
 
   /// Ends the game without a winner or a loser.
   pub fn end_user_game_draw(&mut self, players: impl Into<UOrd<UserId>>) -> Option<UserGame> {
-    self.user_games.remove(&players.into().map(|v| v.0))
+    self.user_games.remove(&players.into().map(|v| v))
   }
 
   pub fn end_computer_game(&mut self, player: UserId) -> Option<ComputerGame> {
-    self.computer_games.remove(&player.0)
+    self.computer_games.remove(&player)
   }
 }
 

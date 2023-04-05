@@ -17,9 +17,9 @@ pub type PersistContainer = ContainerAsyncWritableLocked<Persist, Cbor>;
 #[serde(default)]
 pub struct Persist {
   build_id: u64,
-  guild_plugins: HashMap<u64, HashSet<String>>,
+  guild_plugins: HashMap<GuildId, HashSet<String>>,
   /// List of users who have been notified that chatbot messages from Melody are from CleverBot.
-  cleverbot_notified_users: HashSet<u64>
+  cleverbot_notified_users: HashSet<UserId>
 }
 
 impl Persist {
@@ -38,15 +38,15 @@ impl Persist {
   }
 
   pub fn cleverbot_notify(&mut self, user_id: UserId) -> bool {
-    self.cleverbot_notified_users.insert(user_id.into())
+    self.cleverbot_notified_users.insert(user_id)
   }
 
   pub fn get_guild_plugins_mut(&mut self, id: GuildId) -> &mut HashSet<String> {
-    self.guild_plugins.entry(id.into()).or_default()
+    self.guild_plugins.entry(id).or_default()
   }
 
   pub fn get_guild_plugins(&self, id: GuildId) -> HashSet<String> {
-    self.guild_plugins.get(&id.0).map_or_else(HashSet::new, HashSet::clone)
+    self.guild_plugins.get(&id).map_or_else(HashSet::new, HashSet::clone)
   }
 }
 
