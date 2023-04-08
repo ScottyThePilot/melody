@@ -1,0 +1,9 @@
+[package]
+name = "chessboard-render"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+chess-engine = { version = "0.1.2" }
+image = { version = "0.24", default-features = false, features = ["png"] }
+once_cell = { version = "1.17" }

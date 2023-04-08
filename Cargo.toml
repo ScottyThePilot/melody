@@ -41,4 +41,11 @@ git = "https://github.com/ScottyThePilot/misc-crates"
 features = ["serde"]
 
 [workspace]
-members = ["libs/cleverbot"]
+members = [
+  ".",
+  "libs/chessboard-render",
+  "libs/cleverbot"
+]
+
+[profile.dev.package.chessboard-render]
+opt-level = 3
