@@ -1,3 +1,4 @@
+extern crate cacheable;
 extern crate chrono;
 extern crate md5;
 extern crate percent_encoding;
@@ -5,6 +6,7 @@ extern crate reqwest;
 #[macro_use]
 extern crate thiserror;
 
+use cacheable::{Cache, CacheableAsync, async_trait};
 use chrono::{DateTime, Utc};
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, percent_encode};
 use reqwest::{Client, Proxy, Error as ReqwestError};
@@ -18,8 +20,8 @@ const USER_AGENT: &str = "Opera/9.48 (Windows NT 6.0; sl-SI) Presto/2.11.249 Ver
 /// Facilitates communication with CleverBot by imitating the website's functionality.
 /// A single instance of this should be treated as if it were a single instance of your browser.
 pub struct CleverBotAgent {
-  pub data: Option<CleverBotData>,
-  pub client: Client
+  data: Cache<CleverBotData>,
+  client: Client
 }
 
 impl CleverBotAgent {
@@ -38,17 +40,21 @@ impl CleverBotAgent {
     Self::with_client(client)
   }
 
-  pub fn with_client(client: Client) -> Self {
-    CleverBotAgent { data: None, client }
+  pub const fn with_client(client: Client) -> Self {
+    CleverBotAgent { data: Cache::new(), client }
   }
 
-  async fn init(&mut self) -> Result<(&mut CleverBotData, &Client), Error> {
-    let now = Utc::now();
-    Result::map(match self.data {
-      Some(ref mut data) => data.ensure_valid(&self.client, now).await.map(|()| data),
-      None => CleverBotData::request(&self.client, now).await.map(|data| self.data.insert(data))
-    }, |data| (data, &self.client))
+  async fn get(&mut self) -> Result<(&mut CleverBotData, &Client), Error> {
+    self.data.try_get_async((&self.client, Utc::now()))
+      .await.map(|data| (data, &self.client))
   }
+
+  //async fn init(&mut self) -> Result<(&mut CleverBotData, &Client), Error> {
+  //  Result::map(match self.data {
+  //    Some(ref mut data) => data.ensure_valid(&self.client, now).await.map(|()| data),
+  //    None => CleverBotData::request(&self.client, now).await.map(|data| self.data.insert(data))
+  //  }, |data| (data, &self.client))
+  //}
 }
 
 impl Default for CleverBotAgent {
@@ -77,7 +83,7 @@ impl CleverBotPreviousData {
 }
 
 #[derive(Debug, Clone)]
-pub struct CleverBotData {
+struct CleverBotData {
   xvis: String,
   previous: Option<CleverBotPreviousData>,
   max_age: i64,
@@ -96,7 +102,7 @@ impl CleverBotData {
     })
   }
 
-  pub fn is_expired(&self, now: DateTime<Utc>) -> bool {
+  fn is_expired(&self, now: DateTime<Utc>) -> bool {
     now.signed_duration_since(self.last_update).num_milliseconds() > self.max_age
   }
 
@@ -120,6 +126,20 @@ impl CleverBotData {
   }
 }
 
+#[async_trait]
+impl CacheableAsync for CleverBotData {
+  type Args<'a> = (&'a Client, DateTime<Utc>);
+  type Error = Error;
+
+  async fn operation((client, now): Self::Args<'_>) -> Result<Self, Self::Error> {
+    Self::request(client, now).await
+  }
+
+  fn is_invalid(&self, &(_, now): &Self::Args<'_>) -> bool {
+    self.is_expired(now)
+  }
+}
+
 fn parse_max_age(max_age: &str) -> Option<i64> {
   max_age.strip_prefix("Max-Age=")?.parse::<i64>().ok()
 }
@@ -131,11 +151,11 @@ pub struct CleverBotContext {
 }
 
 impl CleverBotContext {
-  pub fn new() -> Self {
+  pub const fn new() -> Self {
     Self::with_size_limit(32)
   }
 
-  pub fn with_size_limit(history_size_limit: usize) -> Self {
+  pub const fn with_size_limit(history_size_limit: usize) -> Self {
     CleverBotContext {
       history: VecDeque::new(),
       history_size_limit
@@ -161,7 +181,7 @@ impl Default for CleverBotContext {
 }
 
 pub async fn send(agent: &mut CleverBotAgent, history: &[String], message: &str) -> Result<String, Error> {
-  let (agent_data, agent_client) = agent.init().await?;
+  let (agent_data, agent_client) = agent.get().await?;
 
   let mut payload = String::new();
   payload.push_str(&format!("stimulus={}&", escape(message.as_bytes())));

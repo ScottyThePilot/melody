@@ -195,32 +195,3 @@ impl<T, E: Error> Loggable for Result<T, E> {
     }
   }
 }
-
-#[macro_export]
-macro_rules! log_return {
-  ($expr:expr) => ($crate::some_or_return!($expr.log_some()));
-}
-
-#[macro_export]
-macro_rules! ok_or_continue {
-  ($expr:expr) => (match $expr {
-    Result::Ok(value) => value,
-    Result::Err(_) => continue
-  });
-}
-
-#[macro_export]
-macro_rules! some_or_return {
-  ($expr:expr) => (match $expr {
-    Option::Some(value) => value,
-    Option::None => return
-  });
-}
-
-#[macro_export]
-macro_rules! some_or_continue {
-  ($expr:expr) => (match $expr {
-    Option::Some(value) => value,
-    Option::None => continue
-  });
-}

@@ -36,9 +36,16 @@ features = [
   "unstable_discord_api"
 ]
 
+[dependencies.ids]
+git = "https://github.com/ScottyThePilot/misc-crates"
+features = ["serde"]
+
 [dependencies.uord]
 git = "https://github.com/ScottyThePilot/misc-crates"
 features = ["serde"]
 
 [workspace]
-members = ["libs/cleverbot"]
+members = [
+  "libs/cacheable",
+  "libs/cleverbot"
+]

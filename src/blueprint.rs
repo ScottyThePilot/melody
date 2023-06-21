@@ -29,6 +29,7 @@ pub use serenity::futures::future::BoxFuture;
 
 use std::collections::HashSet;
 use std::fmt;
+use std::num::NonZeroU64;
 use std::str::FromStr;
 
 macro_rules! when {
@@ -520,6 +521,7 @@ pub trait ResolveArgumentValue {
 
 impl_resolve_argument_value!(String, CommandDataOptionValue::String(value) => Some(value));
 impl_resolve_argument_value!(i64, CommandDataOptionValue::Integer(value) => Some(value));
+impl_resolve_argument_value!(u64, CommandDataOptionValue::Integer(value) => u64::try_from(value).ok());
 impl_resolve_argument_value!(f64, CommandDataOptionValue::Number(value) => Some(value));
 impl_resolve_argument_value!(bool, CommandDataOptionValue::Boolean(value) => Some(value));
 impl_resolve_argument_value!(User, CommandDataOptionValue::User(value, _) => Some(value));
@@ -527,6 +529,12 @@ impl_resolve_argument_value!(PartialMember, CommandDataOptionValue::User(_, valu
 impl_resolve_argument_value!(PartialChannel, CommandDataOptionValue::Channel(value) => Some(value));
 impl_resolve_argument_value!(Role, CommandDataOptionValue::Role(value) => Some(value));
 impl_resolve_argument_value!(Attachment, CommandDataOptionValue::Attachment(value) => Some(value));
+
+impl ResolveArgumentValue for NonZeroU64 {
+  fn resolve_value(option_value: Option<CommandDataOptionValue>) -> Option<Self> where Self: Sized {
+    u64::resolve_value(option_value).and_then(NonZeroU64::new)
+  }
+}
 
 impl<T: ResolveArgumentValue> ResolveArgumentValue for Option<T> {
   fn resolve_value(option_value: Option<CommandDataOptionValue>) -> Option<Option<T>> {
