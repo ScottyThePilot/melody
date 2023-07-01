@@ -20,6 +20,7 @@ use std::collections::HashSet;
 pub const APPLICATION_COMMANDS: &[BlueprintCommand] = &[
   self::general::PING,
   self::general::HELP,
+  self::general::ECHO,
   self::general::TROLL,
   self::general::AVATAR,
   self::general::BANNER,

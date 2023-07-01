@@ -37,13 +37,15 @@ impl Config {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 enum ConfigGatewayIntents {
+  Name(ConfigGatewayIntentsIdentifier),
   NameList(Vec<ConfigGatewayIntentsIdentifier>),
   GatewayIntents(GatewayIntents)
 }
 
 fn deserialize_intents<'de, D: Deserializer<'de>>(deserializer: D) -> Result<GatewayIntents, D::Error> {
   ConfigGatewayIntents::deserialize(deserializer).map(|intents| match intents {
-    ConfigGatewayIntents::NameList(list) => intents_from_list(list),
+    ConfigGatewayIntents::Name(identifier) => identifier.intents,
+    ConfigGatewayIntents::NameList(identifier_list) => intents_from_list(identifier_list),
     ConfigGatewayIntents::GatewayIntents(intents) => intents
   })
 }

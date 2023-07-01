@@ -3,6 +3,7 @@ use crate::utils::Contextualize;
 use super::Cbor;
 
 use std::collections::{HashMap, HashSet};
+use serenity::model::guild::Emoji;
 use serenity::model::id::{EmojiId, GuildId, UserId};
 use singlefile::container_shared_async::ContainerAsyncWritableLocked;
 use tokio::sync::RwLock;
@@ -134,11 +135,13 @@ impl PersistGuild {
     };
   }
 
-  pub fn get_emoji_uses(&self) -> Vec<(EmojiId, usize)> {
+  pub fn get_emoji_uses<'a, F>(&self, mut f: F) -> Vec<(EmojiId, bool, usize)>
+  where F: FnMut(EmojiId) -> Option<&'a Emoji> {
     let mut emoji_statistics = self.emoji_statistics.iter()
       .filter_map(|(&id, &c)| (c > 0).then_some((id, c)))
-      .collect::<Vec<(EmojiId, usize)>>();
-    emoji_statistics.sort_unstable_by(|a, b| Ord::cmp(&a.1, &b.1).reverse());
+      .filter_map(|(id, c)| f(id).map(|emoji| (emoji.id, emoji.animated, c)))
+      .collect::<Vec<(EmojiId, bool, usize)>>();
+    emoji_statistics.sort_unstable_by(|a, b| Ord::cmp(&a.2, &b.2).reverse());
     emoji_statistics
   }
 }

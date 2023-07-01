@@ -5,10 +5,12 @@ use crate::utils::Loggable;
 
 use chrono::{Utc, Duration};
 use rand::Rng;
-use serenity::model::user::User;
-use serenity::model::timestamp::Timestamp;
-use serenity::model::permissions::Permissions;
+use serenity::model::id::EmojiId;
 use serenity::model::mention::Mentionable;
+use serenity::model::permissions::Permissions;
+use serenity::model::timestamp::Timestamp;
+use serenity::model::user::User;
+use serenity::utils::{content_safe, ContentSafeOptions};
 
 
 
@@ -43,9 +45,12 @@ pub(super) const HELP: BlueprintCommand = blueprint_command! {
       choices: [
         ("ping", "ping"),
         ("help", "help"),
+        ("echo", "echo"),
+        ("troll", "troll"),
         ("avatar", "avatar"),
         ("banner", "banner"),
         ("connect-four", "connect-four"),
+        ("emoji_stats", "emoji_stats"),
         ("roll", "roll")
       ]
     })
@@ -74,6 +79,33 @@ async fn help(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   };
 
   response.send(&core, &args.interaction).await
+}
+
+pub(super) const ECHO: BlueprintCommand = blueprint_command! {
+  name: "echo",
+  description: "Makes the bot repeat something",
+  usage: ["/echo <text>"],
+  examples: ["/echo 'hello world'"],
+  allow_in_dms: true,
+  arguments: [
+    blueprint_argument!(String {
+      name: "text",
+      description: "The text to be repeated back",
+      required: true,
+      max_length: 1000
+    })
+  ],
+  function: echo
+};
+
+#[command_attr::hook]
+async fn echo(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
+  let text = resolve_arguments::<String>(args.option_values)?;
+  let text_filtered = content_safe(&core.cache, &text, &ContentSafeOptions::default().clean_user(false), &[]);
+  info!("Echoing message: {text:?}");
+  info!("Echoing message (filtered): {text_filtered:?}");
+  BlueprintCommandResponse::new(text_filtered)
+    .send(&core, &args.interaction).await
 }
 
 pub(super) const TROLL: BlueprintCommand = blueprint_command! {
@@ -212,14 +244,20 @@ async fn emoji_stats(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   const PER_PAGE: u64 = 24;
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let page = resolve_arguments::<Option<u64>>(args.option_values)?.unwrap_or(1) - 1;
+
   let emoji_statistics = core.operate_persist_guild(guild_id, |persist_guild| {
-    Ok(persist_guild.get_emoji_uses())
+    core.cache.guild_field(guild_id, |guild| {
+      persist_guild.get_emoji_uses(|emoji_id| guild.emojis.get(&emoji_id))
+    }).ok_or(MelodyError::COMMAND_NOT_IN_GUILD)
   }).await?;
 
   let page_start = (page * PER_PAGE) as usize;
   let entries = emoji_statistics.into_iter()
     .enumerate().skip(page_start).take(PER_PAGE as usize)
-    .map(|(i, (emoji, count))| format!("`#{}` {} ({count} times)", i + page_start + 1, emoji.mention()))
+    .map(|(i, (emoji, animated, count))| {
+      let emoji_mention = (emoji, animated).mention();
+      format!("`#{}` {emoji_mention} ({count} times)", i + page_start + 1)
+    })
     .collect::<Vec<String>>();
   let response = match entries.is_empty() {
     true => BlueprintCommandResponse::new("(No results)".to_owned()),
