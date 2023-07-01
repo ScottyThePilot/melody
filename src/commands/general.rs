@@ -8,7 +8,7 @@ use rand::Rng;
 use serenity::model::user::User;
 use serenity::model::timestamp::Timestamp;
 use serenity::model::permissions::Permissions;
-use serenity::model::mention::Mention;
+use serenity::model::mention::Mentionable;
 
 
 
@@ -96,12 +96,12 @@ pub(super) const TROLL: BlueprintCommand = blueprint_command! {
 async fn troll(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let mut member = args.interaction.member.clone().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let target = resolve_arguments::<Option<User>>(args.option_values)?;
-  let time = Timestamp::from(Utc::now() + Duration::minutes(1));
+  let time = Timestamp::from(Utc::now() + Duration::seconds(10));
   let response = match target {
     Some(target) => {
       if target.id == core.cache.current_user_id() {
-        // Shadows `time`, changing it to be 5 minutes instead of 1.
-        let time = Timestamp::from(Utc::now() + Duration::minutes(5));
+        // Shadows `time`, changing it to be 30 seconds instead of 10.
+        let time = Timestamp::from(Utc::now() + Duration::seconds(30));
         match member.disable_communication_until_datetime(&core, time).await.log_some() {
           Some(()) => "Impossible. Heresy. Unspeakable. Heresy. Heresy. Silence.".to_owned(),
           None => "Not happening, buddy.".to_owned()
@@ -112,12 +112,12 @@ async fn troll(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
           let mut target_member = core.cache.member(guild_id, target.id)
             .ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
           match target_member.disable_communication_until_datetime(&core, time).await.log_some() {
-            Some(()) => format!("{} has successfully trolled {}.", Mention::User(member.user.id), Mention::User(target.id)),
+            Some(()) => format!("{} has successfully trolled {}.", member.user.id.mention(), target.id.mention()),
             None => "Sorry, even though you succeeded, I don't have permission to do that.".to_owned()
           }
         } else {
           match member.disable_communication_until_datetime(&core, time).await.log_some() {
-            Some(()) => format!("{}'s attempt at trollage was a royal failure.", Mention::User(member.user.id)),
+            Some(()) => format!("{}'s attempt at trollage was a royal failure.", member.user.id.mention()),
             None => "Sorry, I cannot do that.".to_owned()
           }
         }
@@ -125,7 +125,7 @@ async fn troll(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
     },
     None => {
       match member.disable_communication_until_datetime(&core, time).await.log_some() {
-        Some(()) => format!("{} has been trolled.", Mention::User(member.user.id)),
+        Some(()) => format!("{} has been trolled.", member.user.id.mention()),
         None => "Sorry, I cannot do that.".to_owned()
       }
     }
@@ -186,6 +186,44 @@ async fn banner(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let response = match user.banner_url() {
     Some(banner_url) => BlueprintCommandResponse::new_ephemeral(banner_url),
     None => BlueprintCommandResponse::new_ephemeral("Failed to get that user's banner")
+  };
+
+  response.send(&core, &args.interaction).await
+}
+
+pub const EMOJI_STATS: BlueprintCommand = blueprint_command! {
+  name: "emoji-stats",
+  description: "Gets usage statistics of emojis for this server",
+  usage: ["/emoji-stats [page]"],
+  examples: ["/emoji-stats", "/emoji-stats 3"],
+  allow_in_dms: false,
+  arguments: [
+    blueprint_argument!(Integer {
+      name: "page",
+      description: "The page of results to display (results are grouped 16 at a time)",
+      min_value: 1
+    })
+  ],
+  function: emoji_stats
+};
+
+#[command_attr::hook]
+async fn emoji_stats(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
+  const PER_PAGE: u64 = 24;
+  let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+  let page = resolve_arguments::<Option<u64>>(args.option_values)?.unwrap_or(1) - 1;
+  let emoji_statistics = core.operate_persist_guild(guild_id, |persist_guild| {
+    Ok(persist_guild.get_emoji_uses())
+  }).await?;
+
+  let page_start = (page * PER_PAGE) as usize;
+  let entries = emoji_statistics.into_iter()
+    .enumerate().skip(page_start).take(PER_PAGE as usize)
+    .map(|(i, (emoji, count))| format!("`#{}` {} ({count} times)", i + page_start + 1, emoji.mention()))
+    .collect::<Vec<String>>();
+  let response = match entries.is_empty() {
+    true => BlueprintCommandResponse::new("(No results)".to_owned()),
+    false => BlueprintCommandResponse::new(entries.join("\n"))
   };
 
   response.send(&core, &args.interaction).await

@@ -3,7 +3,7 @@ use crate::utils::Contextualize;
 use super::Cbor;
 
 use std::collections::{HashMap, HashSet};
-use serenity::model::id::{GuildId, UserId};
+use serenity::model::id::{EmojiId, GuildId, UserId};
 use singlefile::container_shared_async::ContainerAsyncWritableLocked;
 use tokio::sync::RwLock;
 
@@ -16,10 +16,10 @@ pub type PersistContainer = ContainerAsyncWritableLocked<Persist, Cbor>;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Persist {
-  build_id: u64,
-  guild_plugins: HashMap<GuildId, HashSet<String>>,
+  pub build_id: u64,
+  pub guild_plugins: HashMap<GuildId, HashSet<String>>,
   /// List of users who have been notified that chatbot messages from Melody are from CleverBot.
-  cleverbot_notified_users: HashSet<UserId>
+  pub cleverbot_notified_users: HashSet<UserId>
 }
 
 impl Persist {
@@ -108,7 +108,9 @@ pub type PersistGuildContainer = ContainerAsyncWritableLocked<PersistGuild, Cbor
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PersistGuild {
-  pub connect_four: crate::feature::connect_four::Manager
+  pub connect_four: crate::feature::connect_four::Manager,
+  /// List of emojis and the number of times they've been used in this server.
+  pub emoji_statistics: HashMap<EmojiId, usize>,
 }
 
 impl PersistGuild {
@@ -120,6 +122,24 @@ impl PersistGuild {
       .await.context(format!("failed to load data/guilds/{id}.bin"))?;
     trace!("Loaded data/guilds/{id}.bin");
     Ok(container)
+  }
+
+  pub fn increment_emoji_uses(&mut self, emoji: EmojiId) {
+    *self.emoji_statistics.entry(emoji).or_default() += 1;
+  }
+
+  pub fn decrement_emoji_uses(&mut self, emoji: EmojiId) {
+    if let Some(value) = self.emoji_statistics.get_mut(&emoji) {
+      *value = value.saturating_sub(1);
+    };
+  }
+
+  pub fn get_emoji_uses(&self) -> Vec<(EmojiId, usize)> {
+    let mut emoji_statistics = self.emoji_statistics.iter()
+      .filter_map(|(&id, &c)| (c > 0).then_some((id, c)))
+      .collect::<Vec<(EmojiId, usize)>>();
+    emoji_statistics.sort_unstable_by(|a, b| Ord::cmp(&a.1, &b.1).reverse());
+    emoji_statistics
   }
 }
 

@@ -14,7 +14,8 @@ use serenity::model::application::interaction::Interaction;
 use serenity::model::channel::Message;
 use serenity::client::{Context, Client, EventHandler};
 use serenity::client::bridge::gateway::ShardManager;
-use serenity::model::gateway::{Activity, GatewayIntents, Ready};
+use serenity::model::channel::{Reaction, ReactionType};
+use serenity::model::gateway::{Activity, ActivityType, Ready};
 use serenity::model::id::{GuildId, UserId};
 use serenity::utils::{content_safe, ContentSafeOptions};
 use tokio::sync::Mutex;
@@ -22,6 +23,7 @@ use tokio::sync::mpsc::UnboundedReceiver as MpscReceiver;
 use tokio::sync::oneshot::Receiver as OneshotReceiver;
 use tokio::time::MissedTickBehavior;
 
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -36,8 +38,11 @@ pub async fn launch(
   let persist = Persist::create().await?;
   let persist_guilds = PersistGuilds::create().await?;
 
-  let token = config.access().await.token.clone();
-  let mut client = Client::builder(&token, intents())
+  let (token, intents) = config.operate(|config| {
+    (config.token.clone(), config.intents)
+  }).await;
+
+  let mut client = Client::builder(&token, intents)
     .event_handler(Handler).await.context("failed to init client")?;
   let core = Core::from(&client);
 
@@ -121,13 +126,17 @@ impl EventHandler for Handler {
     let me = core.cache.current_user_id();
     if message.author.bot || message.author.id == me || message.content.is_empty() { return };
 
-    let ptr = core.get::<MessageChainsKey>().await;
-    let contribute = operate_lock(ptr, |message_chains| {
-      message_chains.should_contribute(&message)
-    }).await;
+    if let Some(guild_id) = message.guild_id {
+      let emojis = crate::utils::parse_emojis(&message.content);
+      core.operate_persist_guild_commit(guild_id, |persist_guild| {
+        for emoji in emojis {
+          persist_guild.increment_emoji_uses(emoji);
+        };
+        Ok(())
+      }).await.log();
+    };
 
-    if contribute {
-      info!("Contributing to message chain in channel ({})", message.channel_id);
+    if should_contribute_message_chain(&core, &message).await {
       message.channel_id.send_message(&core, |create| create.content(&message.content))
         .await.context_log("failed to send message");
     };
@@ -136,7 +145,6 @@ impl EventHandler for Handler {
       let options = ContentSafeOptions::new();
       let content = content_safe(&core, content, &options, &[]);
 
-      info!("Recieved message for cleverbot: {content:?}");
       match core.get::<CleverBotKey>().await.send(message.channel_id, &content).await {
         Ok(reply) => {
           info!("Recieved reply from cleverbot: {reply:?}");
@@ -151,19 +159,30 @@ impl EventHandler for Handler {
       };
     };
   }
-}
 
-#[inline]
-fn intents() -> GatewayIntents {
-  GatewayIntents::GUILDS |
-  GatewayIntents::GUILD_MEMBERS |
-  GatewayIntents::GUILD_BANS |
-  GatewayIntents::GUILD_EMOJIS_AND_STICKERS |
-  //GatewayIntents::GUILD_INTEGRATIONS |
-  //GatewayIntents::GUILD_PRESENCES |
-  GatewayIntents::GUILD_MESSAGES |
-  GatewayIntents::GUILD_MESSAGE_REACTIONS |
-  GatewayIntents::MESSAGE_CONTENT
+  async fn reaction_add(&self, ctx: Context, reaction: Reaction) {
+    let core = Core::from(ctx);
+
+    if let (Some(guild_id), ReactionType::Custom { id: emoji_id, .. }) = (reaction.guild_id, reaction.emoji) {
+      core.operate_persist_guild_commit(guild_id, |persist_guild| {
+        info!("Reaction added");
+        persist_guild.increment_emoji_uses(emoji_id);
+        Ok(())
+      }).await.log();
+    };
+  }
+
+  async fn reaction_remove(&self, ctx: Context, reaction: Reaction) {
+    let core = Core::from(ctx);
+
+    if let (Some(guild_id), ReactionType::Custom { id: emoji_id, .. }) = (reaction.guild_id, reaction.emoji) {
+      core.operate_persist_guild_commit(guild_id, |persist_guild| {
+        info!("Reaction removed");
+        persist_guild.decrement_emoji_uses(emoji_id);
+        Ok(())
+      }).await.log();
+    };
+  }
 }
 
 /// Gets the remaining content of a message if it either replies to the
@@ -173,6 +192,24 @@ fn get_message_replying_to(message: &Message, who: UserId) -> Option<&str> {
     Some(referenced_message) if referenced_message.author.id == who => Some(&message.content),
     Some(..) | None => crate::utils::strip_user_mention(&message.content, who)
   }
+}
+
+async fn should_contribute_message_chain(core: &Core, message: &Message) -> bool {
+  operate_lock(core.get::<MessageChainsKey>().await, |message_chains| {
+    message_chains.should_contribute(&message)
+  }).await
+}
+
+/// Gets a list of games people are playing in a given guild
+fn games(core: &Core, guild_id: GuildId) -> HashSet<String> {
+  core.cache.guild_field(guild_id, |guild| {
+    guild.presences.values()
+      .filter(|presence| presence.user.bot != Some(true))
+      .flat_map(|presence| presence.activities.iter())
+      .filter(|&activity| activity.kind == ActivityType::Playing)
+      .map(|activity| activity.name.clone())
+      .collect::<HashSet<String>>()
+  }).unwrap_or_default()
 }
 
 async fn termination_task(
@@ -197,10 +234,11 @@ async fn cycle_activity_task(core: Core) {
     |_| Activity::playing("Arma 4"),
     |_| Activity::playing("Farming Simulator 23"),
     |_| Activity::playing("League of Legends"),
+    |_| Activity::playing("Katawa Shoujou"),
     |_| {
       let mut rng = crate::utils::create_rng();
-      let number = ['1', '2', '3'].choose(&mut rng).unwrap();
-      let fraction = ['\u{00bc}', '\u{00bd}', '\u{00be}', '\u{215b}', '\u{215c}', '\u{215d}', '\u{215e}'].choose(&mut rng).unwrap();
+      let number = *['1', '2', '3'].choose(&mut rng).unwrap();
+      let fraction = *['\u{00bc}', '\u{00bd}', '\u{00be}', '\u{215b}', '\u{215c}', '\u{215d}', '\u{215e}'].choose(&mut rng).unwrap();
       Activity::playing(format!("Overwatch {number}{fraction}"))
     },
     |_| Activity::watching("you"),
@@ -214,7 +252,8 @@ async fn cycle_activity_task(core: Core) {
     |_| Activity::listening("the intrusive thoughts"),
     |_| Activity::listening("soft loli breathing 10 hours"),
     |_| Activity::competing("big balls competition"),
-    |_| Activity::competing("taco eating competition")
+    |_| Activity::competing("taco eating competition"),
+    |_| Activity::competing("shadow wizard money gang")
   ];
 
   let mut rng = crate::utils::create_rng();

@@ -2,12 +2,17 @@ use crate::{MelodyError, MelodyFileError, MelodyResult};
 
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
+use once_cell::sync::Lazy;
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
-use serenity::model::id::UserId;
+use regex::Regex;
+use serenity::model::id::{EmojiId, UserId};
 
+use std::collections::HashSet;
 use std::error::Error;
 use std::fmt;
+
+
 
 pub fn create_rng() -> SmallRng {
   SmallRng::from_rng(rand::thread_rng()).expect("failed to seed smallrng")
@@ -24,6 +29,14 @@ pub fn capitalize(s: impl AsRef<str>) -> String {
 
 pub fn kebab_case_to_words(s: impl AsRef<str>) -> String {
   s.as_ref().split("-").map(capitalize).join(" ")
+}
+
+pub fn parse_emojis(message: &str) -> HashSet<EmojiId> {
+  static RX: Lazy<Regex> = Lazy::new(|| Regex::new(r"<a?:[0-9a-zA-Z_]+:(\d+)>").unwrap());
+  RX.captures_iter(message)
+    .filter_map(|captures| captures.get(1).map(<&str>::from))
+    .filter_map(|id| id.parse::<u64>().ok().map(EmojiId))
+    .collect::<HashSet<EmojiId>>()
 }
 
 /// Takes message content and a user ID, returning the remainder of the message if the string

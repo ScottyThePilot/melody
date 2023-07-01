@@ -5,7 +5,7 @@ use crate::feature::connect_four::*;
 use crate::utils::{Contextualize, Timestamp, TimestampFormat};
 
 use serenity::model::user::User;
-use serenity::model::mention::Mention;
+use serenity::model::mention::Mentionable;
 
 
 
@@ -140,10 +140,8 @@ async fn connect_four_challenge(core: Core, args: BlueprintCommandArgs) -> Melod
     Ok(match persist_guild.connect_four.create_challenge(challenger, opponent.id) {
       true => {
         format!(
-          "{}, {} has challenged you to a game of connect-four\n\
-          Use `/connect-four accept` to accept this challenge",
-          Mention::User(opponent.id),
-          Mention::User(challenger)
+          "{}, {} has challenged you to a game of connect-four\nUse `/connect-four accept` to accept this challenge",
+          opponent.id.mention(), challenger.mention()
         )
       },
       false => "You cannot challenge that user at this time\n(Are you already playing a game?)".to_owned()
@@ -194,7 +192,7 @@ async fn connect_four_accept(core: Core, args: BlueprintCommandArgs) -> MelodyRe
         let board = game.print(print_piece);
         let player_key = "You are :blue_circle:, your opponent is :red_circle:";
 
-        format!("You have accepted {}'s challenge\nIt is your turn to play\n{player_key}\n\n{board}", Mention::User(player))
+        format!("You have accepted {}'s challenge\nIt is your turn to play\n{player_key}\n\n{board}", player.mention())
       },
       None => if persist_guild.connect_four.is_playing_user(player) {
         "You must finish your current game before starting a new one!".to_owned()
@@ -242,16 +240,16 @@ async fn connect_four_play(core: Core, args: BlueprintCommandArgs) -> MelodyResu
         UserGameResult::Victory(board) => {
           let board = board.print(print_piece);
           persist_guild.connect_four.end_user_game(player, opponent);
-          format!("{} has played the winning move against {}!\n\n{board}", Mention::User(player), Mention::User(opponent))
+          format!("{} has played the winning move against {}!\n\n{board}", player.mention(), opponent.mention())
         },
         UserGameResult::Continuing(board) => {
           let board = board.print(print_piece);
-          format!("It is {}'s turn to play\n\n{board}", Mention::User(opponent))
+          format!("It is {}'s turn to play\n\n{board}", opponent.mention())
         },
         UserGameResult::Draw(board) => {
           let board = board.print(print_piece);
           persist_guild.connect_four.end_user_game_draw((player, opponent));
-          format!("The game between {} and {} has ended in a draw\n\n{board}", Mention::User(player), Mention::User(opponent))
+          format!("The game between {} and {} has ended in a draw\n\n{board}", player.mention(), opponent.mention())
         },
         UserGameResult::NotYourTurn => "It is not your turn!".to_owned(),
         UserGameResult::IllegalMove => "That move is illegal".to_owned()
@@ -314,7 +312,7 @@ async fn connect_four_board(core: Core, args: BlueprintCommandArgs) -> MelodyRes
       Some(GameQuery::UserGame(game, _)) => {
         let board = game.print(print_piece);
         let current_turn_user = game.current_turn_user();
-        format!("This is your current game's board\nIt is {}'s turn to play\n\n{board}", Mention::User(current_turn_user))
+        format!("This is your current game's board\nIt is {}'s turn to play\n\n{board}", current_turn_user.mention())
       },
       Some(GameQuery::ComputerGame(game)) => {
         let board = game.print(print_piece);
@@ -337,7 +335,7 @@ async fn connect_four_resign(core: Core, args: BlueprintCommandArgs) -> MelodyRe
     Ok(match persist_guild.connect_four.resign_user_game(player) {
       Some(game) => {
         let &opponent = game.players().other(&player).unwrap();
-        format!("You have resigned your connect-four game with {}", Mention::User(opponent))
+        format!("You have resigned your connect-four game with {}", opponent.mention())
       },
       None => match persist_guild.connect_four.end_computer_game(player) {
         Some(..) => "You resigned your connect-four game with the computer player".to_owned(),
@@ -369,7 +367,7 @@ async fn connect_four_claim_win(core: Core, args: BlueprintCommandArgs) -> Melod
             if confirm {
               let board = game.print(print_piece);
               persist_guild.connect_four.end_user_game(player, opponent);
-              format!("{} has claimed a win against {}\n\n{board}", Mention::User(player), Mention::User(opponent))
+              format!("{} has claimed a win against {}\n\n{board}", player.mention(), opponent.mention())
             } else {
               format!("You can claim a win\nYour opponent's turn started {timestamp}\nYou can skip with `/connect-four claim-win true`")
             }
