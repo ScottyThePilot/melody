@@ -232,7 +232,7 @@ pub const EMOJI_STATS: BlueprintCommand = blueprint_command! {
   arguments: [
     blueprint_argument!(Integer {
       name: "page",
-      description: "The page of results to display (results are grouped 16 at a time)",
+      description: "The page of results to display (results are grouped 10 at a time)",
       min_value: 1
     })
   ],
@@ -241,7 +241,7 @@ pub const EMOJI_STATS: BlueprintCommand = blueprint_command! {
 
 #[command_attr::hook]
 async fn emoji_stats(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  const PER_PAGE: u64 = 24;
+  const PER_PAGE: u64 = 10;
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let page = resolve_arguments::<Option<u64>>(args.option_values)?.unwrap_or(1) - 1;
 

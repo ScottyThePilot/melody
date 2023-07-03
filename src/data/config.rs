@@ -14,11 +14,16 @@ pub type ConfigContainer = ContainerAsyncReadonly<Config, Toml>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Config {
+  /// Bot token (required)
   pub token: String,
+  /// Bot owner's Discord user ID (required)
   pub owner_id: UserId,
+  /// Accent color shown in help command embeds (optional)
   #[serde(default)]
   pub accent_color: Option<Color>,
-  // defaults to `GatewayIntents::non_privileged`
+  /// The list of gateway intents the bot should send to the Discord API.
+  /// This can either be a list of intent names, or a number representing an intents bitfield.
+  /// Defaults to [`GatewayIntents::non_privileged`].
   #[serde(default, deserialize_with = "deserialize_intents")]
   pub intents: GatewayIntents
 }

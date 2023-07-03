@@ -165,7 +165,6 @@ impl EventHandler for Handler {
 
     if let (Some(guild_id), ReactionType::Custom { id: emoji_id, .. }) = (reaction.guild_id, reaction.emoji) {
       core.operate_persist_guild_commit(guild_id, |persist_guild| {
-        info!("Reaction added");
         persist_guild.increment_emoji_uses(emoji_id);
         Ok(())
       }).await.log();
@@ -177,7 +176,6 @@ impl EventHandler for Handler {
 
     if let (Some(guild_id), ReactionType::Custom { id: emoji_id, .. }) = (reaction.guild_id, reaction.emoji) {
       core.operate_persist_guild_commit(guild_id, |persist_guild| {
-        info!("Reaction removed");
         persist_guild.decrement_emoji_uses(emoji_id);
         Ok(())
       }).await.log();
@@ -204,12 +202,20 @@ async fn should_contribute_message_chain(core: &Core, message: &Message) -> bool
 fn games(core: &Core, guild_id: GuildId) -> HashSet<String> {
   core.cache.guild_field(guild_id, |guild| {
     guild.presences.values()
-      .filter(|presence| presence.user.bot != Some(true))
+      .filter(|&presence| presence.user.bot != Some(true))
       .flat_map(|presence| presence.activities.iter())
       .filter(|&activity| activity.kind == ActivityType::Playing)
       .map(|activity| activity.name.clone())
       .collect::<HashSet<String>>()
   }).unwrap_or_default()
+}
+
+fn random_game(core: &Core) -> Option<String> {
+  let mut rng = crate::utils::create_rng();
+  let games = core.cache.guilds().into_iter()
+    .flat_map(|guild_id| games(core, guild_id))
+    .collect::<Vec<String>>();
+  games.choose(&mut rng).cloned()
 }
 
 async fn termination_task(
@@ -224,30 +230,51 @@ async fn termination_task(
 }
 
 async fn cycle_activity_task(core: Core) {
+  const NUMBERS: &[char] = &['1', '2', '3'];
+  const FRACTIONS: &[char] = &[
+    '\u{00bd}', '\u{00bc}', '\u{00be}',
+    '\u{215b}', '\u{215c}', '\u{215d}', '\u{215e}'
+  ];
+
   const ACTIVITY_CYCLE_TIME: Duration = Duration::from_secs(120);
   const ACTIVITIES: &[fn(&Core) -> Activity] = &[
     |_| Activity::playing("Minecraft 2"),
     |_| Activity::playing("Portal 3"),
     |_| Activity::playing("Pokemon\u{2122} Gun"),
+    |_| Activity::playing("ULTRAKILL"),
+    |_| Activity::playing("Genshin Impact"),
+    |_| Activity::playing("Tower of Fantasy"),
     |_| Activity::playing("Artifact"),
     |_| Activity::playing("Group Fortification: The Sequel"),
+    |_| Activity::playing("Band Bastion: The Second Coming"),
+    |_| Activity::playing("Fortress II (With Team)"),
+    |_| Activity::playing("Gang Garrison: Second Edition"),
+    |_| Activity::playing("Club Citadel II"),
+    |_| Activity::playing("Squad Castle Defense 2"),
+    |_| Activity::playing("Blazing Badge: Four Houses"),
     |_| Activity::playing("Arma 4"),
-    |_| Activity::playing("Farming Simulator 23"),
+    |_| Activity::playing("Farming Simulator 24"),
     |_| Activity::playing("League of Legends"),
+    |_| Activity::playing("DOTA 2"),
     |_| Activity::playing("Katawa Shoujou"),
     |_| {
       let mut rng = crate::utils::create_rng();
-      let number = *['1', '2', '3'].choose(&mut rng).unwrap();
-      let fraction = *['\u{00bc}', '\u{00bd}', '\u{00be}', '\u{215b}', '\u{215c}', '\u{215d}', '\u{215e}'].choose(&mut rng).unwrap();
+      let number = *NUMBERS.choose(&mut rng).unwrap();
+      let fraction = *FRACTIONS.choose(&mut rng).unwrap();
       Activity::playing(format!("Overwatch {number}{fraction}"))
     },
     |_| Activity::watching("you"),
+    |core| match random_game(core) {
+      Some(game) => Activity::watching(format!("you play {game}")),
+      None => Activity::watching("nobody :(")
+    },
     |core| Activity::watching(format!("{} guilds", core.cache.guild_count())),
     |core| Activity::watching(format!("{} users", core.cache.user_count())),
     |_| Activity::watching("Bocchi the Rock!"),
     |_| Activity::watching("Lucky\u{2606}Star"),
     |_| Activity::watching("Chainsaw Man"),
     |_| Activity::watching("Made In Abyss"),
+    |_| Activity::watching("the fog approach"),
     |_| Activity::listening("the screams"),
     |_| Activity::listening("the intrusive thoughts"),
     |_| Activity::listening("soft loli breathing 10 hours"),
