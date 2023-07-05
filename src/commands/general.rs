@@ -256,7 +256,7 @@ async fn emoji_stats(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
     .enumerate().skip(page_start).take(PER_PAGE as usize)
     .map(|(i, (emoji, animated, count))| {
       let emoji_mention = (emoji, animated).mention();
-      format!("`#{}` {emoji_mention} ({count} times)", i + page_start + 1)
+      format!("`#{}` {emoji_mention} ({count} times)", i + 1)
     })
     .collect::<Vec<String>>();
   let response = match entries.is_empty() {
