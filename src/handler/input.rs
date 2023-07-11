@@ -1,7 +1,8 @@
 use crate::MelodyResult;
 use crate::data::Core;
-use crate::utils::{Loggable, List};
+use crate::utils::Loggable;
 
+use itertools::Itertools;
 use serenity::model::id::GuildId;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::UnboundedReceiver as MpscReceiver;
@@ -80,7 +81,7 @@ impl InputAgent {
         },
         InputCommand::PluginList(guild_id) => {
           let plugins = self.plugin_list(guild_id).await;
-          info!("Plugins for guild ({guild_id}): {}", List(&plugins));
+          info!("Plugins for guild ({guild_id}): {}", plugins.iter().join(", "));
         },
         InputCommand::PluginEnable(plugin, guild_id) => {
           self.plugin_enable(plugin, guild_id).await?;

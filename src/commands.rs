@@ -25,6 +25,7 @@ pub const APPLICATION_COMMANDS: &[BlueprintCommand] = &[
   self::general::AVATAR,
   self::general::BANNER,
   self::general::EMOJI_STATS,
+  self::general::JOIN_ROLES,
   self::connect_four::CONNECT_FOUR,
   self::role_playing::ROLL
 ];

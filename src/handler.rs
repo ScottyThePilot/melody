@@ -1,7 +1,7 @@
 //! Items and functions associated with launching the bot and handling discord events
 mod input;
 
-use crate::MelodyResult;
+use crate::{MelodyResult, MelodyError};
 use crate::commands::APPLICATION_COMMANDS;
 use crate::data::*;
 use crate::feature::cleverbot::CleverBotManager;
@@ -16,7 +16,8 @@ use serenity::client::{Context, Client, EventHandler};
 use serenity::client::bridge::gateway::ShardManager;
 use serenity::model::channel::{Reaction, ReactionType};
 use serenity::model::gateway::{Activity, ActivityType, Ready};
-use serenity::model::id::{GuildId, UserId};
+use serenity::model::guild::Member;
+use serenity::model::id::{GuildId, UserId, RoleId};
 use serenity::utils::{content_safe, ContentSafeOptions};
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::UnboundedReceiver as MpscReceiver;
@@ -160,6 +161,11 @@ impl EventHandler for Handler {
     };
   }
 
+  async fn guild_member_addition(&self, ctx: Context, mut member: Member) {
+    let core = Core::from(ctx);
+    add_join_roles(&core, &mut member).await.log();
+  }
+
   async fn reaction_add(&self, ctx: Context, reaction: Reaction) {
     let core = Core::from(ctx);
 
@@ -190,6 +196,35 @@ fn get_message_replying_to(message: &Message, who: UserId) -> Option<&str> {
     Some(referenced_message) if referenced_message.author.id == who => Some(&message.content),
     Some(..) | None => crate::utils::strip_user_mention(&message.content, who)
   }
+}
+
+async fn add_join_roles(core: &Core, member: &mut Member) -> MelodyResult {
+  let (roles, missing_roles) = core.operate_persist_guild(member.guild_id, |persist_guild| {
+    core.cache.guild_field(member.guild_id, |guild| {
+      persist_guild.join_roles.iter()
+        .filter_map(|(&role_id, &filter)| filter.applies(member.user.bot).then_some(role_id))
+        .partition::<Vec<RoleId>, _>(|role_id| guild.roles.contains_key(&role_id))
+    }).ok_or(MelodyError::command_cache_failure("guild"))
+  }).await?;
+
+  if !roles.is_empty() {
+    for role_id in member.add_roles(core, &roles).await.context("failed to grant user join roles")? {
+      info!("granted join role ({}) to user {} ({})", member.user.name, member.user.id, role_id);
+    };
+  };
+
+  if !missing_roles.is_empty() {
+    core.operate_persist_guild_commit(member.guild_id, |persist_guild| {
+      for role_id in missing_roles {
+        persist_guild.join_roles.remove(&role_id);
+        warn!("removed non-existent role ({}) for guild ({})", role_id, member.guild_id);
+      };
+
+      Ok(())
+    }).await?;
+  };
+
+  Ok(())
 }
 
 async fn should_contribute_message_chain(core: &Core, message: &Message) -> bool {

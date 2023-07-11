@@ -106,14 +106,6 @@ impl CleverBotData {
     now.signed_duration_since(self.last_update).num_milliseconds() > self.max_age
   }
 
-  async fn ensure_valid(&mut self, client: &Client, now: DateTime<Utc>) -> Result<(), Error> {
-    if self.is_expired(now) {
-      Self::request(client, now).await.map(|agent| *self = agent)
-    } else {
-      Ok(())
-    }
-  }
-
   async fn request(client: &Client, now: DateTime<Utc>) -> Result<Self, Error> {
     let date = now.format("%Y%m%d");
     let url = format!("https://www.cleverbot.com/extras/conversation-social-min.js?{date}");

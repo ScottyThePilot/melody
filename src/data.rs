@@ -11,6 +11,7 @@ use serenity::client::{Client, Context};
 use serenity::client::bridge::gateway::{ShardManager, ShardId, ShardRunnerInfo};
 use serenity::model::id::GuildId;
 use serenity::model::gateway::Activity;
+use serenity::model::guild::Member;
 use serenity::cache::Cache;
 use serenity::http::{CacheHttp, Http};
 use serenity::prelude::{TypeMap, TypeMapKey};
@@ -238,6 +239,11 @@ impl Core {
 
   pub async fn is_new_build(&self) -> bool {
     self.get::<PreviousBuildIdKey>().await != crate::BUILD_ID
+  }
+
+  pub async fn current_member(&self, guild_id: GuildId) -> MelodyResult<Member> {
+    guild_id.member(self, self.cache.current_user_id())
+      .await.context(format!("failed to locate member for current user in guild ({guild_id})"))
   }
 
   /// Aborts all tasks that this core might be responsible for

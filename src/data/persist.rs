@@ -2,13 +2,13 @@ use crate::MelodyResult;
 use crate::utils::Contextualize;
 use super::Cbor;
 
-use std::collections::{HashMap, HashSet};
 use serenity::model::guild::Emoji;
-use serenity::model::id::{EmojiId, GuildId, UserId};
+use serenity::model::id::{EmojiId, GuildId, UserId, RoleId};
 use singlefile::container_shared_async::ContainerAsyncWritableLocked;
 use tokio::sync::RwLock;
 
-use std::collections::hash_map::Entry;
+use std::collections::BTreeMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -91,6 +91,7 @@ impl PersistGuilds {
   }
 
   pub async fn get_default(wrapper: PersistGuildsWrapper, id: GuildId) -> MelodyResult<PersistGuildContainer> {
+    use std::collections::hash_map::Entry;
     match wrapper.write().await.guilds.entry(id) {
       Entry::Occupied(occupied) => Ok(occupied.get().clone()),
       Entry::Vacant(vacant) => Ok(vacant.insert(PersistGuild::create(id).await?).clone())
@@ -112,6 +113,7 @@ pub struct PersistGuild {
   pub connect_four: crate::feature::connect_four::Manager,
   /// List of emojis and the number of times they've been used in this server.
   pub emoji_statistics: HashMap<EmojiId, usize>,
+  pub join_roles: BTreeMap<RoleId, JoinRoleFilter>
 }
 
 impl PersistGuild {
@@ -148,4 +150,36 @@ impl PersistGuild {
 
 fn parse_file_name(path: &std::ffi::OsStr) -> Option<u64> {
   path.to_str().and_then(|path| path.strip_suffix(".bin")?.parse().ok())
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum JoinRoleFilter {
+  All, Bots, Humans
+}
+
+impl JoinRoleFilter {
+  pub fn applies(self, is_bot: bool) -> bool {
+    match self {
+      Self::All => true,
+      Self::Bots => is_bot,
+      Self::Humans => !is_bot
+    }
+  }
+
+  pub fn from_str(s: &str) -> Option<Self> {
+    match s {
+      "all" => Some(Self::All),
+      "bots" => Some(Self::Bots),
+      "humans" => Some(Self::Humans),
+      _ => None
+    }
+  }
+
+  pub fn into_str(self) -> &'static str {
+    match self {
+      Self::All => "all",
+      Self::Bots => "bots",
+      Self::Humans => "humans"
+    }
+  }
 }
