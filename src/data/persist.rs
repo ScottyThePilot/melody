@@ -1,4 +1,5 @@
 use crate::MelodyResult;
+use crate::feature::feed::{Feed, FeedState};
 use crate::utils::Contextualize;
 use super::Cbor;
 
@@ -20,7 +21,9 @@ pub struct Persist {
   pub build_id: u64,
   pub guild_plugins: HashMap<GuildId, HashSet<String>>,
   /// List of users who have been notified that chatbot messages from Melody are from CleverBot.
-  pub cleverbot_notified_users: HashSet<UserId>
+  pub cleverbot_notified_users: HashSet<UserId>,
+  /// List of RSS feeds and their current state.
+  pub feeds: HashMap<Feed, FeedState>
 }
 
 impl Persist {
@@ -56,7 +59,8 @@ impl Default for Persist {
     Persist {
       build_id: 0,
       guild_plugins: HashMap::new(),
-      cleverbot_notified_users: HashSet::new()
+      cleverbot_notified_users: HashSet::new(),
+      feeds: HashMap::new()
     }
   }
 }
@@ -152,6 +156,7 @@ fn parse_file_name(path: &std::ffi::OsStr) -> Option<u64> {
   path.to_str().and_then(|path| path.strip_suffix(".bin")?.parse().ok())
 }
 
+#[repr(u8)]
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum JoinRoleFilter {
   All, Bots, Humans

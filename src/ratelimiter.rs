@@ -68,6 +68,9 @@ pub struct TimeSlice<'t, T> {
 }
 
 impl<'t, T> TimeSlice<'t, T> {
+  /// Discards this time-slice.
+  pub fn consume(self) {}
+
   /// Discards this time-slice without invoking a delay on the next request.
   pub fn cancel(mut self) {
     self.delay = Duration::ZERO;

@@ -19,7 +19,7 @@ const DELAY: Duration = Duration::from_secs(3);
 pub type CleverBotWrapper = RateLimiter<CleverBotManager>;
 
 impl CleverBotWrapper {
-  pub async fn send(&mut self, channel: ChannelId, message: &str) -> Result<String, CleverBotError> {
+  pub async fn send(&self, channel: ChannelId, message: &str) -> Result<String, CleverBotError> {
     self.get().await.send(channel, message).await
   }
 }
@@ -30,6 +30,7 @@ impl From<CleverBotManager> for CleverBotWrapper {
   }
 }
 
+#[derive(Debug)]
 pub struct CleverBotManager {
   agent: CleverBotAgent,
   channels: HashMap<ChannelId, CleverBotContext>

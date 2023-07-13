@@ -264,8 +264,8 @@ pub const JOIN_ROLES: BlueprintCommand = blueprint_command! {
   name: "join-roles",
   description: "Allows roles to be given to users or bots upon joining",
   usage: [
-    "/join-roles add <role> ['all'|'bots'|'humans']",
-    "/join-roles remove <role> ['all'|'bots'|'humans']",
+    "/join-roles add <role> [all|bots|humans]",
+    "/join-roles remove <role> [all|bots|humans]",
     "/join-roles list"
   ],
   examples: [
@@ -286,15 +286,7 @@ pub const JOIN_ROLES: BlueprintCommand = blueprint_command! {
           description: "The role to be added",
           required: true
         }),
-        blueprint_argument!(String {
-          name: "filter",
-          description: "What types of accounts this role should be applied to (defaults to 'all')",
-          choices: [
-            ("all", "all"),
-            ("bots", "bots"),
-            ("humans", "humans")
-          ]
-        })
+        FILTER_ARGUMENT
       ],
       function: join_roles_add
     },
@@ -307,15 +299,7 @@ pub const JOIN_ROLES: BlueprintCommand = blueprint_command! {
           description: "The role to be removed",
           required: true
         }),
-        blueprint_argument!(String {
-          name: "filter",
-          description: "What types of accounts this role should be applied to (defaults to 'all')",
-          choices: [
-            ("all", "all"),
-            ("bots", "bots"),
-            ("humans", "humans")
-          ]
-        })
+        FILTER_ARGUMENT
       ],
       function: join_roles_remove
     },
@@ -417,3 +401,13 @@ fn stringify_join_roles(join_roles: &BTreeMap<RoleId, JoinRoleFilter>, guild: &G
     })
     .join("\n")
 }
+
+const FILTER_ARGUMENT: BlueprintOption = blueprint_argument!(String {
+  name: "filter",
+  description: "What types of accounts this role should be applied to (defaults to 'all')",
+  choices: [
+    ("all", "all"),
+    ("bots", "bots"),
+    ("humans", "humans")
+  ]
+});

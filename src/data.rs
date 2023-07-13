@@ -3,6 +3,7 @@ mod config;
 mod persist;
 
 use crate::MelodyResult;
+use crate::ratelimiter::RateLimiter;
 use crate::utils::Contextualize;
 pub use self::config::*;
 pub use self::persist::*;
@@ -123,6 +124,7 @@ key!(pub struct PersistKey, PersistContainer);
 key!(pub struct PersistGuildsKey, PersistGuildsWrapper);
 key!(pub struct ShardManagerKey, Arc<Mutex<ShardManager>>);
 key!(pub struct CleverBotKey, crate::feature::cleverbot::CleverBotWrapper);
+key!(pub struct FeedKey, crate::feature::feed::FeedWrapper);
 key!(pub struct MessageChainsKey, crate::feature::message_chains::MessageChainsWrapper);
 key!(pub struct TasksKey, TasksWrapper);
 key!(pub struct PreviousBuildIdKey, u64);
@@ -138,22 +140,18 @@ macro_rules! for_each_some {
 
 pub type TasksWrapper = Arc<Mutex<Tasks>>;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Tasks {
-  pub cycle_activities: Option<JoinHandle<()>>
+  pub cycle_activities: Option<JoinHandle<()>>,
+  pub respawn_feed_tasks: Option<JoinHandle<()>>
 }
 
 impl Tasks {
   pub fn abort(&self) {
-    for_each_some!([&self.cycle_activities], task => task.abort());
-  }
-}
-
-impl Default for Tasks {
-  fn default() -> Self {
-    Tasks {
-      cycle_activities: None
-    }
+    for_each_some!([
+      &self.cycle_activities,
+      &self.respawn_feed_tasks
+    ], task => task.abort());
   }
 }
 
@@ -193,7 +191,10 @@ impl Core {
   #[inline]
   pub async fn get<K>(&self) -> K::Value
   where K: TypeMapKey, K::Value: Clone {
-    self.get_checked::<K>().await.expect("failed to get value from typemap")
+    match self.get_checked::<K>().await {
+      Some(value) => value,
+      None => panic!("failed to get value from typemap with key {}", std::any::type_name::<K>())
+    }
   }
 
   #[inline]
@@ -250,6 +251,9 @@ impl Core {
   pub async fn abort(&self) {
     if let Some(tasks) = self.get_checked::<TasksKey>().await {
       tasks.lock().await.abort();
+    };
+    if let Some(feed_wrapper) = self.get_checked::<FeedKey>().await {
+      feed_wrapper.lock().await.abort_all();
     };
   }
 }
@@ -382,4 +386,11 @@ pub async fn operate_write<T, F, R>(container: Arc<RwLock<T>>, operation: F) -> 
 where F: FnOnce(&mut T) -> R {
   let mut guard = container.write().await;
   operation(&mut *guard)
+}
+
+#[allow(dead_code)]
+pub async fn operate_ratelimiter<T, F, R>(container: RateLimiter<T>, operation: F) -> R
+where F: FnOnce(&mut T) -> R {
+  let mut timeslice = container.get().await;
+  operation(&mut *timeslice)
 }

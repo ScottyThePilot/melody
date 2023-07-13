@@ -5,11 +5,16 @@ use crate::{MelodyResult, MelodyError};
 use crate::commands::APPLICATION_COMMANDS;
 use crate::data::*;
 use crate::feature::cleverbot::CleverBotManager;
+use crate::feature::feed::{Feed, FeedManager};
 use crate::feature::message_chains::MessageChains;
+use crate::feature::feed::FeedEventHandler;
 use crate::terminal::Flag;
 use crate::utils::{Contextualize, Loggable};
 
 use rand::seq::SliceRandom;
+use rss_feed::{TwitterPost, YouTubeVideo};
+use rss_feed::url::Url;
+use rss_feed::reqwest::Client as ReqwestClient;
 use serenity::model::application::interaction::Interaction;
 use serenity::model::channel::Message;
 use serenity::client::{Context, Client, EventHandler};
@@ -17,7 +22,7 @@ use serenity::client::bridge::gateway::ShardManager;
 use serenity::model::channel::{Reaction, ReactionType};
 use serenity::model::gateway::{Activity, ActivityType, Ready};
 use serenity::model::guild::Member;
-use serenity::model::id::{GuildId, UserId, RoleId};
+use serenity::model::id::{ChannelId, GuildId, UserId, RoleId};
 use serenity::utils::{content_safe, ContentSafeOptions};
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::UnboundedReceiver as MpscReceiver;
@@ -40,6 +45,8 @@ pub async fn launch(
   let persist_guilds = PersistGuilds::create().await?;
 
   let (token, intents) = config.operate(|config| {
+    info!("YouTube RSS feeds are {}", if config.rss.youtube.is_some() { "enabled" } else { "disabled" });
+    info!("Twitter RSS feeds are {}", if config.rss.twitter.is_some() { "enabled" } else { "disabled" });
     (config.token.clone(), config.intents)
   }).await;
 
@@ -57,6 +64,7 @@ pub async fn launch(
     data.insert::<PersistGuildsKey>(persist_guilds.into());
     data.insert::<CleverBotKey>(CleverBotManager::new().into());
     data.insert::<MessageChainsKey>(MessageChains::new().into());
+    data.insert::<FeedKey>(Arc::new(Mutex::new(FeedManager::new(ReqwestClient::new(), FeedHandler))));
     data.insert::<ShardManagerKey>(client.shard_manager.clone());
     data.insert::<PreviousBuildIdKey>(previous_build_id);
     data.insert::<RestartKey>(false);
@@ -88,8 +96,19 @@ struct Handler;
 
 #[serenity::async_trait]
 impl EventHandler for Handler {
-  async fn ready(&self, _ctx: Context, ready_info: Ready) {
+  async fn ready(&self, ctx: Context, ready_info: Ready) {
+    let core = Core::from(ctx);
+
     info!("Bot connected: {} ({})", ready_info.user.tag(), ready_info.user.id);
+
+    // Attempt to register all subscribed RSS feeds
+    let feed_wrapper = core.get::<FeedKey>().await;
+    let feeds = core.operate_persist(|persist| {
+      persist.feeds.keys().cloned().collect::<Vec<Feed>>()
+    }).await;
+    for feed in feeds {
+      feed_wrapper.lock().await.register(&core, feed).await;
+    };
   }
 
   async fn cache_ready(&self, ctx: Context, guilds: Vec<GuildId>) {
@@ -99,6 +118,11 @@ impl EventHandler for Handler {
       // Spawn the task for cycling activity status unless it's already been spawned
       tasks.cycle_activities.get_or_insert_with(|| {
         tokio::spawn(cycle_activity_task(core.clone()))
+      });
+
+      // Spawn the task for respawning the feed manager's tasks
+      tasks.respawn_feed_tasks.get_or_insert_with(|| {
+        tokio::spawn(respawn_feed_tasks_task(core.clone()))
       });
     }).await;
 
@@ -189,6 +213,54 @@ impl EventHandler for Handler {
   }
 }
 
+const FEED_POST_DELAY: Duration = Duration::from_secs(3);
+
+#[derive(Debug)]
+struct FeedHandler;
+
+#[serenity::async_trait]
+impl FeedEventHandler for FeedHandler {
+  async fn feed_youtube_video(&self, core: Core, channel: &str, video: YouTubeVideo) {
+    let feed = Feed::YouTube { channel: channel.to_owned() };
+    let delivery_channels = core.operate_persist(|persist| {
+      persist.feeds.get(&feed).map_or_else(Vec::new, |feed_state| {
+        feed_state.guilds.values().copied().collect::<Vec<ChannelId>>()
+      })
+    }).await;
+
+    let link = core.operate_config(|config| match config.rss.youtube.as_deref() {
+      Some(config) => with_domain(&video.link, &config.display_domain),
+      None => video.link.clone()
+    }).await;
+
+    for channel in delivery_channels {
+      channel.send_message(&core, |create| create.content(link.as_str()))
+        .await.context_log("failed to send youtube video message");
+      tokio::time::sleep(FEED_POST_DELAY).await;
+    };
+  }
+
+  async fn feed_twitter_post(&self, core: Core, handle: &str, post: TwitterPost) {
+    let feed = Feed::Twitter { handle: handle.to_owned() };
+    let delivery_channels = core.operate_persist(|persist| {
+      persist.feeds.get(&feed).map_or_else(Vec::new, |feed_state| {
+        feed_state.guilds.values().copied().collect::<Vec<ChannelId>>()
+      })
+    }).await;
+
+    let link = core.operate_config(|config| match config.rss.twitter.as_deref() {
+      Some(config) => with_domain(&post.link, &config.display_domain),
+      None => post.link.clone()
+    }).await;
+
+    for channel in delivery_channels {
+      channel.send_message(&core, |create| create.content(link.as_str()))
+        .await.context_log("failed to send twitter post message");
+      tokio::time::sleep(FEED_POST_DELAY).await;
+    };
+  }
+}
+
 /// Gets the remaining content of a message if it either replies to the
 /// given user, or begins with a mention of the given user.
 fn get_message_replying_to(message: &Message, who: UserId) -> Option<&str> {
@@ -209,7 +281,7 @@ async fn add_join_roles(core: &Core, member: &mut Member) -> MelodyResult {
 
   if !roles.is_empty() {
     for role_id in member.add_roles(core, &roles).await.context("failed to grant user join roles")? {
-      info!("granted join role ({}) to user {} ({})", member.user.name, member.user.id, role_id);
+      info!("Granted join role ({}) to user {} ({})", member.user.name, member.user.id, role_id);
     };
   };
 
@@ -217,7 +289,7 @@ async fn add_join_roles(core: &Core, member: &mut Member) -> MelodyResult {
     core.operate_persist_guild_commit(member.guild_id, |persist_guild| {
       for role_id in missing_roles {
         persist_guild.join_roles.remove(&role_id);
-        warn!("removed non-existent role ({}) for guild ({})", role_id, member.guild_id);
+        warn!("Removed non-existent role ({}) for guild ({})", role_id, member.guild_id);
       };
 
       Ok(())
@@ -228,9 +300,13 @@ async fn add_join_roles(core: &Core, member: &mut Member) -> MelodyResult {
 }
 
 async fn should_contribute_message_chain(core: &Core, message: &Message) -> bool {
-  operate_lock(core.get::<MessageChainsKey>().await, |message_chains| {
-    message_chains.should_contribute(&message)
-  }).await
+  operate!(core, operate_lock::<MessageChainsKey>, |message_chains| message_chains.should_contribute(&message))
+}
+
+fn with_domain(url: &Url, domain: &str) -> Url {
+  let mut url = url.clone();
+  std::mem::drop(url.set_host(Some(domain)));
+  url
 }
 
 /// Gets a list of games people are playing in a given guild
@@ -264,6 +340,22 @@ async fn termination_task(
   shard_manager.lock().await.shutdown_all().await;
 }
 
+// Yes, a tasks-task, what a mouthfull
+async fn respawn_feed_tasks_task(core: Core) {
+  const RESPAWN_INTERVAL: Duration = Duration::from_secs(21600); // 6 hours
+
+  let mut interval = tokio::time::interval(RESPAWN_INTERVAL);
+  interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+  interval.tick().await;
+
+  loop {
+    interval.tick().await;
+    info!("Respawning feed tasks");
+    let feed_wrapper = core.get::<FeedKey>().await;
+    feed_wrapper.lock().await.respawn_all(&core).await;
+  };
+}
+
 async fn cycle_activity_task(core: Core) {
   const NUMBERS: &[char] = &['1', '2', '3'];
   const FRACTIONS: &[char] = &[
@@ -293,7 +385,7 @@ async fn cycle_activity_task(core: Core) {
     |_| Activity::playing("DOTA 2"),
     |_| Activity::playing("Katawa Shoujou"),
     |_| {
-      let mut rng = crate::utils::create_rng();
+      let mut rng = rand::thread_rng();
       let number = *NUMBERS.choose(&mut rng).unwrap();
       let fraction = *FRACTIONS.choose(&mut rng).unwrap();
       Activity::playing(format!("Overwatch {number}{fraction}"))

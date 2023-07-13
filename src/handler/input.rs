@@ -28,7 +28,9 @@ enum InputCommand<'a> {
   Restart,
   PluginList(GuildId),
   PluginEnable(&'a str, GuildId),
-  PluginDisable(&'a str, GuildId)
+  PluginDisable(&'a str, GuildId),
+  FeedRespawnAll,
+  FeedListTasks
 }
 
 #[derive(Debug, Clone)]
@@ -62,6 +64,11 @@ impl InputAgent {
         },
         unknown => Err(InputError::UnknownCommand(unknown))
       },
+      "feed" | "feeds" => match next(&mut args)? {
+        "respawn-all" => Ok(InputCommand::FeedRespawnAll),
+        "list-tasks" => Ok(InputCommand::FeedListTasks),
+        unknown => Err(InputError::UnknownCommand(unknown))
+      },
       unknown => Err(InputError::UnknownCommand(unknown))
     }
   }
@@ -90,6 +97,16 @@ impl InputAgent {
         InputCommand::PluginDisable(plugin, guild_id) => {
           self.plugin_disable(plugin, guild_id).await?;
           info!("Disabled plugin {plugin} for guild ({guild_id})");
+        },
+        InputCommand::FeedRespawnAll => {
+          let feed_wrapper = self.core.get::<crate::data::FeedKey>().await;
+          feed_wrapper.lock().await.respawn_all(&self.core).await;
+        },
+        InputCommand::FeedListTasks => {
+          let feed_wrapper = self.core.get::<crate::data::FeedKey>().await;
+          for (feed, running) in feed_wrapper.lock().await.tasks() {
+            debug!("Feed task: {feed} ({})", if running { "running" } else { "stopped" });
+          };
         }
       }
     };

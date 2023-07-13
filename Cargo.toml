@@ -19,7 +19,8 @@ log = { version = "0.4" }
 once_cell = { version = "1.18" }
 rand = { version = "0.8", features = ["small_rng"] }
 regex = { version = "1.8.4" }
-serde = { version = "1.0", features = ["derive"] }
+rss-feed = { path = "./libs/rss-feed" }
+serde = { version = "1.0", features = ["derive", "rc"] }
 serde_cbor = { version = "0.11.2" }
 singlefile = { version = "0.1.0", features = ["shared-async"] }
 thiserror = { version = "1.0" }
@@ -48,5 +49,6 @@ features = ["serde"]
 [workspace]
 members = [
   "libs/cacheable",
-  "libs/cleverbot"
+  "libs/cleverbot",
+  "libs/rss-feed"
 ]

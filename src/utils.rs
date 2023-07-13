@@ -8,6 +8,7 @@ use rand::rngs::SmallRng;
 use regex::Regex;
 use serenity::model::id::{EmojiId, UserId};
 
+use std::hash::Hasher;
 use std::collections::HashSet;
 use std::error::Error;
 use std::fmt;
@@ -49,11 +50,19 @@ pub fn strip_user_mention(msg: &str, user_id: UserId) -> Option<&str> {
   Some(msg)
 }
 
+pub fn hash_str_ignore_ascii_case<H: Hasher>(string: &str, state: &mut H) {
+  state.write_usize(string.len());
+  for &byte in string.as_bytes() {
+    state.write_u8(byte.to_ascii_lowercase());
+  };
+  state.write_u8(0x00);
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Blockify<S>(pub S);
 
 impl<S: fmt::Display> Blockify<S> {
-  pub fn new(s: S) -> Self {
+  pub const fn new(s: S) -> Self {
     Blockify(s)
   }
 }
@@ -68,7 +77,7 @@ impl<S: fmt::Display> fmt::Display for Blockify<S> {
 pub struct Timestamp(pub DateTime<Utc>, pub TimestampFormat);
 
 impl Timestamp {
-  pub fn new(timestamp: DateTime<Utc>, format: TimestampFormat) -> Self {
+  pub const fn new(timestamp: DateTime<Utc>, format: TimestampFormat) -> Self {
     Timestamp(timestamp, format)
   }
 }
@@ -82,12 +91,19 @@ impl fmt::Display for Timestamp {
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 pub enum TimestampFormat {
+  /// `8:17 PM`
   ShortTime,
+  /// `8:17:00 PM`
   LongTime,
+  /// `7/20/69`
   ShortDate,
+  /// `July 20, 1969`
   LongDate,
-  FullDateShortTime,
-  FullDateLongTime,
+  /// `July 20, 1969 at 8:17 PM`
+  ShortDateTime,
+  /// `Sunday, July 20, 1969 at 8:17 PM`
+  LongDateTime,
+  /// `55 years ago`
   Relative
 }
 
@@ -98,8 +114,8 @@ impl fmt::Display for TimestampFormat {
       TimestampFormat::LongTime => "T",
       TimestampFormat::ShortDate => "d",
       TimestampFormat::LongDate => "D",
-      TimestampFormat::FullDateShortTime => "f",
-      TimestampFormat::FullDateLongTime => "F",
+      TimestampFormat::ShortDateTime => "f",
+      TimestampFormat::LongDateTime => "F",
       TimestampFormat::Relative => "R"
     })
   }
@@ -187,4 +203,11 @@ impl<T, E: Error> Loggable for Result<T, E> {
       }
     }
   }
+}
+
+#[macro_export]
+macro_rules! operate {
+  ($core:expr, $function:ident::<$Key:ty>, $operation:expr) => {
+    crate::data::$function($core.get::<$Key>().await, $operation).await
+  };
 }

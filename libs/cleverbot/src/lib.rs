@@ -12,6 +12,7 @@ use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, percent_encode};
 use reqwest::{Client, Proxy, Error as ReqwestError};
 
 use std::collections::VecDeque;
+use std::fmt;
 
 const USER_AGENT: &str = "Opera/9.48 (Windows NT 6.0; sl-SI) Presto/2.11.249 Version/10.00";
 
@@ -60,6 +61,14 @@ impl CleverBotAgent {
 impl Default for CleverBotAgent {
   fn default() -> Self {
     Self::new()
+  }
+}
+
+impl fmt::Debug for CleverBotAgent {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    f.debug_struct("CleverBotAgent")
+      .field("data", &self.data)
+      .finish_non_exhaustive()
   }
 }
 
@@ -137,6 +146,7 @@ fn parse_max_age(max_age: &str) -> Option<i64> {
 }
 
 /// Saves the user's conversation history for convenience.
+#[derive(Debug, Clone)]
 pub struct CleverBotContext {
   pub history: VecDeque<String>,
   pub history_size_limit: usize

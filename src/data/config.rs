@@ -2,6 +2,7 @@ use crate::MelodyResult;
 use crate::utils::Contextualize;
 use super::Toml;
 
+use rand::seq::SliceRandom;
 use serde::de::{Deserialize, Deserializer, Unexpected};
 use serenity::model::id::UserId;
 use serenity::model::gateway::GatewayIntents;
@@ -9,6 +10,8 @@ use serenity::utils::Color;
 use singlefile::container_shared_async::ContainerAsyncReadonly;
 
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::Duration;
 
 pub type ConfigContainer = ContainerAsyncReadonly<Config, Toml>;
 
@@ -25,7 +28,9 @@ pub struct Config {
   /// This can either be a list of intent names, or a number representing an intents bitfield.
   /// Defaults to [`GatewayIntents::non_privileged`].
   #[serde(default, deserialize_with = "deserialize_intents")]
-  pub intents: GatewayIntents
+  pub intents: GatewayIntents,
+  #[serde(default)]
+  pub rss: ConfigRss
 }
 
 impl Config {
@@ -37,6 +42,89 @@ impl Config {
     trace!("Loaded config.toml");
     Ok(container)
   }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct ConfigRss {
+  pub youtube: Option<Arc<ConfigRssYouTube>>,
+  pub twitter: Option<Arc<ConfigRssTwitter>>
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfigRssYouTube {
+  /// The base domain and URL path that should be used for getting YouTube RSS feeds.
+  ///
+  /// Defaults to `www.youtube.com/feeds/videos.xml?channel_id=`.
+  #[serde(default = "default_youtube_base_url")]
+  pub base_url: String,
+  /// The interval between fetches for each individual registered RSS feed.
+  #[serde(deserialize_with = "deserialize_duration")]
+  pub interval: Duration,
+  /// The base domain that should be used when displaying YouTube URLs.
+  /// This domain should respond to URLs the same as YouTube itself.
+  ///
+  /// Defaults to `www.youtube.com`.
+  #[serde(default = "default_youtube_display_domain")]
+  pub display_domain: String
+}
+
+impl ConfigRssYouTube {
+  pub fn get_url(&self, channel: &str) -> String {
+    let base_url = self.base_url.trim_start_matches("https://");
+    format!("https://{base_url}{channel}")
+  }
+}
+
+fn default_youtube_base_url() -> String {
+  "www.youtube.com/feeds/videos.xml?channel_id=".to_owned()
+}
+
+fn default_youtube_display_domain() -> String {
+  "www.youtube.com".to_owned()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfigRssTwitter {
+  /// A list of Nitter domains that should be used for fetching RSS feeds.
+  /// Note, some Nitter instances don't seem to support RSS feeds or are broken.
+  #[serde(deserialize_with = "deserialize_at_least_one")]
+  pub nitter_instances: Vec<String>,
+  /// The interval between fetches for each individual registered RSS feed.
+  #[serde(deserialize_with = "deserialize_duration")]
+  pub interval: Duration,
+  /// The base domain that should be used when displaying Twitter URLs.
+  /// This domain should respond to URLs the same as Twitter itself.
+  ///
+  /// Defaults to `twitter.com` (consider using `vxtwitter.com`).
+  #[serde(default = "default_twitter_display_domain")]
+  pub display_domain: String
+}
+
+impl ConfigRssTwitter {
+  pub fn get_url(&self, handle: &str) -> String {
+    let mut rng = rand::thread_rng();
+    self.nitter_instances.choose(&mut rng).map(|domain| {
+      let domain = domain.trim_start_matches("https://").trim_end_matches('/');
+      format!("https://{domain}/{handle}/rss")
+    }).expect("invalid nitter instances list")
+  }
+}
+
+fn default_twitter_display_domain() -> String {
+  "twitter.com".to_owned()
+}
+
+fn deserialize_duration<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Duration, D::Error> {
+  f64::deserialize(deserializer).map(Duration::from_secs_f64)
+}
+
+fn deserialize_at_least_one<'de, T, D>(deserializer: D) -> Result<Vec<T>, D::Error>
+where T: Deserialize<'de>, D: Deserializer<'de> {
+  <Vec<T>>::deserialize(deserializer).and_then(|value| match value.is_empty() {
+    true => Err(serde::de::Error::invalid_length(0, &"a sequence of at least length 1")),
+    false => Ok(value)
+  })
 }
 
 #[derive(Debug, Clone, Deserialize)]

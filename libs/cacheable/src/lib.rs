@@ -4,6 +4,7 @@ pub use async_trait::async_trait;
 
 use std::convert::Infallible;
 
+#[derive(Debug, Clone)]
 pub struct Cache<S> {
   state: Option<S>
 }

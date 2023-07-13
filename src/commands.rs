@@ -1,4 +1,5 @@
 mod connect_four;
+mod feed;
 mod general;
 mod role_playing;
 
@@ -18,6 +19,7 @@ use std::collections::HashSet;
 
 
 pub const APPLICATION_COMMANDS: &[BlueprintCommand] = &[
+  self::feed::FEEDS,
   self::general::PING,
   self::general::HELP,
   self::general::ECHO,
