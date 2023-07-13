@@ -31,6 +31,7 @@ pub(super) const FEEDS: BlueprintCommand = blueprint_command! {
     "/feeds remove-all",
     "/feeds list"
   ],
+  plugin: "feed",
   allow_in_dms: false,
   default_permissions: Permissions::MANAGE_WEBHOOKS,
   subcommands: [
