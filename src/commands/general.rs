@@ -240,7 +240,7 @@ async fn emoji_stats(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
 
   let emoji_statistics = core.operate_persist_guild(guild_id, |persist_guild| {
     core.cache.guild_field(guild_id, |guild| {
-      persist_guild.get_emoji_uses(|emoji_id| guild.emojis.get(&emoji_id))
+      persist_guild.emoji_stats.get_emoji_uses(|emoji_id| guild.emojis.get(&emoji_id))
     }).ok_or(MelodyError::command_cache_failure("guild"))
   }).await?;
 

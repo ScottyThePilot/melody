@@ -154,8 +154,10 @@ impl EventHandler for Handler {
     if let Some(guild_id) = message.guild_id {
       let emojis = crate::utils::parse_emojis(&message.content);
       core.operate_persist_guild_commit(guild_id, |persist_guild| {
-        for emoji in emojis {
-          persist_guild.increment_emoji_uses(emoji);
+        // don't be greedy
+        let mut rng = rand::thread_rng();
+        if let Some(&emoji) = emojis.choose(&mut rng) {
+          persist_guild.emoji_stats.increment_emoji_uses(emoji, message.author.id);
         };
         Ok(())
       }).await.log();
@@ -193,9 +195,9 @@ impl EventHandler for Handler {
   async fn reaction_add(&self, ctx: Context, reaction: Reaction) {
     let core = Core::from(ctx);
 
-    if let (Some(guild_id), ReactionType::Custom { id: emoji_id, .. }) = (reaction.guild_id, reaction.emoji) {
+    if let (Some(guild_id), Some(user_id), ReactionType::Custom { id: emoji_id, .. }) = (reaction.guild_id, reaction.user_id, reaction.emoji) {
       core.operate_persist_guild_commit(guild_id, |persist_guild| {
-        persist_guild.increment_emoji_uses(emoji_id);
+        persist_guild.emoji_stats.increment_emoji_uses(emoji_id, user_id);
         Ok(())
       }).await.log();
     };
@@ -204,9 +206,9 @@ impl EventHandler for Handler {
   async fn reaction_remove(&self, ctx: Context, reaction: Reaction) {
     let core = Core::from(ctx);
 
-    if let (Some(guild_id), ReactionType::Custom { id: emoji_id, .. }) = (reaction.guild_id, reaction.emoji) {
+    if let (Some(guild_id), Some(user_id), ReactionType::Custom { id: emoji_id, .. }) = (reaction.guild_id, reaction.user_id, reaction.emoji) {
       core.operate_persist_guild_commit(guild_id, |persist_guild| {
-        persist_guild.decrement_emoji_uses(emoji_id);
+        persist_guild.emoji_stats.decrement_emoji_uses(emoji_id, user_id);
         Ok(())
       }).await.log();
     };

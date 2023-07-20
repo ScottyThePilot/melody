@@ -3,8 +3,7 @@ use crate::feature::feed::{Feed, FeedState};
 use crate::utils::Contextualize;
 use super::Cbor;
 
-use serenity::model::guild::Emoji;
-use serenity::model::id::{EmojiId, GuildId, UserId, RoleId};
+use serenity::model::id::{GuildId, UserId, RoleId};
 use singlefile::container_shared_async::ContainerAsyncWritableLocked;
 use tokio::sync::RwLock;
 
@@ -115,8 +114,8 @@ pub type PersistGuildContainer = ContainerAsyncWritableLocked<PersistGuild, Cbor
 #[serde(default)]
 pub struct PersistGuild {
   pub connect_four: crate::feature::connect_four::Manager,
-  /// List of emojis and the number of times they've been used in this server.
-  pub emoji_statistics: HashMap<EmojiId, usize>,
+  #[serde(alias = "emoji_statistics")]
+  pub emoji_stats: crate::feature::emoji_stats::EmojiStats,
   pub join_roles: BTreeMap<RoleId, JoinRoleFilter>
 }
 
@@ -129,26 +128,6 @@ impl PersistGuild {
       .await.context(format!("failed to load data/guilds/{id}.bin"))?;
     trace!("Loaded data/guilds/{id}.bin");
     Ok(container)
-  }
-
-  pub fn increment_emoji_uses(&mut self, emoji: EmojiId) {
-    *self.emoji_statistics.entry(emoji).or_default() += 1;
-  }
-
-  pub fn decrement_emoji_uses(&mut self, emoji: EmojiId) {
-    if let Some(value) = self.emoji_statistics.get_mut(&emoji) {
-      *value = value.saturating_sub(1);
-    };
-  }
-
-  pub fn get_emoji_uses<'a, F>(&self, mut f: F) -> Vec<(EmojiId, bool, usize)>
-  where F: FnMut(EmojiId) -> Option<&'a Emoji> {
-    let mut emoji_statistics = self.emoji_statistics.iter()
-      .filter_map(|(&id, &c)| (c > 0).then_some((id, c)))
-      .filter_map(|(id, c)| f(id).map(|emoji| (emoji.id, emoji.animated, c)))
-      .collect::<Vec<(EmojiId, bool, usize)>>();
-    emoji_statistics.sort_unstable_by(|a, b| Ord::cmp(&a.2, &b.2).reverse());
-    emoji_statistics
   }
 }
 
