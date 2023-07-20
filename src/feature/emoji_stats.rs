@@ -57,7 +57,7 @@ struct EmojiInteraction {
 
 impl EmojiInteraction {
   fn is_valid(self, hash: u64, now: DateTime<Utc>) -> bool {
-    self.hash != hash && now.signed_duration_since(self.time).num_seconds() > 5
+    self.hash != hash || now.signed_duration_since(self.time).num_seconds() > 5
   }
 }
 
