@@ -317,7 +317,7 @@ async fn join_roles_add(core: Core, args: BlueprintCommandArgs) -> MelodyResult 
   join_roles_add_remove(core, args, |persist_guild, role, filter| {
     Ok(match persist_guild.join_roles.insert(role.id, filter) {
       Some(..) => format!("Replaced existing join role filter for `{}` with `{}`", role.name, filter.into_str()),
-      None => format!("Create new join role for `{}` with filter `{}`", role.name, filter.into_str())
+      None => format!("Created new join role for `{}` with filter `{}`", role.name, filter.into_str())
     })
   }).await
 }
