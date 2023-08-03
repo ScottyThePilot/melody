@@ -173,7 +173,7 @@ impl Hash for Feed {
     std::mem::discriminant(self).hash(state);
     match self {
       Feed::YouTube { channel } => channel.hash(state),
-      Feed::Twitter { handle } => crate::utils::hash_str_ignore_ascii_case(handle, state)
+      Feed::Twitter { handle } => handle.to_lowercase().hash(state)
     }
   }
 }

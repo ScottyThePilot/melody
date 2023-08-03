@@ -8,7 +8,6 @@ use rand::rngs::SmallRng;
 use regex::Regex;
 use serenity::model::id::{EmojiId, UserId};
 
-use std::hash::Hasher;
 use std::error::Error;
 use std::fmt;
 
@@ -47,14 +46,6 @@ pub fn strip_user_mention(msg: &str, user_id: UserId) -> Option<&str> {
   let msg = msg.strip_prefix(&user_id.to_string())?;
   let msg = msg.strip_prefix(">")?.trim_start();
   Some(msg)
-}
-
-pub fn hash_str_ignore_ascii_case<H: Hasher>(string: &str, state: &mut H) {
-  state.write_usize(string.len());
-  for &byte in string.as_bytes() {
-    state.write_u8(byte.to_ascii_lowercase());
-  };
-  state.write_u8(0x00);
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -125,7 +116,7 @@ pub trait Contextualize {
 
   fn context(self, context: impl Into<String>) -> Self::Output;
 
-  fn context_log(self, context: impl Into<String>)
+  fn context_log(self, context: impl Into<String>) -> bool
   where Self: Sized, Self::Output: Loggable {
     self.context(context).log()
   }
@@ -179,7 +170,7 @@ pub trait Loggable {
   type Ok;
   type Err: Error;
 
-  fn log(self);
+  fn log(self) -> bool;
   fn log_some(self) -> Option<Self::Ok>;
 }
 
@@ -187,15 +178,23 @@ impl<T, E: Error> Loggable for Result<T, E> {
   type Ok = T;
   type Err = E;
 
-  fn log(self) {
-    if let Err(error) = self {
-      error!("{error}");
-    };
+  fn log(self) -> bool {
+    match self {
+      Ok(..) => {
+        true
+      },
+      Err(error) => {
+        error!("{error}");
+        false
+      }
+    }
   }
 
   fn log_some(self) -> Option<T> {
     match self {
-      Ok(value) => Some(value),
+      Ok(value) => {
+        Some(value)
+      },
       Err(error) => {
         error!("{error}");
         None
