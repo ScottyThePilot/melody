@@ -14,7 +14,7 @@ pub(super) const CONNECT_FOUR: BlueprintCommand = blueprint_command! {
   description: "Play connect-four",
   usage: [
     "/connect-four challenge <user>",
-    "/connect-four challenge-computer <hard|medium|easy>",
+    "/connect-four challenge-computer <'hard'|'medium'|'easy'>",
     "/connect-four accept <user>",
     "/connect-four decline <user>",
     "/connect-four play <column>",

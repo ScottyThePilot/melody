@@ -19,8 +19,8 @@ pub(super) const FEEDS: BlueprintCommand = blueprint_command! {
   name: "feeds",
   description: "Set up channels to recieve posts from social media websites or from RSS feeds",
   usage: [
-    "/feeds add <youtube|twitter> <feed-source>",
-    "/feeds remove <youtube|twitter> <feed-source>",
+    "/feeds add <'youtube'|'twitter'> <feed-source>",
+    "/feeds remove <'youtube'|'twitter'> <feed-source>",
     "/feeds remove-all",
     "/feeds list"
   ],

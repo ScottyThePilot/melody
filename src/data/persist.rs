@@ -1,4 +1,5 @@
 use crate::MelodyResult;
+use crate::feature::roles::{Granter, JoinRoleFilter};
 use crate::feature::feed::{Feed, FeedState};
 use crate::utils::Contextualize;
 use super::Cbor;
@@ -7,7 +8,6 @@ use serenity::model::id::{GuildId, UserId, RoleId};
 use singlefile::container_shared_async::ContainerAsyncWritableLocked;
 use tokio::sync::RwLock;
 
-use std::collections::BTreeMap;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -116,7 +116,8 @@ pub struct PersistGuild {
   pub connect_four: crate::feature::connect_four::Manager,
   #[serde(alias = "emoji_statistics")]
   pub emoji_stats: crate::feature::emoji_stats::EmojiStats,
-  pub join_roles: BTreeMap<RoleId, JoinRoleFilter>
+  pub join_roles: HashMap<RoleId, JoinRoleFilter>,
+  pub grant_roles: HashMap<RoleId, HashSet<Granter>>
 }
 
 impl PersistGuild {
@@ -133,37 +134,4 @@ impl PersistGuild {
 
 fn parse_file_name(path: &std::ffi::OsStr) -> Option<u64> {
   path.to_str().and_then(|path| path.strip_suffix(".bin")?.parse().ok())
-}
-
-#[repr(u8)]
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub enum JoinRoleFilter {
-  All, Bots, Humans
-}
-
-impl JoinRoleFilter {
-  pub fn applies(self, is_bot: bool) -> bool {
-    match self {
-      Self::All => true,
-      Self::Bots => is_bot,
-      Self::Humans => !is_bot
-    }
-  }
-
-  pub fn from_str(s: &str) -> Option<Self> {
-    match s {
-      "all" => Some(Self::All),
-      "bots" => Some(Self::Bots),
-      "humans" => Some(Self::Humans),
-      _ => None
-    }
-  }
-
-  pub fn into_str(self) -> &'static str {
-    match self {
-      Self::All => "all",
-      Self::Bots => "bots",
-      Self::Humans => "humans"
-    }
-  }
 }

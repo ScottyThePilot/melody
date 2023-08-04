@@ -148,7 +148,7 @@ impl BlueprintCommand {
   }
 
   fn stringify_permissions(self) -> String {
-    self.default_permissions.map_or_else(|| "`EVERYONE`".to_owned(), |p| p.to_string())
+    self.default_permissions.map_or_else(|| "Everyone".to_owned(), |p| p.to_string())
   }
 }
 
@@ -412,6 +412,7 @@ impl BlueprintCommandResponseEdit {
     BlueprintCommandResponseEdit { content: Some(content.into()), embeds: Vec::new() }
   }
 
+  #[allow(dead_code)]
   pub fn with_embeds(embeds: Vec<CreateEmbed>) -> Self {
     BlueprintCommandResponseEdit { content: None, embeds }
   }
@@ -437,6 +438,8 @@ pub struct BlueprintCommandArgs {
   pub interaction: ApplicationCommandInteraction,
   pub option_values: Vec<CommandDataOptionValue>
 }
+
+pub type CommandDataOptionValues = Vec<CommandDataOptionValue>;
 
 pub type BlueprintChoices<T> = &'static [(&'static str, T)];
 
@@ -505,6 +508,11 @@ fn decompose_command(
 
 
 
+pub enum RoleOrMember {
+  Role(Role),
+  Member(User, PartialMember)
+}
+
 macro_rules! impl_resolve_argument_value {
   ($Type:ty, $pat:pat => $expr:expr) => {
     impl ResolveArgumentValue for $Type {
@@ -529,6 +537,16 @@ impl_resolve_argument_value!(PartialMember, CommandDataOptionValue::User(_, valu
 impl_resolve_argument_value!(PartialChannel, CommandDataOptionValue::Channel(value) => Some(value));
 impl_resolve_argument_value!(Role, CommandDataOptionValue::Role(value) => Some(value));
 impl_resolve_argument_value!(Attachment, CommandDataOptionValue::Attachment(value) => Some(value));
+
+impl ResolveArgumentValue for RoleOrMember {
+  fn resolve_value(option_value: Option<CommandDataOptionValue>) -> Option<Self> where Self: Sized {
+    option_value.and_then(|option_value| match option_value {
+      CommandDataOptionValue::Role(role) => Some(RoleOrMember::Role(role)),
+      CommandDataOptionValue::User(user, Some(member)) => Some(RoleOrMember::Member(user, member)),
+      _ => None
+    })
+  }
+}
 
 impl ResolveArgumentValue for NonZeroU64 {
   fn resolve_value(option_value: Option<CommandDataOptionValue>) -> Option<Self> where Self: Sized {
