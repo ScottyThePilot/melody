@@ -30,6 +30,7 @@ enum InputCommand<'a> {
   PluginEnable(&'a str, GuildId),
   PluginDisable(&'a str, GuildId),
   FeedRespawnAll,
+  FeedAbortAll,
   FeedListTasks
 }
 
@@ -66,6 +67,7 @@ impl InputAgent {
       },
       "feed" | "feeds" => match next(&mut args)? {
         "respawn-all" => Ok(InputCommand::FeedRespawnAll),
+        "abort-all" => Ok(InputCommand::FeedAbortAll),
         "list-tasks" => Ok(InputCommand::FeedListTasks),
         unknown => Err(InputError::UnknownCommand(unknown))
       },
@@ -101,6 +103,10 @@ impl InputAgent {
         InputCommand::FeedRespawnAll => {
           let feed_wrapper = self.core.get::<crate::data::FeedKey>().await;
           feed_wrapper.lock().await.respawn_all(&self.core).await;
+        },
+        InputCommand::FeedAbortAll => {
+          let feed_wrapper = self.core.get::<crate::data::FeedKey>().await;
+          feed_wrapper.lock().await.abort_all();
         },
         InputCommand::FeedListTasks => {
           let feed_wrapper = self.core.get::<crate::data::FeedKey>().await;

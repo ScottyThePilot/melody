@@ -213,7 +213,7 @@ async fn youtube_task(
           videos.retain(|entry| entry.time > last_update);
           videos.sort_unstable_by_key(|entry| entry.time);
           if let Some(time) = videos.iter().map(|entry| entry.time).max() {
-            for video in videos.into_iter().rev() {
+            for video in videos.into_iter() {
               trace!("RSS Feed (YouTube): new video (time {time})");
               handler.feed_youtube_video(core.clone(), &channel, video).await;
             };
@@ -223,7 +223,10 @@ async fn youtube_task(
             None
           }
         }),
-        Err(error) => Err(error)
+        Err(error) => {
+          failures += 1;
+          Err(error)
+        }
       };
 
       match result {
