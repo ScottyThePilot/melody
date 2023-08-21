@@ -7,7 +7,7 @@ use crate::utils::Contextualize;
 use itertools::Itertools;
 use serenity::model::permissions::Permissions;
 use serenity::model::id::{UserId, GuildId, RoleId};
-use serenity::model::guild::{Member, Role, Guild};
+use serenity::model::guild::{Member, Role};
 use serenity::model::user::User;
 use serenity::utils::{content_safe, ContentSafeOptions};
 
@@ -15,7 +15,7 @@ use std::collections::{HashMap, HashSet};
 
 
 
-const BOT_MISSING_PERMS: &str = "I am missing `MANAGE_ROLES` permissions";
+const BOT_MISSING_PERMS: &str = "I am missing 'Manage Roles' permissions";
 const BOT_ROLE_TOO_LOW: &str = "The role you have specified is above my highest role and inaccessible to me";
 const USER_ROLE_TOO_LOW: &str = "The role you have specified is above your highest role and not modifiable by you";
 const MANAGED_ROLE: &str = "The role you have specified is a managed role and may not be used";
@@ -71,15 +71,22 @@ pub const ROLE: BlueprintCommand = blueprint_command! {
 #[command_attr::hook]
 async fn role_grant(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let member = args.interaction.member.clone().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+  let member1 = args.interaction.member.clone().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let (role, user) = resolve_arguments::<(Role, User)>(args.option_values)?;
   let is_granter = core.operate_persist_guild(guild_id, |persist_guild| {
-    Ok(is_granter(persist_guild, &member, role.id))
+    Ok(is_granter(persist_guild, &member1, role.id))
   }).await?;
 
   let response = if is_granter {
-    let mut member = guild_id.member(&core, user.id).await.context("failed to find member")?;
-    if member.add_role(&core, role.id).await.context_log("failed to add role") {
+    let mut member2 = guild_id.member(&core, user.id).await.context("failed to find member")?;
+    if member2.add_role(&core, role.id).await.context_log("failed to add role") {
+      info!(
+        "User {user1} ({user1_id}) granted role {} ({}) to user {user2} ({user2_id}) in guild {}",
+        role.name, role.id, guild_id,
+        user1 = member1.user.name, user1_id = member1.user.id,
+        user2 = member2.user.name, user2_id = member2.user.id
+      );
+
       format!("Granted role `@{}` to user `@{}`", role.name, user.name)
     } else {
       format!("Failed to grant role `@{}` to user `@{}`", role.name, user.name)
@@ -95,15 +102,22 @@ async fn role_grant(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
 #[command_attr::hook]
 async fn role_revoke(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let member = args.interaction.member.clone().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+  let member1 = args.interaction.member.clone().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let (role, user) = resolve_arguments::<(Role, User)>(args.option_values)?;
   let is_granter = core.operate_persist_guild(guild_id, |persist_guild| {
-    Ok(is_granter(persist_guild, &member, role.id))
+    Ok(is_granter(persist_guild, &member1, role.id))
   }).await?;
 
   let response = if is_granter {
-    let mut member = guild_id.member(&core, user.id).await.context("failed to find member")?;
-    if member.remove_role(&core, role.id).await.context_log("failed to add role") {
+    let mut member2 = guild_id.member(&core, user.id).await.context("failed to find member")?;
+    if member2.remove_role(&core, role.id).await.context_log("failed to add role") {
+      info!(
+        "User {user1} ({user1_id}) revoked role {} ({}) from user {user2} ({user2_id}) in guild {}",
+        role.name, role.id, guild_id,
+        user1 = member1.user.name, user1_id = member1.user.id,
+        user2 = member2.user.name, user2_id = member2.user.id
+      );
+
       format!("Revoked role `@{}` from user `@{}`", role.name, user.name)
     } else {
       format!("Failed to revoke role `@{}` from user `@{}`", role.name, user.name)
@@ -119,6 +133,12 @@ async fn role_revoke(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
 pub const GRANT_ROLES: BlueprintCommand = blueprint_command! {
   name: "grant-roles",
   description: "Allows specific roles to be made grantable by specific users or other roles",
+  info: [
+    "To create a grantable role, you must first register it with the `/grant-roles add` subcommand,",
+    "and then add granters to it with the `/grant-roles add-granter` subcommand.",
+    "Users will not be able to modify a grantable role if that role is above their highest role.",
+    "The `/role grant` and `/role revoke` commands are used to grant and revoke grantable roles."
+  ],
   usage: [
     "/grant-roles add <role>",
     "/grant-roles add-granter <role> <role|user>",
@@ -349,6 +369,9 @@ fn user_description(core: &Core, user_id: UserId) -> String {
 pub const JOIN_ROLES: BlueprintCommand = blueprint_command! {
   name: "join-roles",
   description: "Allows roles to be given to users or bots upon joining",
+  info: [
+    "Users will not be able to modify a join role if that role is above their highest role."
+  ],
   usage: [
     "/join-roles add <role> ['all'|'bots'|'humans']",
     "/join-roles remove <role> ['all'|'bots'|'humans']",

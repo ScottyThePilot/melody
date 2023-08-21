@@ -9,9 +9,18 @@ use serenity::model::mention::Mentionable;
 
 
 
-pub(super) const CONNECT_FOUR: BlueprintCommand = blueprint_command! {
+pub const CONNECT_FOUR: BlueprintCommand = blueprint_command! {
   name: "connect-four",
   description: "Play connect-four",
+  info: [
+    "To begin a game, one of the players will need to challenge another via the `/connect-four challenge` subcommand.",
+    "That player will then need to accept the challenge via the `/connect-four accept` subcommand.",
+    "From there, play will begin, and moves may be played with the `/connect-four play` subcommand.",
+    "At any time, either player may use the `/connect-four resign` subcommand to resign from the game, or use the",
+    "`/connect-four board` subcommand to see the board of their current game again.",
+    "If your opponent has taken more than 3 hours on a move, you may elect to claim a win and end the game with the",
+    "`/connect-four claim-win` command."
+  ],
   usage: [
     "/connect-four challenge <user>",
     "/connect-four challenge-computer <'hard'|'medium'|'easy'>",

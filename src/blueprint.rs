@@ -67,6 +67,9 @@ pub fn command_embed(command: &'static BlueprintCommand, color: Color) -> Create
   builder.title(crate::utils::kebab_case_to_words(command.name));
   builder.description(command.description);
   builder.color(color);
+  if let Some(help) = command.stringify_info() {
+    builder.field("Info", help, false);
+  };
   builder.field("Usage", command.stringify_usage(), false);
   builder.field("Examples", command.stringify_examples(), false);
   builder.field("Required Permissions", command.stringify_permissions(), false);
@@ -98,10 +101,11 @@ pub fn command_list_embed(commands: &'static [BlueprintCommand], permissions: Pe
   builder
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct BlueprintCommand {
   pub name: &'static str,
   pub description: &'static str,
+  pub info: Option<&'static [&'static str]>,
   pub usage: Option<&'static [&'static str]>,
   pub examples: Option<&'static [&'static str]>,
   pub plugin: Option<&'static str>,
@@ -135,6 +139,10 @@ impl BlueprintCommand {
     self.plugin.is_some()
   }
 
+  fn stringify_info(self) -> Option<String> {
+    self.info.map(|info| info.into_iter().join(" "))
+  }
+
   fn stringify_usage(self) -> String {
     self.usage.map_or_else(|| "none".to_owned(), |usage| {
       usage.into_iter().map(Blockify::new).join("\n")
@@ -152,7 +160,7 @@ impl BlueprintCommand {
   }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct BlueprintSubcommand {
   pub name: &'static str,
   pub description: &'static str,
@@ -167,10 +175,10 @@ impl BlueprintSubcommand {
   }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum BlueprintRoot {
   Command {
-    function: CommandFn,
+    function: crate::utils::NoDebug<CommandFn>,
     options: &'static [BlueprintOption]
   },
   CommandContainer {
@@ -345,6 +353,7 @@ impl BlueprintCommandResponse {
     }
   }
 
+  #[allow(dead_code)]
   pub fn new_ephemeral(content: impl Into<String>) -> Self {
     BlueprintCommandResponse {
       ephemeral: true,
@@ -353,6 +362,7 @@ impl BlueprintCommandResponse {
     }
   }
 
+  #[allow(dead_code)]
   pub fn with_embeds(embeds: Vec<CreateEmbed>) -> Self {
     BlueprintCommandResponse {
       embeds,
@@ -360,6 +370,7 @@ impl BlueprintCommandResponse {
     }
   }
 
+  #[allow(dead_code)]
   pub fn with_ephemeral_embeds(embeds: Vec<CreateEmbed>) -> Self {
     BlueprintCommandResponse {
       ephemeral: true,
@@ -483,7 +494,7 @@ fn decompose_command(
     match blueprint_root {
       // this command root terminates at a command with regular options,
       // return those regular options if `extracted_subcommands` agrees that the command terminates here
-      BlueprintRoot::Command { options, function } => extracted_subcommands.is_empty().then(|| (options, function)),
+      BlueprintRoot::Command { options, function } => extracted_subcommands.is_empty().then(|| (options, *function)),
       // this command root contains other subcommands, split the first element off of `extracted_subcommands`
       BlueprintRoot::CommandContainer { subcommands } => {
         let (subcommand, remaining_subcommands) = extracted_subcommands.split_first()?;
@@ -618,6 +629,7 @@ macro_rules! blueprint_command {
   {
     name: $name:expr,
     description: $description:expr,
+    $(info: [$($info:expr),+ $(,)?],)?
     $(usage: [$($usage:expr),+ $(,)?],)?
     $(examples: [$($examples:expr),+ $(,)?],)?
     $(plugin: $plugin:expr,)?
@@ -628,6 +640,7 @@ macro_rules! blueprint_command {
   } => ($crate::blueprint::BlueprintCommand {
     name: $name,
     description: $description,
+    info: $crate::default_expr!(None, $(Some(&[$($info),*]))?),
     usage: $crate::default_expr!(None, $(Some(&[$($usage),*]))?),
     examples: $crate::default_expr!(None, $(Some(&[$($examples),*]))?),
     plugin: $crate::default_expr!(None, $(Some($plugin))?),
@@ -641,6 +654,7 @@ macro_rules! blueprint_command {
   {
     name: $name:expr,
     description: $description:expr,
+    $(info: [$($info:expr),+ $(,)?],)?
     $(usage: [$($usage:expr),+ $(,)?],)?
     $(examples: [$($examples:expr),+ $(,)?],)?
     $(plugin: $plugin:expr,)?
@@ -652,6 +666,7 @@ macro_rules! blueprint_command {
   } => ($crate::blueprint::BlueprintCommand {
     name: $name,
     description: $description,
+    info: $crate::default_expr!(None, $(Some(&[$($info),*]))?),
     usage: $crate::default_expr!(None, $(Some(&[$($usage),*]))?),
     examples: $crate::default_expr!(None, $(Some(&[$($examples),*]))?),
     plugin: $crate::default_expr!(None, $(Some($plugin))?),
@@ -659,7 +674,7 @@ macro_rules! blueprint_command {
     allow_in_dms: $crate::default_expr!(false, $($allow_in_dms)?),
     default_permissions: $crate::default_expr!(None, $(Some($default_permissions))?),
     root: $crate::blueprint::BlueprintRoot::Command {
-      function: $function,
+      function: crate::utils::NoDebug($function),
       options: &[$($option,)*]
     }
   });
@@ -687,7 +702,7 @@ macro_rules! blueprint_subcommand {
     name: $name,
     description: $description,
     root: $crate::blueprint::BlueprintRoot::Command {
-      function: $function,
+      function: crate::utils::NoDebug($function),
       options: &[$($option,)*]
     }
   });

@@ -13,7 +13,7 @@ use serenity::utils::{content_safe, ContentSafeOptions};
 
 
 
-pub(super) const PING: BlueprintCommand = blueprint_command! {
+pub const PING: BlueprintCommand = blueprint_command! {
   name: "ping",
   description: "Gets a basic response from the bot",
   usage: ["/ping"],
@@ -30,7 +30,7 @@ async fn ping(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
     .send(&core, &args.interaction).await
 }
 
-pub(super) const HELP: BlueprintCommand = blueprint_command! {
+pub const HELP: BlueprintCommand = blueprint_command! {
   name: "help",
   description: "Gets command help",
   usage: ["/help [command]"],
@@ -69,7 +69,7 @@ async fn help(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   response.send(&core, &args.interaction).await
 }
 
-pub(super) const ECHO: BlueprintCommand = blueprint_command! {
+pub const ECHO: BlueprintCommand = blueprint_command! {
   name: "echo",
   description: "Makes the bot repeat something",
   usage: ["/echo <text>"],
@@ -96,7 +96,7 @@ async fn echo(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
     .send(&core, &args.interaction).await
 }
 
-pub(super) const TROLL: BlueprintCommand = blueprint_command! {
+pub const TROLL: BlueprintCommand = blueprint_command! {
   name: "troll",
   description: "Conducts epic trollage",
   usage: ["/troll"],

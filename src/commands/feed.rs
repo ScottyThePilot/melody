@@ -15,7 +15,7 @@ use serenity::model::mention::Mentionable;
 
 
 
-pub(super) const FEEDS: BlueprintCommand = blueprint_command! {
+pub const FEEDS: BlueprintCommand = blueprint_command! {
   name: "feeds",
   description: "Set up channels to recieve posts from social media websites or from RSS feeds",
   usage: [

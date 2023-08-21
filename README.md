@@ -6,6 +6,7 @@ Melody is a Discord bot with a number of features:
 - YouTube and Twitter feeds
 - Server-wide emoji usage stats
 - Join roles
+- Grantable roles
 - Dice rolling
 
 ## Terminal

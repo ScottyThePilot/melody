@@ -6,7 +6,7 @@ use crate::utils::Blockify;
 
 
 
-pub(super) const ROLL: BlueprintCommand = blueprint_command! {
+pub const ROLL: BlueprintCommand = blueprint_command! {
   name: "roll",
   description: "Rolls a configurable dice",
   usage: ["/roll <dice notation>"],

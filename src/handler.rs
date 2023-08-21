@@ -172,6 +172,7 @@ impl EventHandler for Handler {
       let options = ContentSafeOptions::new();
       let content = content_safe(&core, content, &options, &[]);
 
+      info!("Sending message to cleverbot: {content:?}");
       match core.get::<CleverBotKey>().await.send(message.channel_id, &content).await {
         Ok(reply) => {
           info!("Recieved reply from cleverbot: {reply:?}");

@@ -48,6 +48,39 @@ pub fn strip_user_mention(msg: &str, user_id: UserId) -> Option<&str> {
   Some(msg)
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct NoDebug<T>(pub T);
+
+impl<T> std::ops::Deref for NoDebug<T> {
+  type Target = T;
+
+  #[inline]
+  fn deref(&self) -> &Self::Target {
+    &self.0
+  }
+}
+
+impl<T> std::ops::DerefMut for NoDebug<T> {
+  #[inline]
+  fn deref_mut(&mut self) -> &mut Self::Target {
+    &mut self.0
+  }
+}
+
+impl<T: fmt::Display> fmt::Display for NoDebug<T> {
+  #[inline]
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    <T as fmt::Display>::fmt(&self.0, f)
+  }
+}
+
+impl<T> fmt::Debug for NoDebug<T> {
+  #[inline]
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    f.write_str("..")
+  }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Blockify<S>(pub S);
 
