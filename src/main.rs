@@ -40,6 +40,9 @@ use std::sync::Arc;
 pub const BUILD_ID: u64 = const_random::const_random!(u64);
 
 fn main() {
+  let root = crate::utils::root_dir().expect("unable to find root dir");
+  std::env::set_current_dir(root).expect("unable to set root dir");
+
   let (terminate_sender, terminate_receiver) = oneshot_channel();
   let (input_sender, input_receiver) = mpsc_channel();
   crate::terminal::run(

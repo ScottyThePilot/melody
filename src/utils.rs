@@ -13,6 +13,23 @@ use std::fmt;
 
 
 
+pub fn root_dir() -> std::io::Result<std::path::PathBuf> {
+  if let Some(manifest_dir) = std::env::var_os("CARGO_MANIFEST_DIR") {
+    return Ok(std::path::PathBuf::from(manifest_dir));
+  };
+
+  let mut current_exe = dunce::canonicalize(std::env::current_exe()?)?;
+
+  if current_exe.pop() {
+    return Ok(current_exe);
+  };
+
+  Err(std::io::Error::new(
+    std::io::ErrorKind::Other,
+    "failed to find an application root"
+  ))
+}
+
 pub fn create_rng() -> SmallRng {
   SmallRng::from_rng(rand::thread_rng()).expect("failed to seed smallrng")
 }
