@@ -2,8 +2,8 @@ use crate::MelodyResult;
 use crate::feature::roles::{Granter, JoinRoleFilter};
 use crate::feature::feed::{Feed, FeedState};
 use crate::utils::Contextualize;
-use super::Cbor;
 
+use file_formats::Cbor;
 use serenity::model::id::{GuildId, UserId, RoleId};
 use singlefile::container_shared_async::ContainerAsyncWritableLocked;
 use tokio::sync::RwLock;

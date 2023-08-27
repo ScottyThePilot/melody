@@ -1,7 +1,7 @@
 use crate::MelodyResult;
 use crate::utils::Contextualize;
-use super::Toml;
 
+use file_formats::Toml;
 use rand::seq::SliceRandom;
 use serde::de::{Deserialize, Deserializer, Unexpected};
 use serenity::model::id::UserId;

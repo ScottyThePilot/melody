@@ -14,13 +14,10 @@ extern crate itertools;
 extern crate linefeed;
 extern crate once_cell;
 extern crate rand;
-extern crate serde_cbor;
 extern crate serenity;
 extern crate singlefile;
 extern crate tokio;
-extern crate toml;
 extern crate uord;
-extern crate xz2;
 
 #[macro_use] pub(crate) mod utils;
 #[macro_use] pub(crate) mod blueprint;
@@ -98,9 +95,9 @@ pub enum MelodyFileError {
   #[error(transparent)]
   Io(#[from] std::io::Error),
   #[error(transparent)]
-  Toml(#[from] singlefile::Error<crate::data::TomlError>),
+  Toml(#[from] singlefile::Error<file_formats::TomlError>),
   #[error(transparent)]
-  Cbor(#[from] singlefile::Error<crate::data::CborError>)
+  Cbor(#[from] singlefile::Error<file_formats::CborError>)
 }
 
 #[derive(Debug, Error, Clone)]

@@ -12,6 +12,7 @@ cleverbot = { path = "./libs/cleverbot" }
 command_attr = { version = "0.4.2" }
 const-random = { version = "0.1.15" }
 fern = { version = "0.6" }
+file-formats = { path = "./libs/file-formats" }
 float-ord = { version = "0.3.2" }
 itertools = { version = "0.10" }
 linefeed = { version = "0.6.0" }
@@ -21,12 +22,9 @@ rand = { version = "0.8", features = ["small_rng"] }
 regex = { version = "1.8.4" }
 rss-feed = { path = "./libs/rss-feed" }
 serde = { version = "1.0", features = ["derive", "rc"] }
-serde_cbor = { version = "0.11.2" }
 singlefile = { version = "0.1.0", features = ["shared-async"] }
 thiserror = { version = "1.0" }
 tokio = { version = "1.29", features = ["full", "parking_lot"] }
-toml = { version = "0.7" }
-xz2 = { version = "0.1.7" }
 
 [dependencies.serenity]
 version = "0.11"
@@ -50,5 +48,6 @@ features = ["serde"]
 members = [
   "libs/cacheable",
   "libs/cleverbot",
+  "libs/file-formats",
   "libs/rss-feed"
 ]
