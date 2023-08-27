@@ -74,11 +74,13 @@ pub struct PersistGuilds {
 impl PersistGuilds {
   #[inline]
   pub async fn create() -> MelodyResult<PersistGuilds> {
+    tokio::fs::create_dir_all("./data/guilds/")
+      .await.context("failed to create data/guilds/")?;
     let mut guilds = HashMap::new();
     let mut read_dir = tokio::fs::read_dir("./data/guilds/")
-      .await.context("failed to read dir")?;
-    while let Some(entry) = read_dir.next_entry().await.context("failed to read dir")? {
-      let file_type = entry.file_type().await.context("failed to read dir")?;
+      .await.context("failed to read data/guilds/")?;
+    while let Some(entry) = read_dir.next_entry().await.context("failed to read entry in data/guilds/")? {
+      let file_type = entry.file_type().await.context("failed to read entry in data/guilds/")?;
       if !file_type.is_file() { continue };
       if let Some(id) = parse_file_name(&entry.file_name()).map(GuildId) {
         let persist_guild = PersistGuild::create(id).await?;
@@ -122,8 +124,6 @@ pub struct PersistGuild {
 
 impl PersistGuild {
   pub async fn create(id: GuildId) -> MelodyResult<PersistGuildContainer> {
-    tokio::fs::create_dir_all("./data/guilds/")
-      .await.context("failed to create data/guilds/")?;
     let path = PathBuf::from(format!("./data/guilds/{id}.bin"));
     let container = PersistGuildContainer::create_or_default(path, Cbor)
       .await.context(format!("failed to load data/guilds/{id}.bin"))?;
