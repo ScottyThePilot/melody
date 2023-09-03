@@ -43,6 +43,7 @@ key!(pub struct PersistKey, PersistContainer);
 key!(pub struct PersistGuildsKey, PersistGuildsWrapper);
 key!(pub struct ShardManagerKey, Arc<Mutex<ShardManager>>);
 key!(pub struct CleverBotKey, crate::feature::cleverbot::CleverBotWrapper);
+key!(pub struct CleverBotLoggerKey, crate::feature::cleverbot::CleverBotLoggerWrapper);
 key!(pub struct FeedKey, crate::feature::feed::FeedWrapper);
 key!(pub struct MessageChainsKey, crate::feature::message_chains::MessageChainsWrapper);
 key!(pub struct TasksKey, TasksWrapper);

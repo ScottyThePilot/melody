@@ -1,21 +1,30 @@
 #![warn(missing_debug_implementations)]
-#[macro_use] extern crate log;
-#[macro_use] extern crate serde;
-#[macro_use] extern crate thiserror;
 extern crate ahash;
 extern crate chrono;
 extern crate chumsky;
 extern crate cleverbot;
+extern crate cleverbot_logs;
 extern crate command_attr;
 extern crate const_random;
+extern crate dunce;
 extern crate fern;
+extern crate file_formats;
 extern crate float_ord;
+extern crate ids;
 extern crate itertools;
 extern crate linefeed;
+#[macro_use]
+extern crate log;
 extern crate once_cell;
 extern crate rand;
+extern crate regex;
+extern crate rss_feed;
+#[macro_use]
+extern crate serde;
 extern crate serenity;
 extern crate singlefile;
+#[macro_use]
+extern crate thiserror;
 extern crate tokio;
 extern crate uord;
 
@@ -100,7 +109,9 @@ pub enum MelodyFileError {
   #[error(transparent)]
   Toml(#[from] singlefile::Error<file_formats::TomlError>),
   #[error(transparent)]
-  Cbor(#[from] singlefile::Error<file_formats::CborError>)
+  Cbor(#[from] singlefile::Error<file_formats::CborError>),
+  #[error(transparent)]
+  CleverBotLog(#[from] cleverbot_logs::Error)
 }
 
 #[derive(Debug, Error, Clone)]

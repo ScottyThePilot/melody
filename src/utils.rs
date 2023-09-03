@@ -208,6 +208,16 @@ where singlefile::Error<FE>: Into<MelodyFileError> {
   }
 }
 
+impl<T> Contextualize for Result<T, cleverbot_logs::Error> {
+  type Output = MelodyResult<T>;
+
+  fn context(self, context: impl Into<String>) -> Self::Output {
+    self.map_err(|error| {
+      MelodyError::FileError(MelodyFileError::CleverBotLog(error), context.into())
+    })
+  }
+}
+
 impl<T> Contextualize for Result<T, serenity::Error> {
   type Output = MelodyResult<T>;
 

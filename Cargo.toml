@@ -9,6 +9,7 @@ ahash = { version = "0.8" }
 chrono = { version = "0.4", features = ["serde"] }
 chumsky = { version = "0.9.2" }
 cleverbot = { path = "./libs/cleverbot" }
+cleverbot-logs = { path = "./libs/cleverbot-logs" }
 command_attr = { version = "0.4.2" }
 const-random = { version = "0.1.15" }
 dunce = { version = "1.0.4" }
@@ -49,6 +50,7 @@ features = ["serde"]
 members = [
   "libs/cacheable",
   "libs/cleverbot",
+  "libs/cleverbot-logs",
   "libs/file-formats",
   "libs/rss-feed"
 ]

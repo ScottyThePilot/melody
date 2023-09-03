@@ -4,13 +4,56 @@ use crate::ratelimiter::RateLimiter;
 use crate::utils::Contextualize;
 
 pub use cleverbot::Error as CleverBotError;
+pub use cleverbot_logs::Error as CleverBotLogError;
 use cleverbot::{CleverBotAgent, CleverBotContext};
+use cleverbot_logs::{CleverBotLogger, CleverBotLogEntry};
+use chrono::Utc;
 use serenity::builder::CreateEmbed;
 use serenity::model::channel::Message;
 use serenity::model::id::ChannelId;
+use tokio::sync::Mutex;
 
 use std::collections::HashMap;
 use std::time::Duration;
+use std::sync::Arc;
+
+
+
+#[derive(Debug, Clone)]
+pub struct CleverBotLoggerWrapper {
+  ptr: Arc<Mutex<CleverBotLogger>>
+}
+
+impl CleverBotLoggerWrapper {
+  pub async fn create() -> Result<Self, CleverBotLogError> {
+    let logger = tokio::task::spawn_blocking(|| {
+      CleverBotLogger::create(format!("./data/cleverbot.log"))
+    }).await.unwrap()?;
+
+    Ok(CleverBotLoggerWrapper {
+      ptr: Arc::new(Mutex::new(logger))
+    })
+  }
+
+  pub async fn log(
+    self,
+    channel_id: ChannelId,
+    message: impl Into<String>,
+    response: impl Into<String>
+  ) -> Result<(), CleverBotLogError> {
+    let message = message.into();
+    let response = response.into();
+    let guard = self.ptr.lock_owned().await;
+    tokio::task::spawn_blocking(move || {
+      guard.log(&CleverBotLogEntry {
+        thread: channel_id.into(),
+        time: Utc::now(),
+        message,
+        response
+      })
+    }).await.unwrap()
+  }
+}
 
 
 

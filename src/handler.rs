@@ -4,7 +4,7 @@ mod input;
 use crate::{MelodyResult, MelodyError};
 use crate::commands::APPLICATION_COMMANDS;
 use crate::data::*;
-use crate::feature::cleverbot::CleverBotManager;
+use crate::feature::cleverbot::{CleverBotManager, CleverBotLoggerWrapper};
 use crate::feature::feed::{Feed, FeedManager};
 use crate::feature::message_chains::MessageChains;
 use crate::feature::feed::FeedEventHandler;
@@ -58,11 +58,15 @@ pub async fn launch(
   let previous_build_id = persist.operate_mut_commit(|persist| Ok(persist.swap_build_id()))
     .await.context("failed to commit persist-guild state for build id")?;
 
+  let cleverbot_logger = CleverBotLoggerWrapper::create()
+    .await.context("failed to create cleverbot logger")?;
+
   core.init(|data| {
     data.insert::<ConfigKey>(config);
     data.insert::<PersistKey>(persist);
     data.insert::<PersistGuildsKey>(persist_guilds.into());
     data.insert::<CleverBotKey>(CleverBotManager::new().into());
+    data.insert::<CleverBotLoggerKey>(cleverbot_logger);
     data.insert::<MessageChainsKey>(MessageChains::new().into());
     data.insert::<FeedKey>(Arc::new(Mutex::new(FeedManager::new(ReqwestClient::new(), FeedHandler))));
     data.insert::<ShardManagerKey>(client.shard_manager.clone());
@@ -178,6 +182,7 @@ impl EventHandler for Handler {
           info!("Recieved reply from cleverbot: {reply:?}");
           let reply = content_safe(&core, reply, &options, &[]);
           crate::feature::cleverbot::send_reply(&core, &message, &reply).await.log();
+          core.get::<CleverBotLoggerKey>().await.log(message.channel_id, content, reply).await.log();
         },
         Err(error) => {
           message.reply(&core, "There was an error getting a reply from cleverbot").await
