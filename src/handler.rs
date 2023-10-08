@@ -4,7 +4,7 @@ mod input;
 use crate::{MelodyResult, MelodyError};
 use crate::commands::APPLICATION_COMMANDS;
 use crate::data::*;
-use crate::feature::cleverbot::{CleverBotManager, CleverBotLoggerWrapper};
+use crate::feature::cleverbot::{CleverBotLoggerWrapper, CleverBotWrapper};
 use crate::feature::feed::{Feed, FeedManager};
 use crate::feature::message_chains::MessageChains;
 use crate::feature::feed::FeedEventHandler;
@@ -58,6 +58,7 @@ pub async fn launch(
   let previous_build_id = persist.operate_mut_commit(|persist| Ok(persist.swap_build_id()))
     .await.context("failed to commit persist-guild state for build id")?;
 
+  let cleverbot_delay = config.operate(|config| config.cleverbot_ratelimit).await;
   let cleverbot_logger = CleverBotLoggerWrapper::create()
     .await.context("failed to create cleverbot logger")?;
 
@@ -65,7 +66,7 @@ pub async fn launch(
     data.insert::<ConfigKey>(config);
     data.insert::<PersistKey>(persist);
     data.insert::<PersistGuildsKey>(persist_guilds.into());
-    data.insert::<CleverBotKey>(CleverBotManager::new().into());
+    data.insert::<CleverBotKey>(CleverBotWrapper::new(Duration::from_secs_f64(cleverbot_delay)));
     data.insert::<CleverBotLoggerKey>(cleverbot_logger);
     data.insert::<MessageChainsKey>(MessageChains::new().into());
     data.insert::<FeedKey>(Arc::new(Mutex::new(FeedManager::new(ReqwestClient::new(), FeedHandler))));

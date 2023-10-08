@@ -24,6 +24,9 @@ pub struct Config {
   /// Accent color shown in help command embeds (optional)
   #[serde(default)]
   pub accent_color: Option<Color>,
+  /// Messages will not be sent at a higher interval than this.
+  #[serde(default = "default_cleverbot_ratelimit")]
+  pub cleverbot_ratelimit: f64,
   /// The list of gateway intents the bot should send to the Discord API.
   /// This can either be a list of intent names, or a number representing an intents bitfield.
   /// Defaults to [`GatewayIntents::non_privileged`].
@@ -42,6 +45,10 @@ impl Config {
     trace!("Loaded config.toml");
     Ok(container)
   }
+}
+
+fn default_cleverbot_ratelimit() -> f64 {
+  5.0
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

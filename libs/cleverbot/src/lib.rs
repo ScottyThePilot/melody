@@ -9,7 +9,7 @@ extern crate thiserror;
 use cacheable::{Cache, CacheableAsync, async_trait};
 use chrono::{DateTime, Utc};
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, percent_encode};
-use reqwest::{Client, Proxy, Error as ReqwestError};
+use reqwest::{Client, Proxy, Error as ReqwestError, StatusCode};
 
 use std::collections::VecDeque;
 use std::fmt;
@@ -207,12 +207,17 @@ pub async fn send(agent: &mut CleverBotAgent, history: &[String], message: &str)
     .header("enctype", "text/plain")
     .body(payload)
     .send().await?;
+  let response_status = response.status();
   let response_text = response.text().await?;
-  let previous_data = CleverBotPreviousData::new(&response_text)
-    .ok_or_else(|| Error::InvalidResponse(response_text))?;
-  let reply = previous_data.last_reply.clone();
-  agent_data.previous = Some(previous_data);
-  Ok(reply)
+  if response_status.is_client_error() || response_status.is_server_error() {
+    Err(Error::ResponseError(response_status, response_text))
+  } else {
+    let previous_data = CleverBotPreviousData::new(&response_text)
+      .ok_or_else(|| Error::InvalidResponse(response_text))?;
+    let reply = previous_data.last_reply.clone();
+    agent_data.previous = Some(previous_data);
+    Ok(reply)
+  }
 }
 
 macro_rules! ascii_set {
@@ -239,6 +244,8 @@ fn escape(input: &[u8]) -> impl std::fmt::Display + '_ {
 pub enum Error {
   #[error(transparent)]
   ReqwestError(#[from] ReqwestError),
+  #[error("response error: {0}")]
+  ResponseError(StatusCode, String),
   #[error("invalid cookie: {0:?}")]
   InvalidCookie(String),
   #[error("missing cookie")]

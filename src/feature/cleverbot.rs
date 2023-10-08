@@ -55,21 +55,20 @@ impl CleverBotLoggerWrapper {
   }
 }
 
-
-
-const DELAY: Duration = Duration::from_secs(3);
-
-pub type CleverBotWrapper = RateLimiter<CleverBotManager>;
-
-impl CleverBotWrapper {
-  pub async fn send(&self, channel: ChannelId, message: &str) -> Result<String, CleverBotError> {
-    self.get().await.send(channel, message).await
-  }
+#[derive(Debug, Clone)]
+pub struct CleverBotWrapper {
+  ratelimiter: RateLimiter<CleverBotManager>
 }
 
-impl From<CleverBotManager> for CleverBotWrapper {
-  fn from(manager: CleverBotManager) -> Self {
-    RateLimiter::new(manager, DELAY)
+impl CleverBotWrapper {
+  pub fn new(delay: Duration) -> Self {
+    CleverBotWrapper {
+      ratelimiter: RateLimiter::new(CleverBotManager::new(), delay)
+    }
+  }
+
+  pub async fn send(&self, channel: ChannelId, message: &str) -> Result<String, CleverBotError> {
+    self.ratelimiter.get().await.send(channel, message).await
   }
 }
 
