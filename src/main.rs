@@ -8,7 +8,6 @@ extern crate command_attr;
 extern crate const_random;
 extern crate dunce;
 extern crate fern;
-extern crate file_formats;
 extern crate float_ord;
 extern crate ids;
 extern crate itertools;
@@ -23,6 +22,7 @@ extern crate rss_feed;
 extern crate serde;
 extern crate serenity;
 extern crate singlefile;
+extern crate singlefile_formats;
 #[macro_use]
 extern crate thiserror;
 extern crate tokio;
@@ -107,9 +107,9 @@ pub enum MelodyFileError {
   #[error(transparent)]
   Io(#[from] std::io::Error),
   #[error(transparent)]
-  Toml(#[from] singlefile::Error<file_formats::TomlError>),
+  Toml(#[from] singlefile::Error<singlefile_formats::toml_serde::TomlError>),
   #[error(transparent)]
-  Cbor(#[from] singlefile::Error<file_formats::CborError>),
+  Cbor(#[from] singlefile::Error<singlefile_formats::cbor_serde::CborError>),
   #[error(transparent)]
   CleverBotLog(#[from] cleverbot_logs::Error)
 }

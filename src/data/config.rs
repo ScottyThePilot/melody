@@ -1,19 +1,19 @@
 use crate::MelodyResult;
 use crate::utils::Contextualize;
 
-use file_formats::Toml;
 use rand::seq::SliceRandom;
 use serde::de::{Deserialize, Deserializer, Unexpected};
 use serenity::model::id::UserId;
 use serenity::model::gateway::GatewayIntents;
 use serenity::utils::Color;
-use singlefile::container_shared_async::ContainerAsyncReadonly;
+use singlefile::container_shared_async::ContainerSharedAsyncReadonly;
+use singlefile_formats::toml_serde::Toml;
 
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-pub type ConfigContainer = ContainerAsyncReadonly<Config, Toml>;
+pub type ConfigContainer = ContainerSharedAsyncReadonly<Config, Toml>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Config {

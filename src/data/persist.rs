@@ -3,16 +3,16 @@ use crate::feature::roles::{Granter, JoinRoleFilter};
 use crate::feature::feed::{Feed, FeedState};
 use crate::utils::Contextualize;
 
-use file_formats::Cbor;
 use serenity::model::id::{GuildId, UserId, RoleId};
-use singlefile::container_shared_async::ContainerAsyncWritableLocked;
+use singlefile::container_shared_async::ContainerSharedAsyncWritableLocked;
+use singlefile_formats::cbor_serde::Cbor;
 use tokio::sync::RwLock;
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-pub type PersistContainer = ContainerAsyncWritableLocked<Persist, Cbor>;
+pub type PersistContainer = ContainerSharedAsyncWritableLocked<Persist, Cbor>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -110,7 +110,7 @@ impl From<PersistGuilds> for PersistGuildsWrapper {
   }
 }
 
-pub type PersistGuildContainer = ContainerAsyncWritableLocked<PersistGuild, Cbor>;
+pub type PersistGuildContainer = ContainerSharedAsyncWritableLocked<PersistGuild, Cbor>;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
