@@ -4,6 +4,7 @@ extern crate chrono;
 extern crate chumsky;
 extern crate cleverbot;
 extern crate cleverbot_logs;
+extern crate commander;
 extern crate command_attr;
 extern crate const_random;
 extern crate dunce;
@@ -63,6 +64,8 @@ fn main() {
     // Code to be executed when input is sent from the terminal
     move |line| input_sender.send(line).unwrap()
   );
+
+  println!();
 }
 
 #[tokio::main]

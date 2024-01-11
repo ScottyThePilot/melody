@@ -2,14 +2,13 @@ use crate::MelodyResult;
 use crate::data::Core;
 use crate::utils::Loggable;
 
+use commander::{Command, CommandError, CommandOutput, Parsed, resolve_args};
 use itertools::Itertools;
 use serenity::model::id::GuildId;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::UnboundedReceiver as MpscReceiver;
 
 use std::collections::HashSet;
-use std::error::Error;
-use std::str::FromStr;
 use std::sync::Arc;
 
 
@@ -22,99 +21,128 @@ pub async fn input_task(input: Arc<Mutex<MpscReceiver<String>>>, core: Core) {
   };
 }
 
-#[derive(Debug)]
-enum InputCommand<'a> {
+const COMMANDS: &[Command<Target>] = &[
+  Command::new_target("stop", Target::Stop),
+  Command::new_target("restart", Target::Restart),
+  Command::new_group("plugin", &[
+    Command::new_target("list", Target::PluginList),
+    Command::new_target("enable", Target::PluginEnable),
+    Command::new_target("disable", Target::PluginDisable)
+  ]),
+  Command::new_group("feeds", &[
+    Command::new_target("respawn-all", Target::FeedsRespawnAll),
+    Command::new_target("abort-all", Target::FeedsAbortAll),
+    Command::new_target("list-tasks", Target::FeedsListTasks),
+  ])
+];
+
+#[derive(Debug, Clone, Copy)]
+enum Target {
   Stop,
   Restart,
-  PluginList(GuildId),
-  PluginEnable(&'a str, GuildId),
-  PluginDisable(&'a str, GuildId),
-  FeedRespawnAll,
-  FeedAbortAll,
-  FeedListTasks
+  PluginList,
+  PluginEnable,
+  PluginDisable,
+  FeedsRespawnAll,
+  FeedsAbortAll,
+  FeedsListTasks
 }
 
 #[derive(Debug, Clone)]
-pub(super) struct InputAgent {
-  pub core: Core
+enum TargetArgs {
+  Stop,
+  Restart,
+  PluginList(GuildId),
+  PluginEnable(String, GuildId),
+  PluginDisable(String, GuildId),
+  FeedsRespawnAll,
+  FeedsAbortAll,
+  FeedsListTasks
+}
+
+impl TryFrom<CommandOutput<Target>> for TargetArgs {
+  type Error = CommandError;
+
+  fn try_from(output: CommandOutput<Target>) -> Result<Self, Self::Error> {
+    match output.target.clone() {
+      Target::Stop => Ok(TargetArgs::Stop),
+      Target::Restart => Ok(TargetArgs::Restart),
+      Target::PluginList => {
+        let Parsed(guild_id) = resolve_args::<Parsed<GuildId>>(&output.remaining_args)?;
+        Ok(TargetArgs::PluginList(guild_id))
+      },
+      Target::PluginEnable => {
+        let (plugin, Parsed(guild_id)) = resolve_args::<(String, Parsed<GuildId>)>(&output.remaining_args)?;
+        Ok(TargetArgs::PluginEnable(plugin, guild_id))
+      },
+      Target::PluginDisable => {
+        let (plugin, Parsed(guild_id)) = resolve_args::<(String, Parsed<GuildId>)>(&output.remaining_args)?;
+        Ok(TargetArgs::PluginDisable(plugin, guild_id))
+      },
+      Target::FeedsRespawnAll => Ok(TargetArgs::FeedsRespawnAll),
+      Target::FeedsAbortAll => Ok(TargetArgs::FeedsAbortAll),
+      Target::FeedsListTasks => Ok(TargetArgs::FeedsListTasks),
+    }
+  }
+}
+
+impl TargetArgs {
+  async fn execute(self, agent: &InputAgent) -> MelodyResult {
+    match self {
+      TargetArgs::Stop => {
+        info!("Shutdown triggered");
+        agent.core.trigger_shutdown().await;
+      },
+      TargetArgs::Restart => {
+        info!("Restart triggered");
+        agent.core.trigger_shutdown_restart().await;
+      },
+      TargetArgs::PluginList(guild_id) => {
+        let plugins = agent.plugin_list(guild_id).await;
+        info!("Plugins for guild ({guild_id}): {}", plugins.iter().join(", "));
+      },
+      TargetArgs::PluginEnable(plugin, guild_id) => {
+        agent.plugin_enable(&plugin, guild_id).await?;
+        info!("Enabled plugin {plugin} for guild ({guild_id})");
+      },
+      TargetArgs::PluginDisable(plugin, guild_id) => {
+        agent.plugin_disable(&plugin, guild_id).await?;
+        info!("Disabled plugin {plugin} for guild ({guild_id})");
+      },
+      TargetArgs::FeedsRespawnAll => {
+        let feed_wrapper = agent.core.get::<crate::data::FeedKey>().await;
+        feed_wrapper.lock().await.respawn_all(&agent.core).await;
+      },
+      TargetArgs::FeedsAbortAll => {
+        let feed_wrapper = agent.core.get::<crate::data::FeedKey>().await;
+        feed_wrapper.lock().await.abort_all();
+      },
+      TargetArgs::FeedsListTasks => {
+        let feed_wrapper = agent.core.get::<crate::data::FeedKey>().await;
+        for (feed, running) in feed_wrapper.lock().await.tasks() {
+          debug!("Feed task: {feed} ({})", if running { "running" } else { "stopped" });
+        };
+      }
+    };
+
+    Ok(())
+  }
+}
+
+#[derive(Debug, Clone)]
+struct InputAgent {
+  core: Core
 }
 
 impl InputAgent {
-  pub(super) fn new(core: impl Into<Core>) -> Self {
+  fn new(core: impl Into<Core>) -> Self {
     InputAgent { core: core.into() }
   }
 
-  fn get_command<'a>(&self, mut args: impl Iterator<Item = &'a str>) -> Result<InputCommand<'a>, InputError<'a>> {
-    match next(&mut args)? {
-      "stop" => Ok(InputCommand::Stop),
-      "restart" => Ok(InputCommand::Restart),
-      "plugin" | "plugins" => match next(&mut args)? {
-        "list" => {
-          let guild_id = parse(next(&mut args)?)?;
-          Ok(InputCommand::PluginList(GuildId::new(guild_id)))
-        },
-        "enable" => {
-          let plugin = next(&mut args)?;
-          let guild_id = parse(next(&mut args)?)?;
-          Ok(InputCommand::PluginEnable(plugin, GuildId::new(guild_id)))
-        },
-        "disable" => {
-          let plugin = next(&mut args)?;
-          let guild_id = parse(next(&mut args)?)?;
-          Ok(InputCommand::PluginDisable(plugin, GuildId::new(guild_id)))
-        },
-        unknown => Err(InputError::UnknownCommand(unknown))
-      },
-      "feed" | "feeds" => match next(&mut args)? {
-        "respawn-all" => Ok(InputCommand::FeedRespawnAll),
-        "abort-all" => Ok(InputCommand::FeedAbortAll),
-        "list-tasks" => Ok(InputCommand::FeedListTasks),
-        unknown => Err(InputError::UnknownCommand(unknown))
-      },
-      unknown => Err(InputError::UnknownCommand(unknown))
-    }
-  }
-
-  pub(super) async fn line(&self, line: String) -> MelodyResult {
-    let line = line.to_lowercase();
-    match self.get_command(line.split_whitespace()) {
-      Err(err) => error!("{err}"),
-      Ok(input_command) => match input_command {
-        InputCommand::Stop => {
-          info!("Shutdown triggered");
-          self.core.trigger_shutdown().await;
-        },
-        InputCommand::Restart => {
-          info!("Restart triggered");
-          self.core.trigger_shutdown_restart().await;
-        },
-        InputCommand::PluginList(guild_id) => {
-          let plugins = self.plugin_list(guild_id).await;
-          info!("Plugins for guild ({guild_id}): {}", plugins.iter().join(", "));
-        },
-        InputCommand::PluginEnable(plugin, guild_id) => {
-          self.plugin_enable(plugin, guild_id).await?;
-          info!("Enabled plugin {plugin} for guild ({guild_id})");
-        },
-        InputCommand::PluginDisable(plugin, guild_id) => {
-          self.plugin_disable(plugin, guild_id).await?;
-          info!("Disabled plugin {plugin} for guild ({guild_id})");
-        },
-        InputCommand::FeedRespawnAll => {
-          let feed_wrapper = self.core.get::<crate::data::FeedKey>().await;
-          feed_wrapper.lock().await.respawn_all(&self.core).await;
-        },
-        InputCommand::FeedAbortAll => {
-          let feed_wrapper = self.core.get::<crate::data::FeedKey>().await;
-          feed_wrapper.lock().await.abort_all();
-        },
-        InputCommand::FeedListTasks => {
-          let feed_wrapper = self.core.get::<crate::data::FeedKey>().await;
-          for (feed, running) in feed_wrapper.lock().await.tasks() {
-            debug!("Feed task: {feed} ({})", if running { "running" } else { "stopped" });
-          };
-        }
-      }
+  async fn line(&self, line: String) -> MelodyResult {
+    match commander::apply(&line, COMMANDS).and_then(TargetArgs::try_from) {
+      Ok(target_args) => target_args.execute(self).await?,
+      Err(err) => error!("{err}")
     };
 
     Ok(())
@@ -145,25 +173,4 @@ impl InputAgent {
       }).await?
     }).await
   }
-}
-
-fn parse<'a, T>(value: &'a str) -> Result<T, InputError<'a>>
-where T: FromStr, T::Err: Error {
-  value.parse::<T>().map_err(|err| {
-    InputError::FailedParsing(value, err.to_string())
-  })
-}
-
-fn next<'a>(args: &mut impl Iterator<Item = &'a str>) -> Result<&'a str, InputError<'a>> {
-  args.next().ok_or_else(|| InputError::UnexpectedEndOfInput)
-}
-
-#[derive(Debug, Error)]
-enum InputError<'a> {
-  #[error("Unknown command {0}")]
-  UnknownCommand(&'a str),
-  #[error("Failed to parse {0:?}: {1}")]
-  FailedParsing(&'a str, String),
-  #[error("Unexpected end of input")]
-  UnexpectedEndOfInput
 }

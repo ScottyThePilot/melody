@@ -18,8 +18,9 @@ While the bot is running, commands may be issued through the terminal:
 - `plugin list <guild-id>` - Lists the plugins that are enabled for a given guild
 - `plugin enable <plugin> <guild-id>` - Enables a plugin for a given guild
 - `plugin disable <plugin> <guild-id>` - Disables a plugin for a given guild
-- `feed respawn-all` - Respawns all feed tasks that may have terminated after too many failures
-- `feed list-tasks` - Lists all feed tasks and whether they are running
+- `feeds respawn-all` - Respawns all feed tasks that may have terminated after too many failures
+- `feeds abort-all` - Aborts all feed tasks
+- `feeds list-tasks` - Lists all feed tasks and whether they are running
 
 ## Plugins
 
