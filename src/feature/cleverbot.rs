@@ -8,7 +8,7 @@ pub use cleverbot_logs::Error as CleverBotLogError;
 use cleverbot::{CleverBotAgent, CleverBotContext};
 use cleverbot_logs::{CleverBotLogger, CleverBotLogEntry};
 use chrono::Utc;
-use serenity::builder::CreateEmbed;
+use serenity::builder::{CreateEmbed, CreateEmbedFooter, CreateMessage};
 use serenity::model::channel::Message;
 use serenity::model::id::ChannelId;
 use tokio::sync::Mutex;
@@ -91,40 +91,25 @@ impl CleverBotManager {
   }
 }
 
-pub async fn send_reply(core: &Core, message: &Message, content: impl AsRef<str>) -> MelodyResult {
+pub async fn send_reply(core: &Core, message: &Message, content: impl Into<String>) -> MelodyResult {
   // whether or not to notify the user that this message is from cleverbot
   let notify = core.operate_persist_commit(|persist| {
     Ok(persist.cleverbot_notify(message.author.id))
   }).await?;
 
-  message.channel_id
-    .send_message(&core, |builder| {
-      // reply to the original message
-      builder.reference_message(message).allowed_mentions(|mentions| {
-        mentions.replied_user(true)
-          .parse(serenity::builder::ParseValue::Everyone)
-          .parse(serenity::builder::ParseValue::Users)
-          .parse(serenity::builder::ParseValue::Roles)
-      });
-
-      if notify {
-        builder.set_embed(cleverbot_note_embed());
-      };
-
-      builder.content(content.as_ref())
-    })
+  let message_builder = CreateMessage::new()
+    .allowed_mentions(Default::default())
+    .embeds(if notify { vec![cleverbot_note_embed()] } else { Vec::new() })
+    .content(content);
+  message.channel_id.send_message(&core, message_builder)
     .await.context("failed to send cleverbot reply")?;
 
   Ok(())
 }
 
 fn cleverbot_note_embed() -> CreateEmbed {
-  let mut embed = CreateEmbed::default();
-  embed.title("Please note");
-  embed.description("Melody's chatbot responses are from CleverBot. If you send messages too quickly, you'll be ratelimited.");
-  embed.footer(|embed_footer| {
-    embed_footer.text("You're seeing this because it's your first time using this feature.")
-  });
-
-  embed
+  CreateEmbed::default()
+    .title("Please note")
+    .description("Melody's chatbot responses are from CleverBot. If you send messages too quickly, you'll be ratelimited.")
+    .footer(CreateEmbedFooter::new("You're seeing this because it's your first time using this feature."))
 }

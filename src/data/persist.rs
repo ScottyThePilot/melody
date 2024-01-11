@@ -82,7 +82,7 @@ impl PersistGuilds {
     while let Some(entry) = read_dir.next_entry().await.context("failed to read entry in data/guilds/")? {
       let file_type = entry.file_type().await.context("failed to read entry in data/guilds/")?;
       if !file_type.is_file() { continue };
-      if let Some(id) = parse_file_name(&entry.file_name()).map(GuildId) {
+      if let Some(id) = parse_file_name(&entry.file_name()).map(GuildId::new) {
         let persist_guild = PersistGuild::create(id).await?;
         guilds.insert(id, persist_guild);
       };

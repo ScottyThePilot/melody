@@ -1,58 +1,38 @@
-#![allow(missing_debug_implementations)]
-use crate::{MelodyError, MelodyCommandError, MelodyResult};
+use crate::{MelodyError, MelodyCommandError, MelodyParseCommandError, MelodyResult};
 use crate::data::Core;
 use crate::utils::{Blockify, Contextualize};
 
 use itertools::Itertools;
+
 use serenity::builder::{
-  CreateApplicationCommand,
-  CreateApplicationCommands,
-  CreateApplicationCommandOption,
-  CreateInteractionResponse,
-  CreateInteractionResponseData,
+  CreateCommand,
+  CreateCommandOption,
   CreateEmbed,
+  CreateEmbedFooter,
+  CreateInteractionResponse,
+  CreateInteractionResponseMessage,
   EditInteractionResponse
 };
-use serenity::http::Http;
-use serenity::model::application::interaction::InteractionResponseType;
-use serenity::model::application::interaction::application_command::{
-  ApplicationCommandInteraction, CommandData, CommandDataOption, CommandDataOptionValue
+use serenity::http::CacheHttp;
+use serenity::model::application::{
+  CommandData,
+  CommandDataOption,
+  CommandDataOptionValue,
+  CommandDataResolved,
+  CommandInteraction,
+  CommandOptionType,
+  CommandType
 };
-use serenity::model::application::command::{CommandType, CommandOptionType};
-use serenity::model::channel::{Attachment, ChannelType, PartialChannel};
+use serenity::model::channel::{ChannelType, Message};
+use serenity::model::colour::Color;
+use serenity::model::id::{UserId, ChannelId, RoleId, AttachmentId};
 use serenity::model::permissions::Permissions;
-use serenity::model::channel::Message;
-use serenity::model::guild::{PartialMember, Role};
-use serenity::model::user::User;
-use serenity::utils::Color;
 pub use serenity::futures::future::BoxFuture;
 
 use std::collections::HashSet;
 use std::fmt;
 use std::num::NonZeroU64;
 use std::str::FromStr;
-
-macro_rules! when {
-  ($ident:ident, $expr:expr) => {
-    if let Some($ident) = $ident { $expr; };
-  };
-}
-
-macro_rules! builder {
-  ($subject:expr) => (builder!($subject, build));
-  ($subject:expr, $build:ident) => (move |builder| {
-    $subject.$build(builder);
-    builder
-  });
-}
-
-pub fn commands_builder<'a>(commands: impl IntoIterator<Item = &'a BlueprintCommand>)
--> impl FnOnce(&mut CreateApplicationCommands) -> &mut CreateApplicationCommands {
-  move |builder| commands.into_iter().fold(builder, move |builder, &blueprint| {
-    builder.create_application_command(builder!(blueprint));
-    builder
-  })
-}
 
 pub fn find_command(commands: &'static [BlueprintCommand], name: &str) -> Option<&'static BlueprintCommand> {
   commands.into_iter().find(|command| command.name == name)
@@ -62,27 +42,28 @@ pub fn find_subcommand(subcommands: &'static [BlueprintSubcommand], name: &str) 
   subcommands.into_iter().find(|subcommand| subcommand.name == name)
 }
 
-pub fn command_embed(command: &'static BlueprintCommand, color: Color) -> CreateEmbed {
-  let mut builder = CreateEmbed::default();
-  builder.title(crate::utils::kebab_case_to_words(command.name));
-  builder.description(command.description);
-  builder.color(color);
-  if let Some(help) = command.stringify_info() {
-    builder.field("Info", help, false);
-  };
-  builder.field("Usage", command.stringify_usage(), false);
-  builder.field("Examples", command.stringify_examples(), false);
-  builder.field("Required Permissions", command.stringify_permissions(), false);
-  builder.field("Allowed in DM", if command.allow_in_dms { "Yes" } else { "No" }, false);
-  builder.footer(|builder| {
-    builder.text(format_args!("Melody v{}", env!("CARGO_PKG_VERSION")))
-  });
+pub fn iter_default_commands(commands: &'static [BlueprintCommand]) -> impl Iterator<Item = BlueprintCommand> + Clone {
+  commands.into_iter().copied().filter(|blueprint| !blueprint.is_exclusive())
+}
 
-  builder
+pub fn iter_exclusive_commands(commands: &'static [BlueprintCommand]) -> impl Iterator<Item = BlueprintCommand> + Clone {
+  commands.into_iter().copied().filter(|blueprint| blueprint.is_exclusive())
+}
+
+pub fn command_embed(command: &'static BlueprintCommand, color: Color) -> CreateEmbed {
+  CreateEmbed::default()
+    .title(crate::utils::kebab_case_to_words(command.name))
+    .description(command.description)
+    .color(color)
+    .field("Info", command.stringify_info(), false)
+    .field("Usage", command.stringify_usage(), false)
+    .field("Examples", command.stringify_examples(), false)
+    .field("Required Permissions", command.stringify_permissions(), false)
+    .field("Allowed in DM", if command.allow_in_dms { "Yes" } else { "No" }, false)
+    .footer(CreateEmbedFooter::new(format!("Melody v{}", env!("CARGO_PKG_VERSION"))))
 }
 
 pub fn command_list_embed(commands: &'static [BlueprintCommand], permissions: Permissions, color: Color) -> CreateEmbed {
-  let mut builder = CreateEmbed::default();
   let mut commands = commands.to_owned();
   commands.sort_by_key(|command| command.name);
   let body = commands.into_iter()
@@ -90,15 +71,16 @@ pub fn command_list_embed(commands: &'static [BlueprintCommand], permissions: Pe
     .map(|command| format!("`/{}`: *{}*", command.name, command.description))
     .join("\n");
 
-  builder.title("Command Help");
-  builder.description("Below is a list of commands, each with a short description of what they do.");
-  builder.color(color);
-  builder.field("Command List", body, false);
-  builder.footer(|builder| {
-    builder.text(format_args!("Melody v{}", env!("CARGO_PKG_VERSION")))
-  });
+  CreateEmbed::default()
+    .title("Command Help")
+    .description("Below is a list of commands, each with a short description of what they do.")
+    .color(color)
+    .field("Command List", body, false)
+    .footer(CreateEmbedFooter::new(format!("Melody v{}", env!("CARGO_PKG_VERSION"))))
+}
 
-  builder
+pub fn build_commands(commands: impl IntoIterator<Item = BlueprintCommand>) -> Vec<CreateCommand> {
+  commands.into_iter().map(BlueprintCommand::into_command_builder).collect()
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -116,16 +98,15 @@ pub struct BlueprintCommand {
 }
 
 impl BlueprintCommand {
-  fn build(self, builder: &mut CreateApplicationCommand) {
-    builder.name(self.name);
-    builder.description(self.description);
-    builder.kind(self.command_type);
-    builder.dm_permission(self.allow_in_dms);
-    if let Some(permissions) = self.default_permissions {
-      builder.default_member_permissions(permissions);
-    };
-
-    self.root.build_command(builder);
+  pub fn into_command_builder(self) -> CreateCommand {
+    let permissions = self.default_permissions
+      .unwrap_or(Permissions::empty());
+    CreateCommand::new(self.name)
+      .description(self.description)
+      .kind(self.command_type)
+      .dm_permission(self.allow_in_dms)
+      .default_member_permissions(permissions)
+      .set_options(self.root.into_options_builders().1)
   }
 
   pub fn is_enabled(&self, plugins: &HashSet<String>) -> bool {
@@ -139,24 +120,28 @@ impl BlueprintCommand {
     self.plugin.is_some()
   }
 
-  fn stringify_info(self) -> Option<String> {
-    self.info.map(|info| info.into_iter().join(" "))
+  fn stringify_info(self) -> String {
+    self.info.map_or_else(|| "(none)".to_owned(), |info| info.into_iter().join(" "))
   }
 
   fn stringify_usage(self) -> String {
-    self.usage.map_or_else(|| "none".to_owned(), |usage| {
+    self.usage.map_or_else(|| "(none)".to_owned(), |usage| {
       usage.into_iter().map(Blockify::new).join("\n")
     })
   }
 
   fn stringify_examples(self) -> String {
-    self.examples.map_or_else(|| "none".to_owned(), |example| {
+    self.examples.map_or_else(|| "(none)".to_owned(), |example| {
       example.into_iter().map(Blockify::new).join("\n")
     })
   }
 
   fn stringify_permissions(self) -> String {
-    self.default_permissions.map_or_else(|| "Everyone".to_owned(), |p| p.to_string())
+    match self.default_permissions {
+      None => "Everyone".to_owned(),
+      Some(p) if p.is_empty() => "Everyone".to_owned(),
+      Some(p) => p.to_string()
+    }
   }
 }
 
@@ -168,10 +153,14 @@ pub struct BlueprintSubcommand {
 }
 
 impl BlueprintSubcommand {
-  fn build(self, builder: &mut CreateApplicationCommandOption) {
-    builder.name(self.name);
-    builder.description(self.description);
-    self.root.build_command_option(builder);
+  fn into_option_builder(self) -> CreateCommandOption {
+    let (kind, options_builders) = self.root.into_options_builders();
+    let mut builder = CreateCommandOption::new(kind, self.name, self.description);
+    for option_builder in options_builders {
+      builder = builder.add_sub_option(option_builder);
+    };
+
+    builder
   }
 }
 
@@ -187,42 +176,38 @@ pub enum BlueprintRoot {
 }
 
 impl BlueprintRoot {
-  fn build_command(self, builder: &mut CreateApplicationCommand) {
+  fn into_options_builders(self) -> (CommandOptionType, Vec<CreateCommandOption>) {
     match self {
       BlueprintRoot::Command { options, .. } => {
-        for &option in options {
-          builder.create_option(|builder| {
-            option.build(builder);
-            builder
-          });
-        };
+        let builders = options.iter().copied()
+          .map(BlueprintOption::into_option_builder)
+          .collect();
+        (CommandOptionType::SubCommand, builders)
       },
       BlueprintRoot::CommandContainer { subcommands, .. } => {
-        for &subcommand in subcommands {
-          builder.create_option(|builder| {
-            subcommand.build(builder);
-            builder
-          });
-        };
+        let builders = subcommands.iter().copied()
+          .map(BlueprintSubcommand::into_option_builder)
+          .collect();
+        (CommandOptionType::SubCommandGroup, builders)
       }
-    };
+    }
   }
 
-  fn build_command_option(self, builder: &mut CreateApplicationCommandOption) {
+  fn get(self, subcommands_names: &[String]) -> Option<(&'static [BlueprintOption], CommandFn)> {
     match self {
-      BlueprintRoot::Command { options, .. } => {
-        builder.kind(CommandOptionType::SubCommand);
-        for &option in options {
-          builder.create_sub_option(builder!(option));
-        };
-      },
-      BlueprintRoot::CommandContainer { subcommands, .. } => {
-        builder.kind(CommandOptionType::SubCommandGroup);
-        for &subcommand in subcommands {
-          builder.create_sub_option(builder!(subcommand));
-        };
+      // this command root terminates at a command with regular options,
+      // return those regular options if `subcommands_names` agrees that the command terminates here
+      BlueprintRoot::Command { options, function } => subcommands_names.is_empty().then(|| (options, *function)),
+      // this command root contains other subcommands_names, split the first element off of `subcommands_names`
+      BlueprintRoot::CommandContainer { subcommands } => {
+        let (subcommand, remaining_subcommands) = subcommands_names.split_first()?;
+        // if the first element of `subcommands_names` can be split off,
+        // find the corresponding subcommand blueprint and recursively call the validator on it
+        find_subcommand(subcommands, subcommand).and_then(|blueprint_subcommand| {
+          blueprint_subcommand.root.get(remaining_subcommands)
+        })
       }
-    };
+    }
   }
 }
 
@@ -231,30 +216,78 @@ pub struct BlueprintOption {
   pub name: &'static str,
   pub description: &'static str,
   pub required: bool,
-  pub data: BlueprintOptionData
+  pub variant: BlueprintOptionVariant
 }
 
 impl BlueprintOption {
-  fn build(self, builder: &mut CreateApplicationCommandOption) {
-    builder.name(self.name);
-    builder.description(self.description);
-    builder.required(self.required);
-    self.data.build(builder);
+  fn into_option_builder(self) -> CreateCommandOption {
+    match self.variant {
+      BlueprintOptionVariant::String { min_length, max_length, choices } => {
+        let mut builder = CreateCommandOption::new(CommandOptionType::String, self.name, self.description).required(self.required);
+        if let Some(min_length) = min_length { builder = builder.min_length(min_length) };
+        if let Some(max_length) = max_length { builder = builder.max_length(max_length) };
+        for &(name, value) in choices {
+          builder = builder.add_string_choice(name, value);
+        };
+
+        builder
+      },
+      BlueprintOptionVariant::Integer { min_value, max_value, choices } => {
+        // TODO: update this to use `min_int_value` and `max_int_value` when they are fixed
+        let mut builder = CreateCommandOption::new(CommandOptionType::Integer, self.name, self.description).required(self.required);
+        if let Some(min_value) = min_value { builder = builder.min_number_value(min_value as f64) };
+        if let Some(max_value) = max_value { builder = builder.max_number_value(max_value as f64) };
+        for &(name, value) in choices {
+          builder = builder.add_number_choice(name, value as f64);
+        };
+
+        builder
+      },
+      BlueprintOptionVariant::Number { min_value, max_value, choices } => {
+        let mut builder = CreateCommandOption::new(CommandOptionType::Number, self.name, self.description).required(self.required);
+        if let Some(min_value) = min_value { builder = builder.min_number_value(min_value) };
+        if let Some(max_value) = max_value { builder = builder.max_number_value(max_value) };
+        for &(name, value) in choices {
+          builder = builder.add_number_choice(name, value);
+        };
+
+        builder
+      },
+      BlueprintOptionVariant::Boolean => {
+        CreateCommandOption::new(CommandOptionType::Boolean, self.name, self.description).required(self.required)
+      },
+      BlueprintOptionVariant::User => {
+        CreateCommandOption::new(CommandOptionType::User, self.name, self.description).required(self.required)
+      },
+      BlueprintOptionVariant::Role => {
+        CreateCommandOption::new(CommandOptionType::Role, self.name, self.description).required(self.required)
+      },
+      BlueprintOptionVariant::Mentionable => {
+        CreateCommandOption::new(CommandOptionType::Mentionable, self.name, self.description).required(self.required)
+      },
+      BlueprintOptionVariant::Channel { channel_types } => {
+        let builder = CreateCommandOption::new(CommandOptionType::Mentionable, self.name, self.description).required(self.required);
+        if channel_types.is_empty() { builder } else { builder.channel_types(channel_types.to_owned()) }
+      },
+      BlueprintOptionVariant::Attachment => {
+        CreateCommandOption::new(CommandOptionType::Attachment, self.name, self.description).required(self.required)
+      }
+    }
   }
 }
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
-pub enum BlueprintOptionData {
+pub enum BlueprintOptionVariant {
   String {
     min_length: Option<u16>,
     max_length: Option<u16>,
     choices: BlueprintChoices<&'static str>
   },
   Integer {
-    min_value: Option<i32>,
-    max_value: Option<i32>,
-    choices: BlueprintChoices<i32>
+    min_value: Option<i64>,
+    max_value: Option<i64>,
+    choices: BlueprintChoices<i64>
   },
   Number {
     min_value: Option<f64>,
@@ -271,67 +304,18 @@ pub enum BlueprintOptionData {
   Attachment
 }
 
-impl BlueprintOptionData {
-  fn build(self, builder: &mut CreateApplicationCommandOption) {
-    match self {
-      BlueprintOptionData::String { min_length, max_length, choices } => {
-        builder.kind(CommandOptionType::String);
-        when!(min_length, builder.min_length(min_length));
-        when!(max_length, builder.max_length(max_length));
-        for &(name, value) in choices {
-          builder.add_string_choice(name, value);
-        };
-      },
-      BlueprintOptionData::Integer { min_value, max_value, choices } => {
-        builder.kind(CommandOptionType::Integer);
-        when!(min_value, builder.min_int_value(min_value));
-        when!(max_value, builder.max_int_value(max_value));
-        for &(name, value) in choices {
-          builder.add_int_choice(name, value);
-        };
-      },
-      BlueprintOptionData::Number { min_value, max_value, choices } => {
-        builder.kind(CommandOptionType::Number);
-        when!(min_value, builder.min_number_value(min_value));
-        when!(max_value, builder.max_number_value(max_value));
-        for &(name, value) in choices {
-          builder.add_number_choice(name, value);
-        };
-      },
-      BlueprintOptionData::Boolean => {
-        builder.kind(CommandOptionType::Boolean);
-      },
-      BlueprintOptionData::User => {
-        builder.kind(CommandOptionType::User);
-      },
-      BlueprintOptionData::Role => {
-        builder.kind(CommandOptionType::Role);
-      },
-      BlueprintOptionData::Mentionable => {
-        builder.kind(CommandOptionType::Mentionable);
-      },
-      BlueprintOptionData::Channel { channel_types } => {
-        builder.kind(CommandOptionType::Channel);
-        if !channel_types.is_empty() {
-          builder.channel_types(channel_types);
-        };
-      },
-      BlueprintOptionData::Attachment => {
-        builder.kind(CommandOptionType::Attachment);
-      }
-    };
-  }
-
-  fn is_same_type(self, option: &CommandDataOptionValue) -> bool {
-    match (self, option) {
-      (BlueprintOptionData::String { .. }, CommandDataOptionValue::String(..)) => true,
-      (BlueprintOptionData::Integer { .. }, CommandDataOptionValue::Integer(..)) => true,
-      (BlueprintOptionData::Number { .. }, CommandDataOptionValue::Number(..)) => true,
-      (BlueprintOptionData::Boolean, CommandDataOptionValue::Boolean(..)) => true,
-      (BlueprintOptionData::User | BlueprintOptionData::Mentionable, CommandDataOptionValue::User(..)) => true,
-      (BlueprintOptionData::Role | BlueprintOptionData::Mentionable, CommandDataOptionValue::Role(..)) => true,
-      (BlueprintOptionData::Channel { .. } | BlueprintOptionData::Mentionable, CommandDataOptionValue::Channel(..)) => true,
-      (BlueprintOptionData::Attachment, CommandDataOptionValue::Attachment(..)) => true,
+impl BlueprintOptionVariant {
+  fn is_same_type(self, value: &BlueprintOptionValue) -> bool {
+    match (self, value) {
+      (BlueprintOptionVariant::String { .. }, BlueprintOptionValue::String(..)) => true,
+      (BlueprintOptionVariant::Integer { .. }, BlueprintOptionValue::Integer(..)) => true,
+      (BlueprintOptionVariant::Number { .. }, BlueprintOptionValue::Number(..)) => true,
+      (BlueprintOptionVariant::Boolean, BlueprintOptionValue::Boolean(..)) => true,
+      (BlueprintOptionVariant::User, BlueprintOptionValue::User(..)) => true,
+      (BlueprintOptionVariant::Role, BlueprintOptionValue::Role(..)) => true,
+      (BlueprintOptionVariant::Mentionable, BlueprintOptionValue::User(..) | BlueprintOptionValue::Role(..)) => true,
+      (BlueprintOptionVariant::Channel { .. }, BlueprintOptionValue::Channel(..)) => true,
+      (BlueprintOptionVariant::Attachment, BlueprintOptionValue::Attachment(..)) => true,
       _ => false
     }
   }
@@ -379,24 +363,16 @@ impl BlueprintCommandResponse {
     }
   }
 
-  fn build_data(self, builder: &mut CreateInteractionResponseData) {
-    builder.tts(self.tts);
-    builder.ephemeral(self.ephemeral);
-    if let Some(content) = self.content {
-      builder.content(content);
-    };
-    if !self.embeds.is_empty() {
-      builder.set_embeds(self.embeds);
-    };
+  fn into_response_builder(self) -> CreateInteractionResponse {
+    let mut response = CreateInteractionResponseMessage::new()
+      .tts(self.tts).ephemeral(self.ephemeral);
+    if let Some(content) = self.content { response = response.content(content) };
+    if !self.embeds.is_empty() { response = response.embeds(self.embeds) };
+    CreateInteractionResponse::Message(response)
   }
 
-  fn build(self, builder: &mut CreateInteractionResponse) {
-    builder.kind(InteractionResponseType::ChannelMessageWithSource);
-    builder.interaction_response_data(builder!(self, build_data));
-  }
-
-  pub async fn send(self, http: impl AsRef<Http>, interaction: &ApplicationCommandInteraction) -> MelodyResult {
-    interaction.create_interaction_response(http, builder!(self))
+  pub async fn send(self, cache_http: impl CacheHttp, interaction: &CommandInteraction) -> MelodyResult {
+    interaction.create_response(cache_http, self.into_response_builder())
       .await.context("failed to send interaction response")
   }
 }
@@ -428,106 +404,124 @@ impl BlueprintCommandResponseEdit {
     BlueprintCommandResponseEdit { content: None, embeds }
   }
 
-  fn build(self, builder: &mut EditInteractionResponse) {
-    if let Some(content) = self.content {
-      builder.content(content);
-    };
-    if !self.embeds.is_empty() {
-      builder.set_embeds(self.embeds);
-    };
+  fn into_response_builder(self) -> EditInteractionResponse {
+    let mut response = EditInteractionResponse::new();
+    if let Some(content) = self.content { response = response.content(content) };
+    if !self.embeds.is_empty() { response = response.embeds(self.embeds) };
+    response
   }
 
-  pub async fn send(self, http: impl AsRef<Http>, interaction: &ApplicationCommandInteraction) -> MelodyResult<Message> {
-    interaction.edit_original_interaction_response(http, builder!(self))
+  pub async fn send(self, cache_http: impl CacheHttp, interaction: &CommandInteraction) -> MelodyResult<Message> {
+    interaction.edit_response(cache_http, self.into_response_builder())
       .await.context("failed to edit interaction response")
   }
 }
 
+pub type BlueprintChoices<T> = &'static [(&'static str, T)];
+
+#[derive(Debug, Clone)]
 pub struct BlueprintCommandArgs {
   pub command: String,
   pub subcommands: Vec<String>,
-  pub interaction: ApplicationCommandInteraction,
-  pub option_values: Vec<CommandDataOptionValue>
+  pub option_values: Vec<BlueprintOptionValue>,
+  pub interaction: CommandInteraction
 }
-
-pub type CommandDataOptionValues = Vec<CommandDataOptionValue>;
-
-pub type BlueprintChoices<T> = &'static [(&'static str, T)];
 
 pub type CommandFn<T = ()> = fn(Core, BlueprintCommandArgs) -> BoxFuture<'static, MelodyResult<T>>;
 
 pub async fn dispatch(
   core: Core,
-  interaction: ApplicationCommandInteraction,
+  interaction: CommandInteraction,
   blueprint_commands: &'static [BlueprintCommand]
 ) -> MelodyResult {
-  let decomposed = decompose_command(blueprint_commands, &interaction.data)
-    .ok_or(MelodyError::COMMAND_FAILED_TO_PARSE)?;
+  let decomposed = parse_command(&interaction.data, blueprint_commands)?;
   let (command, subcommands, option_values, function) = decomposed;
   function(core, BlueprintCommandArgs { command, subcommands, interaction, option_values }).await
 }
 
-/// Returns the name of the command executed, the list of subcommand arguments, and the list of regular arguments
-fn decompose_command(
-  blueprint_commands: &'static [BlueprintCommand],
-  data: &CommandData
-) -> Option<(String, Vec<String>, Vec<CommandDataOptionValue>, CommandFn)> {
-  fn extract_command_arguments_recursive(
+fn parse_command(
+  data: &CommandData, blueprint_commands: &'static [BlueprintCommand]
+) -> Result<(String, Vec<String>, Vec<BlueprintOptionValue>, CommandFn), MelodyParseCommandError> {
+  fn extract_arguments_recursive(
+    resolved: &CommandDataResolved,
     data_options: &[CommandDataOption],
     extracted_subcommands: &mut Vec<String>,
-    extracted_options: &mut Vec<CommandDataOptionValue>
-  ) {
-    for data_option in data_options {
-      if let CommandOptionType::SubCommandGroup | CommandOptionType::SubCommand = data_option.kind {
-        extracted_subcommands.push(data_option.name.clone());
-        extract_command_arguments_recursive(&data_option.options, extracted_subcommands, extracted_options);
-      } else if let Some(data_value) = &data_option.resolved {
-        extracted_options.push(data_value.clone());
+    extracted_options: &mut Vec<BlueprintOptionValue>
+  ) -> Result<(), MelodyParseCommandError> {
+    if let &[CommandDataOption {
+      ref name, value:
+        CommandDataOptionValue::SubCommandGroup(ref data_options) |
+        CommandDataOptionValue::SubCommand(ref data_options),
+      ..
+    }] = data_options {
+      extracted_subcommands.push(name.to_owned());
+      extract_arguments_recursive(resolved, &data_options, extracted_subcommands, extracted_options)?;
+    } else {
+      for data_option in data_options {
+        extracted_options.push(match data_option.value {
+          CommandDataOptionValue::String(ref value) => BlueprintOptionValue::String(value.clone()),
+          CommandDataOptionValue::Integer(value) => BlueprintOptionValue::Integer(value),
+          CommandDataOptionValue::Number(value) => BlueprintOptionValue::Number(value),
+          CommandDataOptionValue::Boolean(value) => BlueprintOptionValue::Boolean(value),
+          CommandDataOptionValue::User(value) => BlueprintOptionValue::User(value),
+          CommandDataOptionValue::Role(value) => BlueprintOptionValue::Role(value),
+          CommandDataOptionValue::Channel(value) => BlueprintOptionValue::Channel(value),
+          CommandDataOptionValue::Attachment(value) => BlueprintOptionValue::Attachment(value),
+          CommandDataOptionValue::Mentionable(id) => {
+            let user_id = UserId::new(id.get());
+            let role_id = RoleId::new(id.get());
+
+            if resolved.users.contains_key(&user_id) {
+              BlueprintOptionValue::User(user_id)
+            } else if resolved.roles.contains_key(&role_id) {
+              BlueprintOptionValue::Role(role_id)
+            } else {
+              return Err(MelodyParseCommandError::UnresolvedGenericId(id))
+            }
+          },
+          _ => return Err(MelodyParseCommandError::InvalidStructure)
+        });
       };
     };
-  }
 
-  fn validate_subcommands_recursive(
-    blueprint_root: BlueprintRoot,
-    extracted_subcommands: &[String]
-  ) -> Option<(&'static [BlueprintOption], CommandFn)> {
-    match blueprint_root {
-      // this command root terminates at a command with regular options,
-      // return those regular options if `extracted_subcommands` agrees that the command terminates here
-      BlueprintRoot::Command { options, function } => extracted_subcommands.is_empty().then(|| (options, *function)),
-      // this command root contains other subcommands, split the first element off of `extracted_subcommands`
-      BlueprintRoot::CommandContainer { subcommands } => {
-        let (subcommand, remaining_subcommands) = extracted_subcommands.split_first()?;
-        // if the first element of `extracted_subcommands` can be split off,
-        // find the corresponding subcommand blueprint and recursively call the validator on it
-        find_subcommand(subcommands, subcommand).and_then(|blueprint_subcommand| {
-          validate_subcommands_recursive(blueprint_subcommand.root, remaining_subcommands)
-        })
-      }
-    }
+    Ok(())
   }
 
   let mut extracted_subcommands = Vec::new();
   let mut extracted_options = Vec::new();
-  extract_command_arguments_recursive(&data.options, &mut extracted_subcommands, &mut extracted_options);
-  let blueprint_command = find_command(blueprint_commands, &data.name)?;
-  let (blueprint_options, function) = validate_subcommands_recursive(blueprint_command.root, &extracted_subcommands)?;
+  extract_arguments_recursive(&data.resolved, &data.options, &mut extracted_subcommands, &mut extracted_options)?;
+  let blueprint_command = find_command(blueprint_commands, &data.name)
+    .ok_or(MelodyParseCommandError::NoCommandFound)?;
+  let (blueprint_options, function) = blueprint_command.root.get(&extracted_subcommands)
+    .ok_or(MelodyParseCommandError::NoCommandFound)?;
   blueprint_options.into_iter().zip(extracted_options.iter())
-    .all(|(blueprint_option, option)| blueprint_option.data.is_same_type(option))
+    .all(|(blueprint_option, value)| blueprint_option.variant.is_same_type(value))
     .then(|| (data.name.clone(), extracted_subcommands, extracted_options, function))
+    .ok_or(MelodyParseCommandError::InvalidStructure)
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum BlueprintOptionValue {
+  String(String),
+  Integer(i64),
+  Number(f64),
+  Boolean(bool),
+  User(UserId),
+  Role(RoleId),
+  Channel(ChannelId),
+  Attachment(AttachmentId)
+}
 
-
-pub enum RoleOrMember {
-  Role(Role),
-  Member(User, PartialMember)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RoleOrUser {
+  User(UserId),
+  Role(RoleId)
 }
 
 macro_rules! impl_resolve_argument_value {
   ($Type:ty, $pat:pat => $expr:expr) => {
     impl ResolveArgumentValue for $Type {
-      fn resolve_value(option_value: Option<CommandDataOptionValue>) -> Option<Self> {
+      fn resolve_value(option_value: Option<BlueprintOptionValue>) -> Option<Self> {
         if let Some($pat) = option_value { $expr } else { None }
       }
     }
@@ -535,38 +529,37 @@ macro_rules! impl_resolve_argument_value {
 }
 
 pub trait ResolveArgumentValue {
-  fn resolve_value(option_value: Option<CommandDataOptionValue>) -> Option<Self> where Self: Sized;
+  fn resolve_value(option_value: Option<BlueprintOptionValue>) -> Option<Self> where Self: Sized;
 }
 
-impl_resolve_argument_value!(String, CommandDataOptionValue::String(value) => Some(value));
-impl_resolve_argument_value!(i64, CommandDataOptionValue::Integer(value) => Some(value));
-impl_resolve_argument_value!(u64, CommandDataOptionValue::Integer(value) => u64::try_from(value).ok());
-impl_resolve_argument_value!(f64, CommandDataOptionValue::Number(value) => Some(value));
-impl_resolve_argument_value!(bool, CommandDataOptionValue::Boolean(value) => Some(value));
-impl_resolve_argument_value!(User, CommandDataOptionValue::User(value, _) => Some(value));
-impl_resolve_argument_value!(PartialMember, CommandDataOptionValue::User(_, value) => value);
-impl_resolve_argument_value!(PartialChannel, CommandDataOptionValue::Channel(value) => Some(value));
-impl_resolve_argument_value!(Role, CommandDataOptionValue::Role(value) => Some(value));
-impl_resolve_argument_value!(Attachment, CommandDataOptionValue::Attachment(value) => Some(value));
+impl_resolve_argument_value!(String, BlueprintOptionValue::String(value) => Some(value));
+impl_resolve_argument_value!(i64, BlueprintOptionValue::Integer(value) => Some(value));
+impl_resolve_argument_value!(u64, BlueprintOptionValue::Integer(value) => u64::try_from(value).ok());
+impl_resolve_argument_value!(f64, BlueprintOptionValue::Number(value) => Some(value));
+impl_resolve_argument_value!(bool, BlueprintOptionValue::Boolean(value) => Some(value));
+impl_resolve_argument_value!(UserId, BlueprintOptionValue::User(value) => Some(value));
+impl_resolve_argument_value!(RoleId, BlueprintOptionValue::Role(value) => Some(value));
+impl_resolve_argument_value!(ChannelId, BlueprintOptionValue::Channel(value) => Some(value));
+impl_resolve_argument_value!(AttachmentId, BlueprintOptionValue::Attachment(value) => Some(value));
 
-impl ResolveArgumentValue for RoleOrMember {
-  fn resolve_value(option_value: Option<CommandDataOptionValue>) -> Option<Self> where Self: Sized {
+impl ResolveArgumentValue for RoleOrUser {
+  fn resolve_value(option_value: Option<BlueprintOptionValue>) -> Option<Self> where Self: Sized {
     option_value.and_then(|option_value| match option_value {
-      CommandDataOptionValue::Role(role) => Some(RoleOrMember::Role(role)),
-      CommandDataOptionValue::User(user, Some(member)) => Some(RoleOrMember::Member(user, member)),
+      BlueprintOptionValue::User(user) => Some(RoleOrUser::User(user)),
+      BlueprintOptionValue::Role(role) => Some(RoleOrUser::Role(role)),
       _ => None
     })
   }
 }
 
 impl ResolveArgumentValue for NonZeroU64 {
-  fn resolve_value(option_value: Option<CommandDataOptionValue>) -> Option<Self> where Self: Sized {
+  fn resolve_value(option_value: Option<BlueprintOptionValue>) -> Option<Self> where Self: Sized {
     u64::resolve_value(option_value).and_then(NonZeroU64::new)
   }
 }
 
 impl<T: ResolveArgumentValue> ResolveArgumentValue for Option<T> {
-  fn resolve_value(option_value: Option<CommandDataOptionValue>) -> Option<Option<T>> {
+  fn resolve_value(option_value: Option<BlueprintOptionValue>) -> Option<Option<T>> {
     Some(option_value.and_then(|option_value| T::resolve_value(Some(option_value))))
   }
 }
@@ -574,7 +567,7 @@ impl<T: ResolveArgumentValue> ResolveArgumentValue for Option<T> {
 macro_rules! impl_resolve_arguments_values {
   ($($G:ident),*) => {
     impl<$($G: ResolveArgumentValue),*> ResolveArgumentsValues for ($($G,)*) {
-      fn resolve_values(option_values: Vec<CommandDataOptionValue>) -> Option<Self> {
+      fn resolve_values(option_values: Vec<BlueprintOptionValue>) -> Option<Self> {
         let mut option_values = option_values.into_iter();
         Some(($($G::resolve_value(option_values.next())?,)*))
       }
@@ -583,7 +576,7 @@ macro_rules! impl_resolve_arguments_values {
 }
 
 pub trait ResolveArgumentsValues {
-  fn resolve_values(option_values: Vec<CommandDataOptionValue>) -> Option<Self> where Self: Sized;
+  fn resolve_values(option_values: Vec<BlueprintOptionValue>) -> Option<Self> where Self: Sized;
 }
 
 impl_resolve_arguments_values!(A, B);
@@ -595,13 +588,11 @@ impl_resolve_arguments_values!(A, B, C, D, E, F, G);
 impl_resolve_arguments_values!(A, B, C, D, E, F, G, H);
 
 impl<T: ResolveArgumentValue> ResolveArgumentsValues for T {
-  fn resolve_values(option_values: Vec<CommandDataOptionValue>) -> Option<Self> where Self: Sized {
+  fn resolve_values(option_values: Vec<BlueprintOptionValue>) -> Option<Self> where Self: Sized {
     let mut option_values = option_values.into_iter();
     T::resolve_value(option_values.next())
   }
 }
-
-
 
 pub fn parse_argument<P>(option_value: &str) -> MelodyResult<P>
 where P: FromStr, P::Err: fmt::Display {
@@ -610,7 +601,7 @@ where P: FromStr, P::Err: fmt::Display {
   })
 }
 
-pub fn resolve_arguments<R: ResolveArgumentsValues>(option_values: Vec<CommandDataOptionValue>) -> MelodyResult<R> {
+pub fn resolve_arguments<R: ResolveArgumentsValues>(option_values: Vec<BlueprintOptionValue>) -> MelodyResult<R> {
   R::resolve_values(option_values).ok_or(MelodyError::COMMAND_INVALID_ARGUMENTS_STRUCTURE)
 }
 
@@ -721,7 +712,7 @@ macro_rules! blueprint_argument {
     name: $name,
     description: $description,
     required: $crate::default_expr!(false, $($required)?),
-    data: $crate::blueprint::BlueprintOptionData::String {
+    variant: $crate::blueprint::BlueprintOptionVariant::String {
       min_length: $crate::default_expr!(None, $(Some($min_length))?),
       max_length: $crate::default_expr!(None, $(Some($max_length))?),
       choices: $crate::default_expr!(&[], $(&[$($choice,)+])?)
@@ -738,7 +729,7 @@ macro_rules! blueprint_argument {
     name: $name,
     description: $description,
     required: $crate::default_expr!(false, $($required)?),
-    data: $crate::blueprint::BlueprintOptionData::Integer {
+    variant: $crate::blueprint::BlueprintOptionVariant::Integer {
       min_value: $crate::default_expr!(None, $(Some($min_value))?),
       max_value: $crate::default_expr!(None, $(Some($max_value))?),
       choices: $crate::default_expr!(&[], $(&[$($choice,)+])?)
@@ -755,7 +746,7 @@ macro_rules! blueprint_argument {
     name: $name,
     description: $description,
     required: $crate::default_expr!(false, $($required)?),
-    data: $crate::blueprint::BlueprintOptionData::Number {
+    variant: $crate::blueprint::BlueprintOptionVariant::Number {
       min_value: $crate::default_expr!(None, $(Some($min_value))?),
       max_value: $crate::default_expr!(None, $(Some($max_value))?),
       choices: $crate::default_expr!(&[], $(&[$($choice,)+])?)
@@ -769,7 +760,7 @@ macro_rules! blueprint_argument {
     name: $name,
     description: $description,
     required: $crate::default_expr!(false, $($required)?),
-    data: $crate::blueprint::BlueprintOptionData::Boolean
+    variant: $crate::blueprint::BlueprintOptionVariant::Boolean
   });
   (User {
     name: $name:expr,
@@ -779,7 +770,7 @@ macro_rules! blueprint_argument {
     name: $name,
     description: $description,
     required: $crate::default_expr!(false, $($required)?),
-    data: $crate::blueprint::BlueprintOptionData::User
+    variant: $crate::blueprint::BlueprintOptionVariant::User
   });
   (Role {
     name: $name:expr,
@@ -789,7 +780,7 @@ macro_rules! blueprint_argument {
     name: $name,
     description: $description,
     required: $crate::default_expr!(false, $($required)?),
-    data: $crate::blueprint::BlueprintOptionData::Role
+    variant: $crate::blueprint::BlueprintOptionVariant::Role
   });
   (Mentionable {
     name: $name:expr,
@@ -799,7 +790,7 @@ macro_rules! blueprint_argument {
     name: $name,
     description: $description,
     required: $crate::default_expr!(false, $($required)?),
-    data: $crate::blueprint::BlueprintOptionData::Mentionable
+    variant: $crate::blueprint::BlueprintOptionVariant::Mentionable
   });
   (Channel {
     name: $name:expr,
@@ -810,7 +801,7 @@ macro_rules! blueprint_argument {
     name: $name,
     description: $description,
     required: $crate::default_expr!(false, $($required)?),
-    data: $crate::blueprint::BlueprintOptionData::Channel {
+    variant: $crate::blueprint::BlueprintOptionVariant::Channel {
       channel_types: $crate::default_expr!(&[], $(&[$($channel_type,)+])?)
     }
   });
@@ -822,7 +813,7 @@ macro_rules! blueprint_argument {
     name: $name,
     description: $description,
     required: $crate::default_expr!(false, $($required)?),
-    data: $crate::blueprint::BlueprintOptionData::Attachment
+    variant: $crate::blueprint::BlueprintOptionVariant::Attachment
   });
 }
 

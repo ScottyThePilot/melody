@@ -9,9 +9,8 @@ pub use self::config::*;
 pub use self::persist::*;
 
 use serenity::client::{Client, Context};
-use serenity::client::bridge::gateway::{ShardManager, ShardId, ShardRunnerInfo};
-use serenity::model::id::GuildId;
-use serenity::model::gateway::Activity;
+use serenity::gateway::{ActivityData, ShardManager, ShardRunnerInfo};
+use serenity::model::id::{GuildId, UserId, ShardId};
 use serenity::model::guild::Member;
 use serenity::cache::Cache;
 use serenity::http::{CacheHttp, Http};
@@ -41,7 +40,7 @@ macro_rules! key {
 key!(pub struct ConfigKey, ConfigContainer);
 key!(pub struct PersistKey, PersistContainer);
 key!(pub struct PersistGuildsKey, PersistGuildsWrapper);
-key!(pub struct ShardManagerKey, Arc<Mutex<ShardManager>>);
+key!(pub struct ShardManagerKey, Arc<ShardManager>);
 key!(pub struct CleverBotKey, crate::feature::cleverbot::CleverBotWrapper);
 key!(pub struct CleverBotLoggerKey, crate::feature::cleverbot::CleverBotLoggerWrapper);
 key!(pub struct FeedKey, crate::feature::feed::FeedWrapper);
@@ -103,7 +102,7 @@ impl Core {
 
   #[inline]
   pub async fn get_checked<K>(&self) -> Option<K::Value>
-  where K: TypeMapKey, K::Value: Clone {
+  where K: TypeMapKey, K::Value: Clone + Send + 'static {
     self.data.read().await.get::<K>().cloned()
   }
 
@@ -124,7 +123,7 @@ impl Core {
   }
 
   pub async fn get_shard_runners(&self) -> Arc<Mutex<ShardRunners>> {
-    self.get::<ShardManagerKey>().await.lock().await.runners.clone()
+    self.get::<ShardManagerKey>().await.runners.clone()
   }
 
   pub async fn get_config(&self) -> ConfigContainer {
@@ -141,7 +140,7 @@ impl Core {
   }
 
   pub async fn trigger_shutdown(&self) {
-    self.get::<ShardManagerKey>().await.lock().await.shutdown_all().await
+    self.get::<ShardManagerKey>().await.shutdown_all().await
   }
 
   pub async fn trigger_shutdown_restart(&self) {
@@ -150,8 +149,9 @@ impl Core {
   }
 
   pub async fn set_activities<F>(&self, mut f: F)
-  where F: FnMut(ShardId) -> Option<Activity> {
-    operate_lock(self.get_shard_runners().await, |shard_runners| {
+  where F: FnMut(ShardId) -> Option<ActivityData> {
+    // TODO: does not need annotations, despite its insistence to the contrary
+    operate_lock(self.get_shard_runners().await, |shard_runners: &mut ShardRunners| {
       for (&shard_id, shard_runner) in shard_runners.iter() {
         shard_runner.runner_tx.set_activity(f(shard_id));
       };
@@ -163,8 +163,12 @@ impl Core {
   }
 
   pub async fn current_member(&self, guild_id: GuildId) -> MelodyResult<Member> {
-    guild_id.member(self, self.cache.current_user_id())
+    guild_id.member(self, self.current_user_id())
       .await.context(format!("failed to locate member for current user in guild ({guild_id})"))
+  }
+
+  pub fn current_user_id(&self) -> UserId {
+    self.cache.current_user().id
   }
 
   /// Aborts all tasks that this core might be responsible for
@@ -234,8 +238,8 @@ impl From<&Client> for Core {
   fn from(client: &Client) -> Self {
     Core {
       data: client.data.clone(),
-      cache: client.cache_and_http.cache.clone(),
-      http: client.cache_and_http.http.clone()
+      cache: client.cache.clone(),
+      http: client.http.clone()
     }
   }
 }

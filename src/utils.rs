@@ -6,7 +6,8 @@ use once_cell::sync::Lazy;
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
 use regex::Regex;
-use serenity::model::id::{EmojiId, UserId};
+use serenity::model::id::{EmojiId, GuildId, UserId};
+use serenity::cache::Cache;
 
 use std::error::Error;
 use std::fmt;
@@ -47,11 +48,15 @@ pub fn kebab_case_to_words(s: impl AsRef<str>) -> String {
   s.as_ref().split("-").map(capitalize).join(" ")
 }
 
+pub fn guild_name(cache: impl AsRef<Cache>, guild_id: GuildId) -> String {
+  cache.as_ref().guild(guild_id).map_or_else(|| "Unknown".to_owned(), |guild| guild.name.clone())
+}
+
 pub fn parse_emojis(message: &str) -> Vec<EmojiId> {
   static RX: Lazy<Regex> = Lazy::new(|| Regex::new(r"<a?:[0-9a-zA-Z_]+:(\d+)>").unwrap());
   RX.captures_iter(message)
     .filter_map(|captures| captures.get(1).map(<&str>::from))
-    .filter_map(|id| id.parse::<u64>().ok().map(EmojiId))
+    .filter_map(|id| id.parse::<u64>().ok().map(EmojiId::new))
     .collect::<Vec<EmojiId>>()
 }
 

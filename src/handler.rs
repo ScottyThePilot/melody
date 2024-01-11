@@ -2,7 +2,7 @@
 mod input;
 
 use crate::{MelodyResult, MelodyError};
-use crate::commands::APPLICATION_COMMANDS;
+use crate::commands::COMMANDS;
 use crate::data::*;
 use crate::feature::cleverbot::{CleverBotLoggerWrapper, CleverBotWrapper};
 use crate::feature::feed::{Feed, FeedManager};
@@ -15,12 +15,12 @@ use rand::seq::SliceRandom;
 use rss_feed::{TwitterPost, YouTubeVideo};
 use rss_feed::url::Url;
 use rss_feed::reqwest::Client as ReqwestClient;
-use serenity::model::application::interaction::Interaction;
+use serenity::gateway::{ActivityData, ShardManager};
+use serenity::model::application::Interaction;
 use serenity::model::channel::Message;
 use serenity::client::{Context, Client, EventHandler};
-use serenity::client::bridge::gateway::ShardManager;
 use serenity::model::channel::{Reaction, ReactionType};
-use serenity::model::gateway::{Activity, ActivityType, Ready};
+use serenity::model::gateway::{ActivityType, Ready};
 use serenity::model::guild::Member;
 use serenity::model::id::{ChannelId, GuildId, UserId, RoleId};
 use serenity::utils::{content_safe, ContentSafeOptions};
@@ -145,15 +145,15 @@ impl EventHandler for Handler {
 
   async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
     let core = Core::from(ctx);
-    if let Interaction::ApplicationCommand(interaction) = interaction {
-      crate::blueprint::dispatch(core, interaction, APPLICATION_COMMANDS).await.log();
+    if let Interaction::Command(interaction) = interaction {
+      crate::blueprint::dispatch(core, interaction, COMMANDS).await.log();
     };
   }
 
   async fn message(&self, ctx: Context, message: Message) {
     let core = Core::from(ctx);
 
-    let me = core.cache.current_user_id();
+    let me = core.current_user_id();
     if message.author.bot || message.author.id == me || message.content.is_empty() { return };
 
     if let Some(guild_id) = message.guild_id {
@@ -169,7 +169,7 @@ impl EventHandler for Handler {
     };
 
     if should_contribute_message_chain(&core, &message).await {
-      message.channel_id.send_message(&core, |create| create.content(&message.content))
+      message.channel_id.say(&core, &message.content)
         .await.context_log("failed to send message");
     };
 
@@ -243,7 +243,7 @@ impl FeedEventHandler for FeedHandler {
     }).await;
 
     for channel in delivery_channels {
-      channel.send_message(&core, |create| create.content(link.as_str()))
+      channel.say(&core, link.as_str())
         .await.context_log("failed to send youtube video message");
       tokio::time::sleep(FEED_POST_DELAY).await;
     };
@@ -263,7 +263,7 @@ impl FeedEventHandler for FeedHandler {
     }).await;
 
     for channel in delivery_channels {
-      channel.send_message(&core, |create| create.content(link.as_str()))
+      channel.say(&core, link.as_str())
         .await.context_log("failed to send twitter post message");
       tokio::time::sleep(FEED_POST_DELAY).await;
     };
@@ -281,7 +281,7 @@ fn get_message_replying_to(message: &Message, who: UserId) -> Option<&str> {
 
 async fn add_join_roles(core: &Core, member: &mut Member) -> MelodyResult {
   let (roles, missing_roles) = core.operate_persist_guild(member.guild_id, |persist_guild| {
-    core.cache.guild_field(member.guild_id, |guild| {
+    core.cache.guild(member.guild_id).map(|guild| {
       persist_guild.join_roles.iter()
         .filter_map(|(&role_id, &filter)| filter.applies(member.user.bot).then_some(role_id))
         .partition::<Vec<RoleId>, _>(|role_id| guild.roles.contains_key(&role_id))
@@ -289,7 +289,9 @@ async fn add_join_roles(core: &Core, member: &mut Member) -> MelodyResult {
   }).await?;
 
   if !roles.is_empty() {
-    for role_id in member.add_roles(core, &roles).await.context("failed to grant user join roles")? {
+    member.add_roles(core, &roles).await
+      .context("failed to grant user join roles")?;
+    for role_id in roles.iter() {
       info!("Granted join role ({}) to user {} ({})", member.user.name, member.user.id, role_id);
     };
   };
@@ -314,20 +316,20 @@ async fn should_contribute_message_chain(core: &Core, message: &Message) -> bool
 
 fn with_domain(url: &Url, domain: &str) -> Url {
   let mut url = url.clone();
-  std::mem::drop(url.set_host(Some(domain)));
+  let _ = url.set_host(Some(domain));
   url
 }
 
 /// Gets a list of games people are playing in a given guild
 fn games(core: &Core, guild_id: GuildId) -> HashSet<String> {
-  core.cache.guild_field(guild_id, |guild| {
+  core.cache.guild(guild_id).map_or_else(HashSet::new, |guild| {
     guild.presences.values()
       .filter(|&presence| presence.user.bot != Some(true))
       .flat_map(|presence| presence.activities.iter())
       .filter(|&activity| activity.kind == ActivityType::Playing)
       .map(|activity| activity.name.clone())
       .collect::<HashSet<String>>()
-  }).unwrap_or_default()
+  })
 }
 
 fn random_game(core: &Core) -> Option<String> {
@@ -340,13 +342,13 @@ fn random_game(core: &Core) -> Option<String> {
 
 async fn termination_task(
   terminate: Arc<Mutex<OneshotReceiver<Flag>>>,
-  shard_manager: Arc<Mutex<ShardManager>>
+  shard_manager: Arc<ShardManager>
 ) {
   let mut terminate = terminate.lock().await;
   let kill_flag = (&mut *terminate).await.unwrap();
 
   kill_flag.set();
-  shard_manager.lock().await.shutdown_all().await;
+  shard_manager.shutdown_all().await;
 }
 
 // Yes, a tasks-task, what a mouthfull
@@ -373,50 +375,50 @@ async fn cycle_activity_task(core: Core) {
   ];
 
   const ACTIVITY_CYCLE_TIME: Duration = Duration::from_secs(120);
-  const ACTIVITIES: &[fn(&Core) -> Activity] = &[
-    |_| Activity::playing("Minecraft 2"),
-    |_| Activity::playing("Portal 3"),
-    |_| Activity::playing("Pokemon\u{2122} Gun"),
-    |_| Activity::playing("ULTRAKILL"),
-    |_| Activity::playing("Genshin Impact"),
-    |_| Activity::playing("Tower of Fantasy"),
-    |_| Activity::playing("Artifact"),
-    |_| Activity::playing("Group Fortification: The Sequel"),
-    |_| Activity::playing("Band Bastion: The Second Coming"),
-    |_| Activity::playing("Fortress II (With Team)"),
-    |_| Activity::playing("Gang Garrison: Second Edition"),
-    |_| Activity::playing("Club Citadel II"),
-    |_| Activity::playing("Squad Castle Defense 2"),
-    |_| Activity::playing("Blazing Badge: Four Houses"),
-    |_| Activity::playing("Arma 4"),
-    |_| Activity::playing("Farming Simulator 24"),
-    |_| Activity::playing("League of Legends"),
-    |_| Activity::playing("DOTA 2"),
-    |_| Activity::playing("Katawa Shoujou"),
+  const ACTIVITIES: &[fn(&Core) -> ActivityData] = &[
+    |_| ActivityData::playing("Minecraft 2"),
+    |_| ActivityData::playing("Portal 3"),
+    |_| ActivityData::playing("Pokemon\u{2122} Gun"),
+    |_| ActivityData::playing("ULTRAKILL"),
+    |_| ActivityData::playing("Genshin Impact"),
+    |_| ActivityData::playing("Tower of Fantasy"),
+    |_| ActivityData::playing("Artifact"),
+    |_| ActivityData::playing("Group Fortification: The Sequel"),
+    |_| ActivityData::playing("Band Bastion: The Second Coming"),
+    |_| ActivityData::playing("Fortress II (With Team)"),
+    |_| ActivityData::playing("Gang Garrison: Second Edition"),
+    |_| ActivityData::playing("Club Citadel II"),
+    |_| ActivityData::playing("Squad Castle Defense 2"),
+    |_| ActivityData::playing("Blazing Badge: Four Houses"),
+    |_| ActivityData::playing("Arma 4"),
+    |_| ActivityData::playing("Farming Simulator 25"),
+    |_| ActivityData::playing("League of Legends"),
+    |_| ActivityData::playing("DOTA 2"),
+    |_| ActivityData::playing("Katawa Shoujou"),
     |_| {
       let mut rng = rand::thread_rng();
       let number = *NUMBERS.choose(&mut rng).unwrap();
       let fraction = *FRACTIONS.choose(&mut rng).unwrap();
-      Activity::playing(format!("Overwatch {number}{fraction}"))
+      ActivityData::playing(format!("Overwatch {number}{fraction}"))
     },
-    |_| Activity::watching("you"),
+    |_| ActivityData::watching("you"),
     |core| match random_game(core) {
-      Some(game) => Activity::watching(format!("you play {game}")),
-      None => Activity::watching("nobody :(")
+      Some(game) => ActivityData::watching(format!("you play {game}")),
+      None => ActivityData::watching("nobody :(")
     },
-    |core| Activity::watching(format!("{} guilds", core.cache.guild_count())),
-    |core| Activity::watching(format!("{} users", core.cache.user_count())),
-    |_| Activity::watching("Bocchi the Rock!"),
-    |_| Activity::watching("Lucky\u{2606}Star"),
-    |_| Activity::watching("Chainsaw Man"),
-    |_| Activity::watching("Made In Abyss"),
-    |_| Activity::watching("the fog approach"),
-    |_| Activity::listening("the screams"),
-    |_| Activity::listening("the intrusive thoughts"),
-    |_| Activity::listening("soft loli breathing 10 hours"),
-    |_| Activity::competing("big balls competition"),
-    |_| Activity::competing("taco eating competition"),
-    |_| Activity::competing("shadow wizard money gang")
+    |core| ActivityData::watching(format!("{} guilds", core.cache.guild_count())),
+    |core| ActivityData::watching(format!("{} users", core.cache.user_count())),
+    |_| ActivityData::watching("Bocchi the Rock!"),
+    |_| ActivityData::watching("Lucky\u{2606}Star"),
+    |_| ActivityData::watching("Chainsaw Man"),
+    |_| ActivityData::watching("Made In Abyss"),
+    |_| ActivityData::watching("the fog approach"),
+    |_| ActivityData::listening("the screams"),
+    |_| ActivityData::listening("the intrusive thoughts"),
+    |_| ActivityData::listening("soft loli breathing 10 hours"),
+    |_| ActivityData::competing("big balls competition"),
+    |_| ActivityData::competing("taco eating competition"),
+    |_| ActivityData::competing("shadow wizard money gang")
   ];
 
   let mut rng = crate::utils::create_rng();

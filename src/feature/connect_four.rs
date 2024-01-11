@@ -213,8 +213,8 @@ pub struct UserGame {
   board: Board,
   #[serde(default = "Utc::now")]
   last_played: DateTime<Utc>,
-  player1: u64,
-  player2: u64
+  player1: UserId,
+  player2: UserId
 }
 
 impl UserGame {
@@ -222,8 +222,8 @@ impl UserGame {
     UserGame {
       board: Board::new(Color::Player2),
       last_played: Utc::now(),
-      player1: player1.into(),
-      player2: player2.into()
+      player1,
+      player2
     }
   }
 
@@ -256,20 +256,20 @@ impl UserGame {
 
   pub fn current_turn_user(&self) -> UserId {
     match self.board.turn {
-      Color::Player1 => UserId(self.player1),
-      Color::Player2 => UserId(self.player2)
+      Color::Player1 => self.player1,
+      Color::Player2 => self.player2
     }
   }
 
   /// The unordered pair of players participating in this game.
   pub fn players(&self) -> UOrd<UserId> {
-    UOrd::new(self.player1, self.player2).map(UserId)
+    UOrd::new(self.player1, self.player2)
   }
 
   pub fn player_color(&self, player: UserId) -> Option<Color> {
     match () {
-      () if self.player1 == player.0 => Some(Color::Player1),
-      () if self.player2 == player.0 => Some(Color::Player2),
+      () if self.player1 == player => Some(Color::Player1),
+      () if self.player2 == player => Some(Color::Player2),
       () => None
     }
   }
@@ -295,7 +295,7 @@ pub enum UserGameResult {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ComputerGame {
   board: Board,
-  player: u64,
+  player: UserId,
   player_color: Color,
   difficulty: Difficulty,
   #[serde(skip, default = "create_rng")]
@@ -306,7 +306,7 @@ impl ComputerGame {
   pub fn new(player: UserId, difficulty: Difficulty) -> Self {
     ComputerGame {
       board: Board::new(Color::Player2),
-      player: player.0,
+      player,
       player_color: Color::Player2,
       difficulty,
       rng: create_rng()

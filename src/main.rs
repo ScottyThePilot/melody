@@ -40,6 +40,7 @@ pub(crate) mod terminal;
 use crate::terminal::Flag;
 
 use serenity::prelude::SerenityError;
+use serenity::model::id::GenericId;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::{unbounded_channel as mpsc_channel, UnboundedReceiver as MpscReceiver};
 use tokio::sync::oneshot::{channel as oneshot_channel, Receiver as OneshotReceiver};
@@ -93,11 +94,16 @@ pub enum MelodyError {
 
 impl MelodyError {
   pub const COMMAND_NOT_IN_GUILD: Self = MelodyError::CommandError(MelodyCommandError::NotInGuild);
-  pub const COMMAND_FAILED_TO_PARSE: Self = MelodyError::CommandError(MelodyCommandError::FailedToParse);
   pub const COMMAND_INVALID_ARGUMENTS_STRUCTURE: Self = MelodyError::CommandError(MelodyCommandError::InvalidArgumentsStructure);
 
   pub const fn command_cache_failure(message: &'static str) -> Self {
     MelodyError::CommandError(MelodyCommandError::CacheFailure(message))
+  }
+}
+
+impl From<MelodyParseCommandError> for MelodyError {
+  fn from(error: MelodyParseCommandError) -> Self {
+    MelodyError::CommandError(MelodyCommandError::FailedToParse(error))
   }
 }
 
@@ -118,12 +124,22 @@ pub enum MelodyFileError {
 pub enum MelodyCommandError {
   #[error("not in a guild")]
   NotInGuild,
-  #[error("failed to parse interaction")]
-  FailedToParse,
+  #[error("failed to parse interaction: {0}")]
+  FailedToParse(#[from] MelodyParseCommandError),
   #[error("invalid arguments structure")]
   InvalidArgumentsStructure,
   #[error("invalid arguments: {0}")]
   InvalidArguments(String),
   #[error("data not cached: {0}")]
   CacheFailure(&'static str)
+}
+
+#[derive(Debug, Error, Clone, Copy)]
+pub enum MelodyParseCommandError {
+  #[error("no command found")]
+  NoCommandFound,
+  #[error("unresolved mentionable (generic) id")]
+  UnresolvedGenericId(GenericId),
+  #[error("invalid structure")]
+  InvalidStructure
 }

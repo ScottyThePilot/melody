@@ -121,9 +121,13 @@ impl FeedMedia {
   fn from_media_object(media_object: MediaObject) -> Option<Self> {
     let title = media_object.title.map(|text| text.content);
     let description = media_object.description.map(|text| text.content);
-    let (content_type, link) = media_object.content.into_iter().find_map(|media_content| {
-      media_content.content_type.and_then(FeedContentType::from_mime).zip(media_content.url)
-    }).unzip();
+    let (content_type, link) = media_object.content.into_iter()
+      .find_map(|media_content| {
+        media_content.content_type
+          .and_then(FeedContentType::from_mime)
+          .zip(media_content.url)
+      })
+      .unzip();
     let content_type = content_type?;
     let thumbnails = media_object.thumbnails.into_iter()
       .filter_map(|media_thumbnail| Url::parse(&media_thumbnail.image.uri).ok())

@@ -10,7 +10,6 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use serenity::model::Permissions;
 use serenity::model::id::{ChannelId, GuildId};
-use serenity::model::channel::PartialChannel;
 use serenity::model::mention::Mentionable;
 
 
@@ -86,9 +85,9 @@ pub const FEEDS: BlueprintCommand = blueprint_command! {
 #[command_attr::hook]
 async fn feeds_add(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let (feed_type, feed_source, channel) = resolve_arguments::<(String, String, Option<PartialChannel>)>(args.option_values)?;
+  let (feed_type, feed_source, channel_id) = resolve_arguments::<(String, String, Option<ChannelId>)>(args.option_values)?;
   let feed_type = FeedType::from_str(&feed_type).ok_or(MelodyError::COMMAND_INVALID_ARGUMENTS_STRUCTURE)?;
-  let channel_id = channel.map_or(args.interaction.channel_id, |channel| channel.id);
+  let channel_id = channel_id.unwrap_or(args.interaction.channel_id);
 
   let response = if let Some(feed) = feed_type.with_source(&feed_source) {
     let (was_replaced, is_disabled) = register_feed(&core, feed.clone(), guild_id, channel_id).await?;

@@ -5,10 +5,10 @@ use crate::data::{Core, PersistGuild};
 use crate::utils::Contextualize;
 
 use itertools::Itertools;
+use serenity::cache::Cache;
 use serenity::model::permissions::Permissions;
 use serenity::model::id::{UserId, GuildId, RoleId};
 use serenity::model::guild::{Member, Role};
-use serenity::model::user::User;
 use serenity::utils::{content_safe, ContentSafeOptions};
 
 use std::collections::{HashMap, HashSet};
@@ -72,24 +72,26 @@ pub const ROLE: BlueprintCommand = blueprint_command! {
 async fn role_grant(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let member1 = args.interaction.member.clone().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let (role, user) = resolve_arguments::<(Role, User)>(args.option_values)?;
+  let (role_id, user_id) = resolve_arguments::<(RoleId, UserId)>(args.option_values)?;
+  let role = get_role(core.as_ref(), guild_id, role_id)?;
+
   let is_granter = core.operate_persist_guild(guild_id, |persist_guild| {
     Ok(is_granter(persist_guild, &member1, role.id))
   }).await?;
 
   let response = if is_granter {
-    let mut member2 = guild_id.member(&core, user.id).await.context("failed to find member")?;
+    let member2 = guild_id.member(&core, user_id).await.context("failed to find member")?;
     if member2.add_role(&core, role.id).await.context_log("failed to add role") {
       info!(
-        "User {user1} ({user1_id}) granted role {} ({}) to user {user2} ({user2_id}) in guild {}",
-        role.name, role.id, guild_id,
+        "User {user1} ({user1_id}) granted role {role} ({role_id}) to user {user2} ({user2_id}) in guild {guild_id}",
+        role = role.name, role_id = role.id, guild_id = guild_id,
         user1 = member1.user.name, user1_id = member1.user.id,
         user2 = member2.user.name, user2_id = member2.user.id
       );
 
-      format!("Granted role `@{}` to user `@{}`", role.name, user.name)
+      format!("Granted role `@{}` to user `@{}`", role.name, member2.user.name)
     } else {
-      format!("Failed to grant role `@{}` to user `@{}`", role.name, user.name)
+      format!("Failed to grant role `@{}` to user `@{}`", role.name, member2.user.name)
     }
   } else {
     "You cannot grant this role".to_owned()
@@ -103,24 +105,26 @@ async fn role_grant(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
 async fn role_revoke(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let member1 = args.interaction.member.clone().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let (role, user) = resolve_arguments::<(Role, User)>(args.option_values)?;
+  let (role_id, user_id) = resolve_arguments::<(RoleId, UserId)>(args.option_values)?;
+  let role = get_role(core.as_ref(), guild_id, role_id)?;
+
   let is_granter = core.operate_persist_guild(guild_id, |persist_guild| {
     Ok(is_granter(persist_guild, &member1, role.id))
   }).await?;
 
   let response = if is_granter {
-    let mut member2 = guild_id.member(&core, user.id).await.context("failed to find member")?;
+    let member2 = guild_id.member(&core, user_id).await.context("failed to find member")?;
     if member2.remove_role(&core, role.id).await.context_log("failed to add role") {
       info!(
-        "User {user1} ({user1_id}) revoked role {} ({}) from user {user2} ({user2_id}) in guild {}",
-        role.name, role.id, guild_id,
+        "User {user1} ({user1_id}) revoked role {role} ({role_id}) from user {user2} ({user2_id}) in guild {guild_id}",
+        role = role.name, role_id = role.id, guild_id = guild_id,
         user1 = member1.user.name, user1_id = member1.user.id,
         user2 = member2.user.name, user2_id = member2.user.id
       );
 
-      format!("Revoked role `@{}` from user `@{}`", role.name, user.name)
+      format!("Revoked role `@{}` from user `@{}`", role.name, member2.user.name)
     } else {
-      format!("Failed to revoke role `@{}` from user `@{}`", role.name, user.name)
+      format!("Failed to revoke role `@{}` from user `@{}`", role.name, member2.user.name)
     }
   } else {
     "You cannot revoke this role".to_owned()
@@ -232,7 +236,7 @@ pub const GRANT_ROLES: BlueprintCommand = blueprint_command! {
 
 #[command_attr::hook]
 async fn grant_roles_add(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  grant_roles_add_remove(core, args, |persist_guild, role, ()| {
+  grant_roles_add_remove(&core, args, |persist_guild, _guild_id, role, ()| {
     Ok(match persist_guild.grant_roles.insert(role.id, HashSet::new()) {
       Some(..) => format!("Reset granters for existing grant role `@{}`", role.name),
       None => format!("Created new grant role for `@{}` (Add granters with the `/grant-roles add-granter`)", role.name)
@@ -242,7 +246,7 @@ async fn grant_roles_add(core: Core, args: BlueprintCommandArgs) -> MelodyResult
 
 #[command_attr::hook]
 async fn grant_roles_remove(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  grant_roles_add_remove(core, args, |persist_guild, role, ()| {
+  grant_roles_add_remove(&core, args, |persist_guild, _guild_id, role, ()| {
     Ok(match persist_guild.grant_roles.remove(&role.id) {
       Some(..) => format!("Removed existing grant role `@{}`", role.name),
       None => format!("No grant role for `@{}` was found", role.name)
@@ -252,13 +256,12 @@ async fn grant_roles_remove(core: Core, args: BlueprintCommandArgs) -> MelodyRes
 
 #[command_attr::hook]
 async fn grant_roles_add_granter(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  grant_roles_add_remove_granter(core, args, |persist_guild, role, granter| {
+  grant_roles_add_remove_granter(&core, args, |persist_guild, guild_id, role, granter| {
     Ok(match persist_guild.grant_roles.get_mut(&role.id) {
       Some(granters) => {
-        let (granter, granter_description, granter_type) = match &granter {
-          RoleOrMember::Member(user, ..) => (Granter::User(user.id), format!("user `@{}`", user.name), "user"),
-          RoleOrMember::Role(role) => (Granter::Role(role.id), format!("role `@{}`", role.name), "role")
-        };
+        let granter = Granter::from(granter);
+        let granter_description = granter.display(guild_id, core.as_ref());
+        let granter_type = granter.type_str();
 
         match granters.insert(granter) {
           true => format!("Added {granter_description} as a granter for grantable role `@{}`", role.name),
@@ -272,13 +275,12 @@ async fn grant_roles_add_granter(core: Core, args: BlueprintCommandArgs) -> Melo
 
 #[command_attr::hook]
 async fn grant_roles_remove_granter(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  grant_roles_add_remove_granter(core, args, |persist_guild, role, granter| {
+  grant_roles_add_remove_granter(&core, args, |persist_guild, guild_id, role, granter| {
     Ok(match persist_guild.grant_roles.get_mut(&role.id) {
       Some(granters) => {
-        let (granter, granter_description, granter_type) = match &granter {
-          RoleOrMember::Member(user, ..) => (Granter::User(user.id), format!("user `@{}`", user.name), "user"),
-          RoleOrMember::Role(role) => (Granter::Role(role.id), format!("role `@{}`", role.name), "role")
-        };
+        let granter = Granter::from(granter);
+        let granter_description = granter.display(guild_id, core.as_ref());
+        let granter_type = granter.type_str();
 
         match granters.remove(&granter) {
           true => format!("Removed {granter_description} as a granter for grantable role `@{}`", role.name),
@@ -293,7 +295,9 @@ async fn grant_roles_remove_granter(core: Core, args: BlueprintCommandArgs) -> M
 #[command_attr::hook]
 async fn grant_roles_list(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let role = resolve_arguments::<Option<Role>>(args.option_values)?;
+  let role_id = resolve_arguments::<Option<RoleId>>(args.option_values)?;
+  let role = role_id.map(|role_id| get_role(core.as_ref(), guild_id, role_id)).transpose()?;
+
   let response = core.operate_persist_guild(guild_id, |persist_guild| {
     let content = if let Some(role) = role {
       if let Some(granters) = persist_guild.grant_roles.get(&role.id) {
@@ -313,17 +317,17 @@ async fn grant_roles_list(core: Core, args: BlueprintCommandArgs) -> MelodyResul
     .send(&core, &args.interaction).await
 }
 
-async fn grant_roles_add_remove<F>(core: Core, args: BlueprintCommandArgs, operation: F) -> MelodyResult
-where F: FnOnce(&mut crate::data::PersistGuild, &Role, ()) -> MelodyResult<String> {
+async fn grant_roles_add_remove<F>(core: &Core, args: BlueprintCommandArgs, operation: F) -> MelodyResult
+where F: FnOnce(&mut crate::data::PersistGuild, GuildId, &Role, ()) -> MelodyResult<String> {
   roles_common(core, args, |option_values| {
-    resolve_arguments::<Role>(option_values).map(|role| (role, ()))
+    resolve_arguments::<RoleId>(option_values).map(|role_id| (role_id, ()))
   }, operation).await
 }
 
-async fn grant_roles_add_remove_granter<F>(core: Core, args: BlueprintCommandArgs, operation: F) -> MelodyResult
-where F: FnOnce(&mut crate::data::PersistGuild, &Role, RoleOrMember) -> MelodyResult<String> {
+async fn grant_roles_add_remove_granter<F>(core: &Core, args: BlueprintCommandArgs, operation: F) -> MelodyResult
+where F: FnOnce(&mut crate::data::PersistGuild, GuildId, &Role, RoleOrUser) -> MelodyResult<String> {
   roles_common(core, args, |option_values| {
-    resolve_arguments::<(Role, RoleOrMember)>(option_values)
+    resolve_arguments::<(RoleId, RoleOrUser)>(option_values)
   }, operation).await
 }
 
@@ -423,7 +427,7 @@ pub const JOIN_ROLES: BlueprintCommand = blueprint_command! {
 
 #[command_attr::hook]
 async fn join_roles_add(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  join_roles_add_remove(core, args, |persist_guild, role, filter| {
+  join_roles_add_remove(&core, args, |persist_guild, _guild_id, role, filter| {
     Ok(match persist_guild.join_roles.insert(role.id, filter) {
       Some(..) => format!("Replaced existing join role filter for `@{}` with filter `{}`", role.name, filter.to_str()),
       None => format!("Created new join role for `@{}` with filter `{}`", role.name, filter.to_str())
@@ -433,7 +437,7 @@ async fn join_roles_add(core: Core, args: BlueprintCommandArgs) -> MelodyResult 
 
 #[command_attr::hook]
 async fn join_roles_remove(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  join_roles_add_remove(core, args, |persist_guild, role, filter| {
+  join_roles_add_remove(&core, args, |persist_guild, _guild_id, role, filter| {
     Ok(match persist_guild.join_roles.remove(&role.id) {
       Some(..) => format!("Removed existing join role for `@{}` with filter `{}`", role.name, filter.to_str()),
       None => format!("No join role for `@{}` was found", role.name)
@@ -453,21 +457,22 @@ async fn join_roles_list(core: Core, args: BlueprintCommandArgs) -> MelodyResult
     .send(&core, &args.interaction).await
 }
 
-async fn join_roles_add_remove<F>(core: Core, args: BlueprintCommandArgs, operation: F) -> MelodyResult
-where F: FnOnce(&mut crate::data::PersistGuild, &Role, JoinRoleFilter) -> MelodyResult<String> {
-  roles_common(core, args, |option_values| {
-    let (role, filter) = resolve_arguments::<(Role, Option<String>)>(option_values)?;
+async fn join_roles_add_remove<F>(core: &Core, args: BlueprintCommandArgs, operation: F) -> MelodyResult
+where F: FnOnce(&mut crate::data::PersistGuild, GuildId, &Role, JoinRoleFilter) -> MelodyResult<String> {
+  roles_common(&core, args, |option_values| {
+    let (role, filter) = resolve_arguments::<(RoleId, Option<String>)>(option_values)?;
     let filter = filter.as_deref().map_or(Some(JoinRoleFilter::All), JoinRoleFilter::from_str)
       .ok_or(MelodyError::COMMAND_INVALID_ARGUMENTS_STRUCTURE)?;
     Ok((role, filter))
   }, operation).await
 }
 
-fn member_role_position(member: &Member, core: &Core) -> Option<i64> {
-  core.cache.guild_field(member.guild_id, |guild| {
+// TODO: figure out how role positions actually work
+fn member_role_position(member: &Member, core: &Core) -> Option<u16> {
+  core.cache.guild(member.guild_id).map(|guild| {
     member.roles.iter()
       .filter_map(|role_id| guild.roles.get(role_id))
-      .map(|role| role.position).max().unwrap_or(-1)
+      .map(|role| role.position).max().unwrap_or(0)
   })
 }
 
@@ -506,20 +511,20 @@ fn is_granter(persist_guild: &PersistGuild, member: &Member, role_id: RoleId) ->
 
 
 async fn roles_common<F, FA, A>(
-  core: Core, args: BlueprintCommandArgs,
+  core: &Core, args: BlueprintCommandArgs,
   args_operation: FA, operation: F
 ) -> MelodyResult where
-  F: FnOnce(&mut crate::data::PersistGuild, &Role, A) -> MelodyResult<String>,
-  FA: FnOnce(CommandDataOptionValues) -> MelodyResult<(Role, A)>
+  F: FnOnce(&mut crate::data::PersistGuild, GuildId, &Role, A) -> MelodyResult<String>,
+  FA: FnOnce(Vec<BlueprintOptionValue>) -> MelodyResult<(RoleId, A)>
 {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let (role, args_remaining) = args_operation(args.option_values)?;
+  let (role_id, args_remaining) = args_operation(args.option_values)?;
+  let role = get_role(core.as_ref(), guild_id, role_id)?;
 
   let member = args.interaction.member.clone().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let user_role_position = member_role_position(&member, &core)
     .ok_or(MelodyError::command_cache_failure("guild"))?;
-  let is_owner = core.cache.guild_field(guild_id, |guild| guild.owner_id == member.user.id)
-    .ok_or(MelodyError::command_cache_failure("guild"))?;
+  let is_owner = is_owner(&core.cache, guild_id, member.user.id)?;
 
   let response = if role.managed {
     MANAGED_ROLE.to_owned()
@@ -532,7 +537,7 @@ async fn roles_common<F, FA, A>(
     let permissions = me.permissions(&core).context("failed to get permissions for member")?;
 
     let response = core.operate_persist_guild_commit(guild_id, |persist_guild| {
-      operation(persist_guild, &role, args_remaining).map(|content| {
+      operation(persist_guild, guild_id, &role, args_remaining).map(|content| {
         content_safe(&core, content, &ContentSafeOptions::new(), &[])
       })
     }).await?;
@@ -545,4 +550,16 @@ async fn roles_common<F, FA, A>(
 
   BlueprintCommandResponse::new(response)
     .send(&core, &args.interaction).await
+}
+
+fn is_owner(cache: &Cache, guild_id: GuildId, user_id: UserId) -> MelodyResult<bool> {
+  cache.guild(guild_id)
+    .ok_or(MelodyError::command_cache_failure("guild"))
+    .map(|guild| guild.owner_id == user_id)
+}
+
+fn get_role(cache: &Cache, guild_id: GuildId, role_id: RoleId) -> MelodyResult<Role> {
+  cache.as_ref().role(guild_id, role_id)
+    .ok_or(MelodyError::command_cache_failure("role"))
+    .map(|role_ref| role_ref.clone())
 }

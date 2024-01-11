@@ -4,7 +4,7 @@ use crate::data::*;
 use crate::feature::connect_four::*;
 use crate::utils::{Contextualize, Timestamp, TimestampFormat};
 
-use serenity::model::user::User;
+use serenity::model::id::UserId;
 use serenity::model::mention::Mentionable;
 
 
@@ -144,13 +144,13 @@ pub const CONNECT_FOUR: BlueprintCommand = blueprint_command! {
 async fn connect_four_challenge(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let challenger = args.interaction.user.id;
-  let opponent = resolve_arguments::<User>(args.option_values)?;
+  let opponent = resolve_arguments::<UserId>(args.option_values)?;
   let response = core.operate_persist_guild_commit(guild_id, |persist_guild| {
-    Ok(match persist_guild.connect_four.create_challenge(challenger, opponent.id) {
+    Ok(match persist_guild.connect_four.create_challenge(challenger, opponent) {
       true => {
         format!(
           "{}, {} has challenged you to a game of connect-four\nUse `/connect-four accept` to accept this challenge",
-          opponent.id.mention(), challenger.mention()
+          opponent.mention(), challenger.mention()
         )
       },
       false => "You cannot challenge that user at this time\n(Are you already playing a game?)".to_owned()
@@ -193,9 +193,9 @@ async fn connect_four_challenge_computer(core: Core, args: BlueprintCommandArgs)
 async fn connect_four_accept(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let player = args.interaction.user.id;
-  let challenger = resolve_arguments::<User>(args.option_values)?;
+  let challenger = resolve_arguments::<UserId>(args.option_values)?;
   let response = core.operate_persist_guild_commit(guild_id, |persist_guild| {
-    Ok(match persist_guild.connect_four.accept_challenge(challenger.id, player) {
+    Ok(match persist_guild.connect_four.accept_challenge(challenger, player) {
       Some(game) => {
         let &player = game.players().other(&player).unwrap();
         let board = game.print(print_piece);
@@ -219,10 +219,10 @@ async fn connect_four_accept(core: Core, args: BlueprintCommandArgs) -> MelodyRe
 async fn connect_four_decline(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let player = args.interaction.user.id;
-  let challenger = resolve_arguments::<User>(args.option_values)?;
+  let challenger = resolve_arguments::<UserId>(args.option_values)?;
   let response = core.operate_persist_guild_commit(guild_id, |persist_guild| {
-    Ok(match persist_guild.connect_four.remove_challenge(challenger.id, player) {
-      true => format!("You have declined a challenge from {}", challenger.tag()),
+    Ok(match persist_guild.connect_four.remove_challenge(challenger, player) {
+      true => format!("You have declined a challenge from {}", challenger.mention()),
       false => "You do not have a pending challenge from this user".to_owned()
     })
   }).await?;

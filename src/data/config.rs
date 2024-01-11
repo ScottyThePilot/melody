@@ -5,7 +5,7 @@ use rand::seq::SliceRandom;
 use serde::de::{Deserialize, Deserializer, Unexpected};
 use serenity::model::id::UserId;
 use serenity::model::gateway::GatewayIntents;
-use serenity::utils::Color;
+use serenity::model::colour::Color;
 use singlefile::container_shared_async::ContainerSharedAsyncReadonly;
 use singlefile_formats::toml_serde::Toml;
 
@@ -166,7 +166,8 @@ impl<'de> Deserialize<'de> for ConfigGatewayIntentsIdentifier {
     let intents = match identifier.as_str() {
       "guilds" => GatewayIntents::GUILDS,
       "guild_members" => GatewayIntents::GUILD_MEMBERS,
-      "guild_bans" => GatewayIntents::GUILD_BANS,
+      "guild_moderation" => GatewayIntents::GUILD_MODERATION,
+      "guild_bans" => GatewayIntents::GUILD_MODERATION,
       "guild_emojis_and_stickers" => GatewayIntents::GUILD_EMOJIS_AND_STICKERS,
       "guild_integrations" => GatewayIntents::GUILD_INTEGRATIONS,
       "guild_webhooks" => GatewayIntents::GUILD_WEBHOOKS,

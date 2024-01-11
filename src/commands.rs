@@ -12,14 +12,14 @@ use crate::utils::Contextualize;
 use itertools::Itertools;
 use serenity::cache::Cache;
 use serenity::model::id::GuildId;
-use serenity::model::application::command::Command;
-use serenity::utils::Color;
+use serenity::model::application::Command;
+use serenity::model::colour::Color;
 
 use std::collections::HashSet;
 
 
 
-pub const APPLICATION_COMMANDS: &[BlueprintCommand] = &[
+pub const COMMANDS: &[BlueprintCommand] = &[
   self::feed::FEEDS,
   self::general::PING,
   self::general::HELP,
@@ -35,36 +35,29 @@ pub const APPLICATION_COMMANDS: &[BlueprintCommand] = &[
   self::roles::JOIN_ROLES
 ];
 
-pub async fn bot_color(core: &Core) -> Color {
+
+
+pub async fn get_bot_color(core: &Core) -> Color {
   core.operate_config(|config| config.accent_color).await
-    .or_else(|| core.cache.current_user_field(|me| me.accent_colour))
-    .unwrap_or(serenity::utils::colours::branding::BLURPLE)
+    .or_else(|| core.cache.current_user().accent_colour)
+    .unwrap_or(Color::BLURPLE)
 }
 
 pub async fn register_guild_commands(
   core: &Core, guild_id: GuildId, plugins: HashSet<String>
 ) -> MelodyResult {
-  let guild_name = core.cache.guild_field(guild_id, |guild| guild.name.clone())
-    .unwrap_or_else(|| "Unknown".to_owned());
-  register_guild_commands_verbose(core, guild_id, &guild_name, exclusive_commands(), plugins).await
-}
-
-pub async fn register_guild_commands_verbose(
-  core: &Core, guild_id: GuildId, guild_name: &str,
-  exclusive_commands: impl IntoIterator<Item = &BlueprintCommand>,
-  plugins: HashSet<String>
-) -> MelodyResult {
-  let guild_commands = exclusive_commands.into_iter().cloned()
-    .filter(|&blueprint| blueprint.is_enabled(&plugins))
-    .collect::<Vec<_>>();
+  let guild_name = crate::utils::guild_name(&core, guild_id);
+  let guild_commands = iter_exclusive_commands(COMMANDS)
+    .filter(|blueprint| blueprint.is_enabled(&plugins))
+    .collect::<Vec<BlueprintCommand>>();
   if guild_commands.is_empty() {
     info!("Clearing exclusive commands for guild {guild_name} ({guild_id})");
-    guild_id.set_application_commands(&core, |builder| builder)
+    guild_id.set_commands(&core, Vec::new())
       .await.context("failed to clear guild commands")?;
   } else {
     let commands_text = guild_commands.iter().map(|blueprint| blueprint.name).join(", ");
     info!("Registering exclusive commands ({commands_text}) for guild {guild_name} ({guild_id})");
-    guild_id.set_application_commands(&core, commands_builder(&guild_commands))
+    guild_id.set_commands(&core, build_commands(guild_commands))
       .await.context("failed to register guild-only commands")?;
   };
 
@@ -72,13 +65,14 @@ pub async fn register_guild_commands_verbose(
 }
 
 pub async fn register_commands(core: &Core, guilds: &[GuildId]) -> MelodyResult {
-  let (exclusive_commands, default_commands) = partition_application_commands();
-  info!("Found {} commands, {} exclusive commands", default_commands.len(), exclusive_commands.len());
-  Command::set_global_application_commands(&core, commands_builder(&default_commands))
+  let default_commands_count = iter_default_commands(COMMANDS).count();
+  let exclusive_commands_count = iter_exclusive_commands(COMMANDS).count();
+  info!("Found {default_commands_count} commands, {exclusive_commands_count} exclusive commands");
+  Command::set_global_commands(&core, build_commands(iter_default_commands(COMMANDS)))
     .await.context("failed to register commands")?;
-  for (guild_id, guild_name) in iter_guilds(&core, guilds) {
+  for &guild_id in guilds {
     let plugins = core.operate_persist(|persist| persist.get_guild_plugins(guild_id)).await;
-    register_guild_commands_verbose(core, guild_id, &guild_name, &exclusive_commands, plugins).await?;
+    register_guild_commands(core, guild_id, plugins).await?;
   };
 
   Ok(())
@@ -87,15 +81,6 @@ pub async fn register_commands(core: &Core, guilds: &[GuildId]) -> MelodyResult 
 pub fn iter_guilds<'a>(cache: impl AsRef<Cache> + 'a, guilds: &'a [GuildId])
 -> impl Iterator<Item = (GuildId, String)> + 'a {
   guilds.into_iter().map(move |&guild_id| {
-    let guild_name = cache.as_ref().guild_field(guild_id, |guild| guild.name.clone());
-    (guild_id, guild_name.unwrap_or_else(|| "Unknown".to_owned()))
+    (guild_id, crate::utils::guild_name(cache.as_ref(), guild_id))
   })
-}
-
-pub fn partition_application_commands() -> (Vec<BlueprintCommand>, Vec<BlueprintCommand>) {
-  APPLICATION_COMMANDS.into_iter().copied().partition(|blueprint| blueprint.is_exclusive())
-}
-
-pub fn exclusive_commands() -> impl Iterator<Item = &'static BlueprintCommand> {
-  APPLICATION_COMMANDS.into_iter().filter(|blueprint| blueprint.is_exclusive())
 }

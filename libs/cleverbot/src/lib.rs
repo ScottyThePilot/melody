@@ -49,13 +49,6 @@ impl CleverBotAgent {
     self.data.try_get_async((&self.client, Utc::now()))
       .await.map(|data| (data, &self.client))
   }
-
-  //async fn init(&mut self) -> Result<(&mut CleverBotData, &Client), Error> {
-  //  Result::map(match self.data {
-  //    Some(ref mut data) => data.ensure_valid(&self.client, now).await.map(|()| data),
-  //    None => CleverBotData::request(&self.client, now).await.map(|data| self.data.insert(data))
-  //  }, |data| (data, &self.client))
-  //}
 }
 
 impl Default for CleverBotAgent {

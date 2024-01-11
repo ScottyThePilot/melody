@@ -29,13 +29,13 @@ impl EmojiStats {
     };
   }
 
-  pub fn get_emoji_uses<'a, F>(&self, mut f: F) -> Vec<(EmojiId, bool, usize)>
+  pub fn get_emoji_uses<'a, F>(&self, mut f: F) -> Vec<(Emoji, usize)>
   where F: FnMut(EmojiId) -> Option<&'a Emoji> {
     let mut uses = self.uses.iter()
       .filter_map(|(&id, &c)| (c > 0).then_some((id, c)))
-      .filter_map(|(id, c)| f(id).map(|emoji| (emoji.id, emoji.animated, c)))
-      .collect::<Vec<(EmojiId, bool, usize)>>();
-    uses.sort_unstable_by(|a, b| Ord::cmp(&a.2, &b.2).reverse());
+      .filter_map(|(id, c)| f(id).map(|emoji| (emoji.clone(), c)))
+      .collect::<Vec<(Emoji, usize)>>();
+    uses.sort_unstable_by(|a, b| Ord::cmp(&a.1, &b.1).reverse());
     uses
   }
 

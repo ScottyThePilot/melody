@@ -5,10 +5,10 @@ use crate::utils::Loggable;
 
 use chrono::{Utc, Duration};
 use rand::Rng;
+use serenity::model::id::UserId;
 use serenity::model::mention::Mentionable;
 use serenity::model::permissions::Permissions;
 use serenity::model::timestamp::Timestamp;
-use serenity::model::user::User;
 use serenity::utils::{content_safe, ContentSafeOptions};
 
 
@@ -48,10 +48,10 @@ pub const HELP: BlueprintCommand = blueprint_command! {
 
 #[command_attr::hook]
 async fn help(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let color = super::bot_color(&core).await;
+  let color = super::get_bot_color(&core).await;
   let response = match resolve_arguments::<Option<String>>(args.option_values)? {
     // User provided a command, return help for that command
-    Some(command_name) => match find_command(super::APPLICATION_COMMANDS, &command_name) {
+    Some(command_name) => match find_command(super::COMMANDS, &command_name) {
       Some(command) => BlueprintCommandResponse::with_ephemeral_embeds(vec![command_embed(command, color)]),
       None => BlueprintCommandResponse::new_ephemeral("That command does not exist")
     },
@@ -61,7 +61,7 @@ async fn help(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
         .and_then(|member| member.permissions(&core).ok())
         .unwrap_or(Permissions::all());
       BlueprintCommandResponse::with_ephemeral_embeds(vec![
-        command_list_embed(super::APPLICATION_COMMANDS, permissions, color)
+        command_list_embed(super::COMMANDS, permissions, color)
       ])
     }
   };
@@ -115,11 +115,11 @@ pub const TROLL: BlueprintCommand = blueprint_command! {
 #[command_attr::hook]
 async fn troll(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let mut member = args.interaction.member.clone().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let target = resolve_arguments::<Option<User>>(args.option_values)?;
+  let target = resolve_arguments::<Option<UserId>>(args.option_values)?;
   let time = Timestamp::from(Utc::now() + Duration::seconds(10));
   let response = match target {
     Some(target) => {
-      if target.id == core.cache.current_user_id() {
+      if target == core.current_user_id() {
         // Shadows `time`, changing it to be 30 seconds instead of 10.
         let time = Timestamp::from(Utc::now() + Duration::seconds(30));
         match member.disable_communication_until_datetime(&core, time).await.log_some() {
@@ -129,10 +129,10 @@ async fn troll(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
       } else {
         if rand::thread_rng().gen_bool(0.01) {
           let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-          let mut target_member = core.cache.member(guild_id, target.id)
-            .ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+          let mut target_member = core.cache.member(guild_id, target)
+            .ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?.clone();
           match target_member.disable_communication_until_datetime(&core, time).await.log_some() {
-            Some(()) => format!("{} has successfully trolled {}.", member.user.id.mention(), target.id.mention()),
+            Some(()) => format!("{} has successfully trolled {}.", member.user.id.mention(), target.mention()),
             None => "Sorry, even though you succeeded, I don't have permission to do that.".to_owned()
           }
         } else {
@@ -173,9 +173,12 @@ pub const AVATAR: BlueprintCommand = blueprint_command! {
 
 #[command_attr::hook]
 async fn avatar(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let user = resolve_arguments::<Option<User>>(args.option_values)?
-    .unwrap_or_else(|| args.interaction.user.clone());
-  let response = match user.avatar_url() {
+  let avatar_url = match resolve_arguments::<Option<UserId>>(args.option_values)? {
+    Some(user_id) => core.cache.user(user_id).and_then(|user| user.avatar_url()),
+    None => args.interaction.user.avatar_url()
+  };
+
+  let response = match avatar_url {
     Some(avatar_url) => BlueprintCommandResponse::new_ephemeral(avatar_url),
     None => BlueprintCommandResponse::new_ephemeral("Failed to get that user's avatar")
   };
@@ -201,9 +204,12 @@ pub const BANNER: BlueprintCommand = blueprint_command! {
 
 #[command_attr::hook]
 async fn banner(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let user = resolve_arguments::<Option<User>>(args.option_values)?
-    .unwrap_or_else(|| args.interaction.user.clone());
-  let response = match user.banner_url() {
+  let banner_url = match resolve_arguments::<Option<UserId>>(args.option_values)? {
+    Some(user_id) => core.cache.user(user_id).and_then(|user| user.banner_url()),
+    None => args.interaction.user.banner_url()
+  };
+
+  let response = match banner_url {
     Some(banner_url) => BlueprintCommandResponse::new_ephemeral(banner_url),
     None => BlueprintCommandResponse::new_ephemeral("Failed to get that user's banner")
   };
@@ -234,7 +240,7 @@ async fn emoji_stats(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let page = resolve_arguments::<Option<u64>>(args.option_values)?.unwrap_or(1) - 1;
 
   let emoji_statistics = core.operate_persist_guild(guild_id, |persist_guild| {
-    core.cache.guild_field(guild_id, |guild| {
+    core.cache.guild(guild_id).map(|guild| {
       persist_guild.emoji_stats.get_emoji_uses(|emoji_id| guild.emojis.get(&emoji_id))
     }).ok_or(MelodyError::command_cache_failure("guild"))
   }).await?;
@@ -242,10 +248,7 @@ async fn emoji_stats(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let page_start = (page * PER_PAGE) as usize;
   let entries = emoji_statistics.into_iter()
     .enumerate().skip(page_start).take(PER_PAGE as usize)
-    .map(|(i, (emoji, animated, count))| {
-      let emoji_mention = (emoji, animated).mention();
-      format!("`#{}` {emoji_mention} ({count} times)", i + 1)
-    })
+    .map(|(i, (emoji, count))| format!("`#{}` {emoji} ({count} times)", i + 1))
     .collect::<Vec<String>>();
   let response = match entries.is_empty() {
     true => BlueprintCommandResponse::new("(No results)".to_owned()),

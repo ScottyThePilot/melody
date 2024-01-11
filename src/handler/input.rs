@@ -51,17 +51,17 @@ impl InputAgent {
       "plugin" | "plugins" => match next(&mut args)? {
         "list" => {
           let guild_id = parse(next(&mut args)?)?;
-          Ok(InputCommand::PluginList(GuildId(guild_id)))
+          Ok(InputCommand::PluginList(GuildId::new(guild_id)))
         },
         "enable" => {
           let plugin = next(&mut args)?;
           let guild_id = parse(next(&mut args)?)?;
-          Ok(InputCommand::PluginEnable(plugin, GuildId(guild_id)))
+          Ok(InputCommand::PluginEnable(plugin, GuildId::new(guild_id)))
         },
         "disable" => {
           let plugin = next(&mut args)?;
           let guild_id = parse(next(&mut args)?)?;
-          Ok(InputCommand::PluginDisable(plugin, GuildId(guild_id)))
+          Ok(InputCommand::PluginDisable(plugin, GuildId::new(guild_id)))
         },
         unknown => Err(InputError::UnknownCommand(unknown))
       },
