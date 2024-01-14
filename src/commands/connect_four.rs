@@ -59,6 +59,7 @@ pub const CONNECT_FOUR: BlueprintCommand = blueprint_command! {
         blueprint_argument!(String {
           name: "difficulty",
           description: "The difficulty level the computer should use (defaults to medium)",
+          required: false,
           choices: [
             //("impossible", "maximum"),
             ("hard", "hard"),
@@ -140,7 +141,6 @@ pub const CONNECT_FOUR: BlueprintCommand = blueprint_command! {
   ]
 };
 
-#[command_attr::hook]
 async fn connect_four_challenge(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let challenger = args.interaction.user.id;
@@ -161,7 +161,6 @@ async fn connect_four_challenge(core: Core, args: BlueprintCommandArgs) -> Melod
     .send(&core, &args.interaction).await
 }
 
-#[command_attr::hook]
 async fn connect_four_challenge_computer(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   const CHALLENGE_MESSAGE: &str = "You have challenged the computer to a game of connect-four";
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
@@ -189,7 +188,6 @@ async fn connect_four_challenge_computer(core: Core, args: BlueprintCommandArgs)
     .send(&core, &args.interaction).await
 }
 
-#[command_attr::hook]
 async fn connect_four_accept(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let player = args.interaction.user.id;
@@ -215,7 +213,6 @@ async fn connect_four_accept(core: Core, args: BlueprintCommandArgs) -> MelodyRe
     .send(&core, &args.interaction).await
 }
 
-#[command_attr::hook]
 async fn connect_four_decline(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let player = args.interaction.user.id;
@@ -231,7 +228,6 @@ async fn connect_four_decline(core: Core, args: BlueprintCommandArgs) -> MelodyR
     .send(&core, &args.interaction).await
 }
 
-#[command_attr::hook]
 async fn connect_four_play(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let player = args.interaction.user.id;
@@ -312,7 +308,6 @@ async fn connect_four_play(core: Core, args: BlueprintCommandArgs) -> MelodyResu
   Ok(())
 }
 
-#[command_attr::hook]
 async fn connect_four_board(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let player = args.interaction.user.id;
@@ -336,7 +331,6 @@ async fn connect_four_board(core: Core, args: BlueprintCommandArgs) -> MelodyRes
     .send(&core, &args.interaction).await
 }
 
-#[command_attr::hook]
 async fn connect_four_resign(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let player = args.interaction.user.id;
@@ -357,7 +351,6 @@ async fn connect_four_resign(core: Core, args: BlueprintCommandArgs) -> MelodyRe
     .send(&core, &args.interaction).await
 }
 
-#[command_attr::hook]
 async fn connect_four_claim_win(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let player = args.interaction.user.id;
@@ -393,7 +386,6 @@ async fn connect_four_claim_win(core: Core, args: BlueprintCommandArgs) -> Melod
     .send(&core, &args.interaction).await
 }
 
-#[command_attr::hook]
 async fn connect_four_stats(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let player = args.interaction.user.id;

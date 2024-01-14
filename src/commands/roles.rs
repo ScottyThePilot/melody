@@ -44,7 +44,8 @@ pub const ROLE: BlueprintCommand = blueprint_command! {
         }),
         blueprint_argument!(User {
           name: "user",
-          description: "The user to grant the role to"
+          description: "The user to grant the role to",
+          required: false
         })
       ],
       function: role_grant
@@ -60,7 +61,8 @@ pub const ROLE: BlueprintCommand = blueprint_command! {
         }),
         blueprint_argument!(User {
           name: "user",
-          description: "The user to revoke the role from"
+          description: "The user to revoke the role from",
+          required: false
         })
       ],
       function: role_revoke
@@ -68,7 +70,6 @@ pub const ROLE: BlueprintCommand = blueprint_command! {
   ]
 };
 
-#[command_attr::hook]
 async fn role_grant(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let member1 = args.interaction.member.clone().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
@@ -101,7 +102,6 @@ async fn role_grant(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
     .send(&core, &args.interaction).await
 }
 
-#[command_attr::hook]
 async fn role_revoke(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let member1 = args.interaction.member.clone().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
@@ -226,7 +226,8 @@ pub const GRANT_ROLES: BlueprintCommand = blueprint_command! {
       arguments: [
         blueprint_argument!(Role {
           name: "role",
-          description: "The role who's granters should be listed"
+          description: "The role who's granters should be listed",
+          required: false
         })
       ],
       function: grant_roles_list
@@ -234,7 +235,6 @@ pub const GRANT_ROLES: BlueprintCommand = blueprint_command! {
   ]
 };
 
-#[command_attr::hook]
 async fn grant_roles_add(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   grant_roles_add_remove(&core, args, |persist_guild, _guild_id, role, ()| {
     Ok(match persist_guild.grant_roles.insert(role.id, HashSet::new()) {
@@ -244,7 +244,6 @@ async fn grant_roles_add(core: Core, args: BlueprintCommandArgs) -> MelodyResult
   }).await
 }
 
-#[command_attr::hook]
 async fn grant_roles_remove(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   grant_roles_add_remove(&core, args, |persist_guild, _guild_id, role, ()| {
     Ok(match persist_guild.grant_roles.remove(&role.id) {
@@ -254,7 +253,6 @@ async fn grant_roles_remove(core: Core, args: BlueprintCommandArgs) -> MelodyRes
   }).await
 }
 
-#[command_attr::hook]
 async fn grant_roles_add_granter(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   grant_roles_add_remove_granter(&core, args, |persist_guild, guild_id, role, granter| {
     Ok(match persist_guild.grant_roles.get_mut(&role.id) {
@@ -273,7 +271,6 @@ async fn grant_roles_add_granter(core: Core, args: BlueprintCommandArgs) -> Melo
   }).await
 }
 
-#[command_attr::hook]
 async fn grant_roles_remove_granter(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   grant_roles_add_remove_granter(&core, args, |persist_guild, guild_id, role, granter| {
     Ok(match persist_guild.grant_roles.get_mut(&role.id) {
@@ -292,7 +289,6 @@ async fn grant_roles_remove_granter(core: Core, args: BlueprintCommandArgs) -> M
   }).await
 }
 
-#[command_attr::hook]
 async fn grant_roles_list(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let role_id = resolve_arguments::<Option<RoleId>>(args.option_values)?;
@@ -425,7 +421,6 @@ pub const JOIN_ROLES: BlueprintCommand = blueprint_command! {
   ]
 };
 
-#[command_attr::hook]
 async fn join_roles_add(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   join_roles_add_remove(&core, args, |persist_guild, _guild_id, role, filter| {
     Ok(match persist_guild.join_roles.insert(role.id, filter) {
@@ -435,7 +430,6 @@ async fn join_roles_add(core: Core, args: BlueprintCommandArgs) -> MelodyResult 
   }).await
 }
 
-#[command_attr::hook]
 async fn join_roles_remove(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   join_roles_add_remove(&core, args, |persist_guild, _guild_id, role, filter| {
     Ok(match persist_guild.join_roles.remove(&role.id) {
@@ -445,7 +439,6 @@ async fn join_roles_remove(core: Core, args: BlueprintCommandArgs) -> MelodyResu
   }).await
 }
 
-#[command_attr::hook]
 async fn join_roles_list(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let response = core.operate_persist_guild(guild_id, |persist_guild| {
@@ -492,6 +485,7 @@ fn stringify_join_roles(core: &Core, guild_id: GuildId, join_roles: &HashMap<Rol
 const FILTER_ARGUMENT: BlueprintOption = blueprint_argument!(String {
   name: "filter",
   description: "What types of accounts this role should be applied to (defaults to 'all')",
+  required: false,
   choices: [
     ("all", "all"),
     ("bots", "bots"),

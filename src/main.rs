@@ -5,7 +5,6 @@ extern crate chumsky;
 extern crate cleverbot;
 extern crate cleverbot_logs;
 extern crate commander;
-extern crate command_attr;
 extern crate const_random;
 extern crate dunce;
 extern crate fern;

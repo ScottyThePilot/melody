@@ -82,7 +82,6 @@ pub const FEEDS: BlueprintCommand = blueprint_command! {
   ]
 };
 
-#[command_attr::hook]
 async fn feeds_add(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let (feed_type, feed_source, channel_id) = resolve_arguments::<(String, String, Option<ChannelId>)>(args.option_values)?;
@@ -103,7 +102,6 @@ async fn feeds_add(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
     .send(&core, &args.interaction).await
 }
 
-#[command_attr::hook]
 async fn feeds_remove(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let (feed_type, feed_source) = resolve_arguments::<(String, String)>(args.option_values)?;
@@ -122,7 +120,6 @@ async fn feeds_remove(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
     .send(&core, &args.interaction).await
 }
 
-#[command_attr::hook]
 async fn feeds_remove_all(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let removed = unregister_guild_feeds(&core, guild_id).await?;
@@ -136,7 +133,6 @@ async fn feeds_remove_all(core: Core, args: BlueprintCommandArgs) -> MelodyResul
     .send(&core, &args.interaction).await
 }
 
-#[command_attr::hook]
 async fn feeds_list(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let feeds = list_guild_feeds(&core, guild_id).await;

@@ -23,7 +23,6 @@ pub const PING: BlueprintCommand = blueprint_command! {
   function: ping
 };
 
-#[command_attr::hook]
 async fn ping(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let response = if rand::thread_rng().gen_bool(0.01) { "Pog" } else { "Pong" };
   BlueprintCommandResponse::new(response)
@@ -46,7 +45,6 @@ pub const HELP: BlueprintCommand = blueprint_command! {
   function: help
 };
 
-#[command_attr::hook]
 async fn help(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let color = super::get_bot_color(&core).await;
   let response = match resolve_arguments::<Option<String>>(args.option_values)? {
@@ -86,7 +84,6 @@ pub const ECHO: BlueprintCommand = blueprint_command! {
   function: echo
 };
 
-#[command_attr::hook]
 async fn echo(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let text = resolve_arguments::<String>(args.option_values)?;
   let text_filtered = content_safe(&core.cache, &text, &ContentSafeOptions::default().clean_user(false), &[]);
@@ -112,7 +109,6 @@ pub const TROLL: BlueprintCommand = blueprint_command! {
   function: troll
 };
 
-#[command_attr::hook]
 async fn troll(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let mut member = args.interaction.member.clone().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let target = resolve_arguments::<Option<UserId>>(args.option_values)?;
@@ -171,7 +167,6 @@ pub const AVATAR: BlueprintCommand = blueprint_command! {
   function: avatar
 };
 
-#[command_attr::hook]
 async fn avatar(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let avatar_url = match resolve_arguments::<Option<UserId>>(args.option_values)? {
     Some(user_id) => core.cache.user(user_id).and_then(|user| user.avatar_url()),
@@ -202,7 +197,6 @@ pub const BANNER: BlueprintCommand = blueprint_command! {
   function: banner
 };
 
-#[command_attr::hook]
 async fn banner(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let banner_url = match resolve_arguments::<Option<UserId>>(args.option_values)? {
     Some(user_id) => core.cache.user(user_id).and_then(|user| user.banner_url()),
@@ -227,13 +221,13 @@ pub const EMOJI_STATS: BlueprintCommand = blueprint_command! {
     blueprint_argument!(Integer {
       name: "page",
       description: "The page of results to display (results are grouped 10 at a time)",
+      required: false,
       min_value: 1
     })
   ],
   function: emoji_stats
 };
 
-#[command_attr::hook]
 async fn emoji_stats(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   const PER_PAGE: u64 = 10;
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;

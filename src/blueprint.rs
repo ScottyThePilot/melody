@@ -610,6 +610,13 @@ pub fn resolve_arguments<R: ResolveArgumentsValues>(option_values: Vec<Blueprint
 pub const DEFAULT_COMMAND_TYPE: CommandType = CommandType::ChatInput;
 
 #[macro_export]
+macro_rules! make_concrete_asyncfn {
+  ($function:expr => ($($arg:ident: $Ty:ty),* $(,)?)) => {
+    (|$($arg: $Ty),*| Box::pin($function($($arg),*)) as $crate::blueprint::BoxFuture<'static, _>) as fn($($Ty),*) -> _
+  };
+}
+
+#[macro_export]
 macro_rules! default_expr {
   ($default:expr, $expr:expr) => ($expr);
   ($default:expr $(,)?) => ($default);
@@ -665,7 +672,9 @@ macro_rules! blueprint_command {
     allow_in_dms: $crate::default_expr!(false, $($allow_in_dms)?),
     default_permissions: $crate::default_expr!(None, $(Some($default_permissions))?),
     root: $crate::blueprint::BlueprintRoot::Command {
-      function: crate::utils::NoDebug($function),
+      function: crate::utils::NoDebug(
+        $crate::make_concrete_asyncfn!($function => (c: _, a: _))
+      ),
       options: &[$($option,)*]
     }
   });
@@ -693,7 +702,9 @@ macro_rules! blueprint_subcommand {
     name: $name,
     description: $description,
     root: $crate::blueprint::BlueprintRoot::Command {
-      function: crate::utils::NoDebug($function),
+      function: crate::utils::NoDebug(
+        $crate::make_concrete_asyncfn!($function => (c: _, a: _))
+      ),
       options: &[$($option,)*]
     }
   });
@@ -703,15 +714,15 @@ macro_rules! blueprint_subcommand {
 macro_rules! blueprint_argument {
   (String {
     name: $name:expr,
-    description: $description:expr
-    $(, required: $required:expr)?
+    description: $description:expr,
+    required: $required:expr
     $(, min_length: $min_length:expr)?
     $(, max_length: $max_length:expr)?
     $(, choices: [$($choice:expr),+ $(,)?])?
   }) => ($crate::blueprint::BlueprintOption {
     name: $name,
     description: $description,
-    required: $crate::default_expr!(false, $($required)?),
+    required: $required,
     variant: $crate::blueprint::BlueprintOptionVariant::String {
       min_length: $crate::default_expr!(None, $(Some($min_length))?),
       max_length: $crate::default_expr!(None, $(Some($max_length))?),
@@ -720,15 +731,15 @@ macro_rules! blueprint_argument {
   });
   (Integer {
     name: $name:expr,
-    description: $description:expr
-    $(, required: $required:expr)?
+    description: $description:expr,
+    required: $required:expr
     $(, min_value: $min_value:expr)?
     $(, max_value: $max_value:expr)?
     $(, choices: [$($choice:expr),+ $(,)?])?
   }) => ($crate::blueprint::BlueprintOption {
     name: $name,
     description: $description,
-    required: $crate::default_expr!(false, $($required)?),
+    required: $required,
     variant: $crate::blueprint::BlueprintOptionVariant::Integer {
       min_value: $crate::default_expr!(None, $(Some($min_value))?),
       max_value: $crate::default_expr!(None, $(Some($max_value))?),
@@ -737,15 +748,15 @@ macro_rules! blueprint_argument {
   });
   (Number {
     name: $name:expr,
-    description: $description:expr
-    $(, required: $required:expr)?
+    description: $description:expr,
+    required: $required:expr
     $(, min_value: $min_value:expr)?
     $(, max_value: $max_value:expr)?
     $(, choices: [$($choice:expr),+ $(,)?])?
   }) => ($crate::blueprint::BlueprintOption {
     name: $name,
     description: $description,
-    required: $crate::default_expr!(false, $($required)?),
+    required: $required,
     variant: $crate::blueprint::BlueprintOptionVariant::Number {
       min_value: $crate::default_expr!(None, $(Some($min_value))?),
       max_value: $crate::default_expr!(None, $(Some($max_value))?),
@@ -754,65 +765,65 @@ macro_rules! blueprint_argument {
   });
   (Boolean {
     name: $name:expr,
-    description: $description:expr
-    $(, required: $required:expr)?
+    description: $description:expr,
+    required: $required:expr
   }) => ($crate::blueprint::BlueprintOption {
     name: $name,
     description: $description,
-    required: $crate::default_expr!(false, $($required)?),
+    required: $required,
     variant: $crate::blueprint::BlueprintOptionVariant::Boolean
   });
   (User {
     name: $name:expr,
-    description: $description:expr
-    $(, required: $required:expr)?
+    description: $description:expr,
+    required: $required:expr
   }) => ($crate::blueprint::BlueprintOption {
     name: $name,
     description: $description,
-    required: $crate::default_expr!(false, $($required)?),
+    required: $required,
     variant: $crate::blueprint::BlueprintOptionVariant::User
   });
   (Role {
     name: $name:expr,
-    description: $description:expr
-    $(, required: $required:expr)?
+    description: $description:expr,
+    required: $required:expr
   }) => ($crate::blueprint::BlueprintOption {
     name: $name,
     description: $description,
-    required: $crate::default_expr!(false, $($required)?),
+    required: $required,
     variant: $crate::blueprint::BlueprintOptionVariant::Role
   });
   (Mentionable {
     name: $name:expr,
-    description: $description:expr
-    $(, required: $required:expr)?
+    description: $description:expr,
+    required: $required:expr
   }) => ($crate::blueprint::BlueprintOption {
     name: $name,
     description: $description,
-    required: $crate::default_expr!(false, $($required)?),
+    required: $required,
     variant: $crate::blueprint::BlueprintOptionVariant::Mentionable
   });
   (Channel {
     name: $name:expr,
-    description: $description:expr
-    $(, required: $required:expr)?
+    description: $description:expr,
+    required: $required:expr
     $(, channel_types: [$($channel_type:expr),+ $(,)?])?
   }) => ($crate::blueprint::BlueprintOption {
     name: $name,
     description: $description,
-    required: $crate::default_expr!(false, $($required)?),
+    required: $required,
     variant: $crate::blueprint::BlueprintOptionVariant::Channel {
       channel_types: $crate::default_expr!(&[], $(&[$($channel_type,)+])?)
     }
   });
   (Attachment {
     name: $name:expr,
-    description: $description:expr
-    $(, required: $required:expr)?
+    description: $description:expr,
+    required: $required:expr
   }) => ($crate::blueprint::BlueprintOption {
     name: $name,
     description: $description,
-    required: $crate::default_expr!(false, $($required)?),
+    required: $required,
     variant: $crate::blueprint::BlueprintOptionVariant::Attachment
   });
 }

@@ -30,7 +30,6 @@ pub const ROLL: BlueprintCommand = blueprint_command! {
   function: roll
 };
 
-#[command_attr::hook]
 async fn roll(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   match resolve_arguments::<String>(args.option_values)?.parse::<Roll>() {
     Ok(roll) => {
