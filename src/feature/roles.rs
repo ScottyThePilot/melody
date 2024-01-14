@@ -5,6 +5,9 @@ use serenity::model::id::{UserId, RoleId};
 use serenity::cache::Cache;
 
 use std::fmt;
+use std::str::FromStr;
+
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub enum Granter {
@@ -111,6 +114,19 @@ impl JoinRoleFilter {
       Self::All => "all",
       Self::Bots => "bots",
       Self::Humans => "humans"
+    }
+  }
+}
+
+impl FromStr for JoinRoleFilter {
+  type Err = ();
+
+  fn from_str(s: &str) -> Result<Self, ()> {
+    match s {
+      "all" => Ok(Self::All),
+      "bots" => Ok(Self::Bots),
+      "humans" => Ok(Self::Humans),
+      _ => Err(())
     }
   }
 }

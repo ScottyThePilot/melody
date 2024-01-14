@@ -1,4 +1,4 @@
-use crate::{MelodyError, MelodyCommandError, MelodyParseCommandError, MelodyResult};
+use crate::{MelodyError, MelodyParseCommandError, MelodyResult};
 use crate::data::Core;
 use crate::utils::{Blockify, Contextualize};
 
@@ -23,7 +23,9 @@ use serenity::model::application::{
   CommandOptionType,
   CommandType
 };
-use serenity::model::channel::{ChannelType, Message};
+use serenity::model::user::User;
+use serenity::model::channel::{Attachment, ChannelType, Message, PartialChannel};
+use serenity::model::guild::{PartialMember, Role};
 use serenity::model::colour::Color;
 use serenity::model::id::{UserId, ChannelId, RoleId, AttachmentId};
 use serenity::model::permissions::Permissions;
@@ -427,6 +429,13 @@ pub struct BlueprintCommandArgs {
   pub interaction: CommandInteraction
 }
 
+impl BlueprintCommandArgs {
+  pub fn resolve_values<'a, R: ResolveArgumentsValues<'a>>(&'a self) -> MelodyResult<R> {
+    R::resolve_values(&self.option_values, &self.interaction.data.resolved)
+      .ok_or(MelodyError::COMMAND_INVALID_ARGUMENTS_STRUCTURE)
+  }
+}
+
 pub type CommandFn<T = ()> = fn(Core, BlueprintCommandArgs) -> BoxFuture<'static, MelodyResult<T>>;
 
 pub async fn dispatch(
@@ -518,65 +527,94 @@ pub enum RoleOrUser {
   Role(RoleId)
 }
 
+pub trait ResolveArgumentValue<'a> {
+  fn resolve_value(
+    option_value: Option<&'a BlueprintOptionValue>,
+    resolved: &'a CommandDataResolved
+  ) -> Option<Self> where Self: Sized;
+}
+
 macro_rules! impl_resolve_argument_value {
-  ($Type:ty, $pat:pat => $expr:expr) => {
-    impl ResolveArgumentValue for $Type {
-      fn resolve_value(option_value: Option<BlueprintOptionValue>) -> Option<Self> {
-        if let Some($pat) = option_value { $expr } else { None }
+  ($lt:lifetime, $resolved:ident, $Type:ty, $pat:pat => $expr:expr) => {
+    impl<'a> ResolveArgumentValue<'a> for $Type {
+      fn resolve_value(option_value: Option<&'a BlueprintOptionValue>, $resolved: &'a CommandDataResolved) -> Option<Self> {
+        if let Some(&$pat) = option_value { $expr } else { None }
       }
     }
   };
 }
 
-pub trait ResolveArgumentValue {
-  fn resolve_value(option_value: Option<BlueprintOptionValue>) -> Option<Self> where Self: Sized;
-}
+impl_resolve_argument_value!('a, _r, &'a str, BlueprintOptionValue::String(ref value) => Some(value.as_str()));
+impl_resolve_argument_value!('a, _r, &'a String, BlueprintOptionValue::String(ref value) => Some(value));
+impl_resolve_argument_value!('a, _r, String, BlueprintOptionValue::String(ref value) => Some(value.to_owned()));
+impl_resolve_argument_value!('a, _r, i64, BlueprintOptionValue::Integer(value) => Some(value));
+impl_resolve_argument_value!('a, _r, u64, BlueprintOptionValue::Integer(value) => u64::try_from(value).ok());
+impl_resolve_argument_value!('a, _r, f64, BlueprintOptionValue::Number(value) => Some(value));
+impl_resolve_argument_value!('a, _r, bool, BlueprintOptionValue::Boolean(value) => Some(value));
+impl_resolve_argument_value!('a, _r, UserId, BlueprintOptionValue::User(value) => Some(value));
+impl_resolve_argument_value!('a, _r, RoleId, BlueprintOptionValue::Role(value) => Some(value));
+impl_resolve_argument_value!('a, _r, ChannelId, BlueprintOptionValue::Channel(value) => Some(value));
+impl_resolve_argument_value!('a, _r, AttachmentId, BlueprintOptionValue::Attachment(value) => Some(value));
+impl_resolve_argument_value!('a, resolved, &'a User, BlueprintOptionValue::User(id) => resolved.users.get(&id));
+impl_resolve_argument_value!('a, resolved, &'a Role, BlueprintOptionValue::Role(id) => resolved.roles.get(&id));
+impl_resolve_argument_value!('a, resolved, &'a PartialMember, BlueprintOptionValue::User(id) => resolved.members.get(&id));
+impl_resolve_argument_value!('a, resolved, &'a PartialChannel, BlueprintOptionValue::Channel(id) => resolved.channels.get(&id));
+impl_resolve_argument_value!('a, resolved, &'a Attachment, BlueprintOptionValue::Attachment(id) => resolved.attachments.get(&id));
 
-impl_resolve_argument_value!(String, BlueprintOptionValue::String(value) => Some(value));
-impl_resolve_argument_value!(i64, BlueprintOptionValue::Integer(value) => Some(value));
-impl_resolve_argument_value!(u64, BlueprintOptionValue::Integer(value) => u64::try_from(value).ok());
-impl_resolve_argument_value!(f64, BlueprintOptionValue::Number(value) => Some(value));
-impl_resolve_argument_value!(bool, BlueprintOptionValue::Boolean(value) => Some(value));
-impl_resolve_argument_value!(UserId, BlueprintOptionValue::User(value) => Some(value));
-impl_resolve_argument_value!(RoleId, BlueprintOptionValue::Role(value) => Some(value));
-impl_resolve_argument_value!(ChannelId, BlueprintOptionValue::Channel(value) => Some(value));
-impl_resolve_argument_value!(AttachmentId, BlueprintOptionValue::Attachment(value) => Some(value));
-
-impl ResolveArgumentValue for RoleOrUser {
-  fn resolve_value(option_value: Option<BlueprintOptionValue>) -> Option<Self> where Self: Sized {
+impl<'a> ResolveArgumentValue<'a> for RoleOrUser {
+  fn resolve_value(option_value: Option<&'a BlueprintOptionValue>, _: &'a CommandDataResolved) -> Option<Self> {
     option_value.and_then(|option_value| match option_value {
-      BlueprintOptionValue::User(user) => Some(RoleOrUser::User(user)),
-      BlueprintOptionValue::Role(role) => Some(RoleOrUser::Role(role)),
+      &BlueprintOptionValue::User(user) => Some(RoleOrUser::User(user)),
+      &BlueprintOptionValue::Role(role) => Some(RoleOrUser::Role(role)),
       _ => None
     })
   }
 }
 
-impl ResolveArgumentValue for NonZeroU64 {
-  fn resolve_value(option_value: Option<BlueprintOptionValue>) -> Option<Self> where Self: Sized {
-    u64::resolve_value(option_value).and_then(NonZeroU64::new)
+impl<'a> ResolveArgumentValue<'a> for NonZeroU64 {
+  fn resolve_value(option_value: Option<&'a BlueprintOptionValue>, resolved: &'a CommandDataResolved) -> Option<Self> {
+    u64::resolve_value(option_value, resolved).and_then(NonZeroU64::new)
   }
 }
 
-impl<T: ResolveArgumentValue> ResolveArgumentValue for Option<T> {
-  fn resolve_value(option_value: Option<BlueprintOptionValue>) -> Option<Option<T>> {
-    Some(option_value.and_then(|option_value| T::resolve_value(Some(option_value))))
+impl<'a, T: ResolveArgumentValue<'a>> ResolveArgumentValue<'a> for Option<T> {
+  fn resolve_value(option_value: Option<&'a BlueprintOptionValue>, resolved: &'a CommandDataResolved) -> Option<Option<T>> {
+    Some(option_value.and_then(|option_value| T::resolve_value(Some(option_value), resolved)))
+  }
+}
+
+impl<'a> ResolveArgumentValue<'a> for () {
+  fn resolve_value(option_value: Option<&'a BlueprintOptionValue>, _: &'a CommandDataResolved) -> Option<Self> where Self: Sized {
+    option_value.map(|_| ())
+  }
+}
+
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Parsed<T>(pub T);
+
+impl<'a, T> ResolveArgumentValue<'a> for Parsed<T> where T: FromStr {
+  fn resolve_value(option_value: Option<&'a BlueprintOptionValue>, resolved: &'a CommandDataResolved) -> Option<Self> where Self: Sized {
+    <&'a str>::resolve_value(option_value, resolved).and_then(|s| s.parse::<T>().ok()).map(Parsed)
   }
 }
 
 macro_rules! impl_resolve_arguments_values {
   ($($G:ident),*) => {
-    impl<$($G: ResolveArgumentValue),*> ResolveArgumentsValues for ($($G,)*) {
-      fn resolve_values(option_values: Vec<BlueprintOptionValue>) -> Option<Self> {
+    impl<'a, $($G: ResolveArgumentValue<'a>),*> ResolveArgumentsValues<'a> for ($($G,)*) {
+      fn resolve_values(option_values: &'a [BlueprintOptionValue], resolved: &'a CommandDataResolved) -> Option<Self> {
         let mut option_values = option_values.into_iter();
-        Some(($($G::resolve_value(option_values.next())?,)*))
+        Some(($($G::resolve_value(option_values.next(), resolved)?,)*))
       }
     }
   };
 }
 
-pub trait ResolveArgumentsValues {
-  fn resolve_values(option_values: Vec<BlueprintOptionValue>) -> Option<Self> where Self: Sized;
+pub trait ResolveArgumentsValues<'a> {
+  fn resolve_values(
+    option_values: &'a [BlueprintOptionValue],
+    resolved: &'a CommandDataResolved
+  ) -> Option<Self> where Self: Sized;
 }
 
 impl_resolve_arguments_values!(A, B);
@@ -587,22 +625,10 @@ impl_resolve_arguments_values!(A, B, C, D, E, F);
 impl_resolve_arguments_values!(A, B, C, D, E, F, G);
 impl_resolve_arguments_values!(A, B, C, D, E, F, G, H);
 
-impl<T: ResolveArgumentValue> ResolveArgumentsValues for T {
-  fn resolve_values(option_values: Vec<BlueprintOptionValue>) -> Option<Self> where Self: Sized {
-    let mut option_values = option_values.into_iter();
-    T::resolve_value(option_values.next())
+impl<'a, T: ResolveArgumentValue<'a>> ResolveArgumentsValues<'a> for T {
+  fn resolve_values(option_values: &'a [BlueprintOptionValue], resolved: &'a CommandDataResolved) -> Option<Self> {
+    T::resolve_value(option_values.first(), resolved)
   }
-}
-
-pub fn parse_argument<P>(option_value: &str) -> MelodyResult<P>
-where P: FromStr, P::Err: fmt::Display {
-  option_value.parse::<P>().map_err(|err| {
-    MelodyError::CommandError(MelodyCommandError::InvalidArguments(err.to_string()))
-  })
-}
-
-pub fn resolve_arguments<R: ResolveArgumentsValues>(option_values: Vec<BlueprintOptionValue>) -> MelodyResult<R> {
-  R::resolve_values(option_values).ok_or(MelodyError::COMMAND_INVALID_ARGUMENTS_STRUCTURE)
 }
 
 // Avert your eyes

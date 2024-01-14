@@ -31,7 +31,7 @@ pub const ROLL: BlueprintCommand = blueprint_command! {
 };
 
 async fn roll(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  match resolve_arguments::<String>(args.option_values)?.parse::<Roll>() {
+  match args.resolve_values::<String>()?.parse::<Roll>() {
     Ok(roll) => {
       let roll_message = roll.execute().to_string();
       let response = if roll_message.len() > 2000 {

@@ -144,7 +144,7 @@ pub const CONNECT_FOUR: BlueprintCommand = blueprint_command! {
 async fn connect_four_challenge(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let challenger = args.interaction.user.id;
-  let opponent = resolve_arguments::<UserId>(args.option_values)?;
+  let opponent = args.resolve_values::<UserId>()?;
   let response = core.operate_persist_guild_commit(guild_id, |persist_guild| {
     Ok(match persist_guild.connect_four.create_challenge(challenger, opponent) {
       true => {
@@ -165,8 +165,7 @@ async fn connect_four_challenge_computer(core: Core, args: BlueprintCommandArgs)
   const CHALLENGE_MESSAGE: &str = "You have challenged the computer to a game of connect-four";
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let player = args.interaction.user.id;
-  let difficulty = resolve_arguments::<Option<String>>(args.option_values)?;
-  let difficulty = difficulty.as_deref().map_or(Ok(Difficulty::Medium), |d| parse_argument(d))?;
+  let Parsed(difficulty) = args.resolve_values::<Option<Parsed<Difficulty>>>()?.unwrap_or(Parsed(Difficulty::Medium));
   let response = core.operate_persist_guild_commit(guild_id, |persist_guild| {
     Ok(match persist_guild.connect_four.challenge_computer(player, difficulty) {
       Some((game, computer_move)) => match computer_move {
@@ -191,7 +190,7 @@ async fn connect_four_challenge_computer(core: Core, args: BlueprintCommandArgs)
 async fn connect_four_accept(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let player = args.interaction.user.id;
-  let challenger = resolve_arguments::<UserId>(args.option_values)?;
+  let challenger = args.resolve_values::<UserId>()?;
   let response = core.operate_persist_guild_commit(guild_id, |persist_guild| {
     Ok(match persist_guild.connect_four.accept_challenge(challenger, player) {
       Some(game) => {
@@ -216,7 +215,7 @@ async fn connect_four_accept(core: Core, args: BlueprintCommandArgs) -> MelodyRe
 async fn connect_four_decline(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let player = args.interaction.user.id;
-  let challenger = resolve_arguments::<UserId>(args.option_values)?;
+  let challenger = args.resolve_values::<UserId>()?;
   let response = core.operate_persist_guild_commit(guild_id, |persist_guild| {
     Ok(match persist_guild.connect_four.remove_challenge(challenger, player) {
       true => format!("You have declined a challenge from {}", challenger.mention()),
@@ -237,7 +236,7 @@ async fn connect_four_play(core: Core, args: BlueprintCommandArgs) -> MelodyResu
   let (deferred, response) = match persist_guild.connect_four.find_game_mut(player) {
     Some(GameQuery::UserGame(game, player_color)) => {
       let &opponent = game.players().other(&player).unwrap();
-      let column = resolve_arguments::<i64>(args.option_values)?;
+      let column = args.resolve_values::<i64>()?;
       let column = crate::feature::connect_four::validate_column(column)
         .ok_or(MelodyError::COMMAND_INVALID_ARGUMENTS_STRUCTURE)?;
 
@@ -261,7 +260,7 @@ async fn connect_four_play(core: Core, args: BlueprintCommandArgs) -> MelodyResu
       })
     },
     Some(GameQuery::ComputerGame(game)) => {
-      let column = resolve_arguments::<i64>(args.option_values)?;
+      let column = args.resolve_values::<i64>()?;
       let column = crate::feature::connect_four::validate_column(column)
         .ok_or(MelodyError::COMMAND_INVALID_ARGUMENTS_STRUCTURE)?;
 
@@ -354,7 +353,7 @@ async fn connect_four_resign(core: Core, args: BlueprintCommandArgs) -> MelodyRe
 async fn connect_four_claim_win(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let player = args.interaction.user.id;
-  let confirm = resolve_arguments::<Option<bool>>(args.option_values)?.unwrap_or(false);
+  let confirm = args.resolve_values::<Option<bool>>()?.unwrap_or(false);
   let response = core.operate_persist_guild_commit(guild_id, |persist_guild| {
     Ok(if persist_guild.connect_four.is_playing_computer(player) {
       "You cannot claim a win against the computer player".to_owned()

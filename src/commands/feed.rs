@@ -84,7 +84,7 @@ pub const FEEDS: BlueprintCommand = blueprint_command! {
 
 async fn feeds_add(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let (feed_type, feed_source, channel_id) = resolve_arguments::<(String, String, Option<ChannelId>)>(args.option_values)?;
+  let (feed_type, feed_source, channel_id) = args.resolve_values::<(String, String, Option<ChannelId>)>()?;
   let feed_type = FeedType::from_str(&feed_type).ok_or(MelodyError::COMMAND_INVALID_ARGUMENTS_STRUCTURE)?;
   let channel_id = channel_id.unwrap_or(args.interaction.channel_id);
 
@@ -104,7 +104,7 @@ async fn feeds_add(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
 
 async fn feeds_remove(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let (feed_type, feed_source) = resolve_arguments::<(String, String)>(args.option_values)?;
+  let (feed_type, feed_source) = args.resolve_values::<(String, String)>()?;
   let feed_type = FeedType::from_str(&feed_type).ok_or(MelodyError::COMMAND_INVALID_ARGUMENTS_STRUCTURE)?;
 
   let response = if let Some(feed) = feed_type.with_source(&feed_source) {
