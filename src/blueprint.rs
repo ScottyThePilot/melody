@@ -33,7 +33,7 @@ pub use serenity::futures::future::BoxFuture;
 
 use std::collections::HashSet;
 use std::fmt;
-use std::num::NonZeroU64;
+use std::num::{NonZeroU64, NonZeroU32, NonZeroUsize};
 use std::str::FromStr;
 
 pub fn find_command(commands: &'static [BlueprintCommand], name: &str) -> Option<&'static BlueprintCommand> {
@@ -101,14 +101,16 @@ pub struct BlueprintCommand {
 
 impl BlueprintCommand {
   pub fn into_command_builder(self) -> CreateCommand {
-    let permissions = self.default_permissions
-      .unwrap_or(Permissions::empty());
-    CreateCommand::new(self.name)
+    let builder = CreateCommand::new(self.name)
       .description(self.description)
       .kind(self.command_type)
       .dm_permission(self.allow_in_dms)
-      .default_member_permissions(permissions)
-      .set_options(self.root.into_options_builders().1)
+      .set_options(self.root.into_options_builders().1);
+    if let Some(permissions) = self.default_permissions {
+      builder.default_member_permissions(permissions)
+    } else {
+      builder
+    }
   }
 
   pub fn is_enabled(&self, plugins: &HashSet<String>) -> bool {
@@ -549,6 +551,14 @@ impl_resolve_argument_value!('a, _r, &'a String, BlueprintOptionValue::String(re
 impl_resolve_argument_value!('a, _r, String, BlueprintOptionValue::String(ref value) => Some(value.to_owned()));
 impl_resolve_argument_value!('a, _r, i64, BlueprintOptionValue::Integer(value) => Some(value));
 impl_resolve_argument_value!('a, _r, u64, BlueprintOptionValue::Integer(value) => u64::try_from(value).ok());
+impl_resolve_argument_value!('a, _r, i32, BlueprintOptionValue::Integer(value) => i32::try_from(value).ok());
+impl_resolve_argument_value!('a, _r, u32, BlueprintOptionValue::Integer(value) => u32::try_from(value).ok());
+impl_resolve_argument_value!('a, _r, isize, BlueprintOptionValue::Integer(value) => isize::try_from(value).ok());
+impl_resolve_argument_value!('a, _r, usize, BlueprintOptionValue::Integer(value) => usize::try_from(value).ok());
+impl_resolve_argument_value!('a, _r, NonZeroU64, BlueprintOptionValue::Integer(value) => u64::try_from(value).ok().and_then(NonZeroU64::new));
+impl_resolve_argument_value!('a, _r, NonZeroU32, BlueprintOptionValue::Integer(value) => u32::try_from(value).ok().and_then(NonZeroU32::new));
+impl_resolve_argument_value!('a, _r, NonZeroUsize, BlueprintOptionValue::Integer(value) => usize::try_from(value).ok().and_then(NonZeroUsize::new));
+impl_resolve_argument_value!('a, _r, f32, BlueprintOptionValue::Number(value) => Some(value as f32));
 impl_resolve_argument_value!('a, _r, f64, BlueprintOptionValue::Number(value) => Some(value));
 impl_resolve_argument_value!('a, _r, bool, BlueprintOptionValue::Boolean(value) => Some(value));
 impl_resolve_argument_value!('a, _r, UserId, BlueprintOptionValue::User(value) => Some(value));
@@ -568,12 +578,6 @@ impl<'a> ResolveArgumentValue<'a> for RoleOrUser {
       &BlueprintOptionValue::Role(role) => Some(RoleOrUser::Role(role)),
       _ => None
     })
-  }
-}
-
-impl<'a> ResolveArgumentValue<'a> for NonZeroU64 {
-  fn resolve_value(option_value: Option<&'a BlueprintOptionValue>, resolved: &'a CommandDataResolved) -> Option<Self> {
-    u64::resolve_value(option_value, resolved).and_then(NonZeroU64::new)
   }
 }
 
