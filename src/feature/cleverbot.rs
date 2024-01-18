@@ -100,6 +100,7 @@ pub async fn send_reply(core: &Core, message: &Message, content: impl Into<Strin
   let message_builder = CreateMessage::new()
     .allowed_mentions(Default::default())
     .embeds(if notify { vec![cleverbot_note_embed()] } else { Vec::new() })
+    .reference_message(message)
     .content(content);
   message.channel_id.send_message(&core, message_builder)
     .await.context("failed to send cleverbot reply")?;
