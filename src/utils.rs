@@ -12,6 +12,8 @@ use regex::Regex;
 use serenity::model::id::{EmojiId, GuildId, UserId};
 use serenity::cache::Cache;
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::error::Error;
 use std::fmt;
 
@@ -263,4 +265,22 @@ macro_rules! operate {
   ($core:expr, $function:ident::<$Key:ty>, $operation:expr) => {
     crate::data::$function($core.get::<$Key>().await, $operation).await
   };
+}
+
+#[repr(transparent)]
+#[derive(Debug, Clone)]
+pub struct Flag(Arc<AtomicBool>);
+
+impl Flag {
+  pub fn new() -> Self {
+    Flag(Arc::new(AtomicBool::new(false)))
+  }
+
+  pub fn get(&self) -> bool {
+    self.0.load(Ordering::Relaxed)
+  }
+
+  pub fn set(&self) {
+    self.0.store(true, Ordering::Relaxed);
+  }
 }

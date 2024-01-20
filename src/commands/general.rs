@@ -26,7 +26,7 @@ pub const PING: BlueprintCommand = blueprint_command! {
 async fn ping(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let response = if rand::thread_rng().gen_bool(0.01) { "Pog" } else { "Pong" };
   BlueprintCommandResponse::new(response)
-    .send(&core, &args.interaction).await
+    .send(&core, &args).await
 }
 
 pub const HELP: BlueprintCommand = blueprint_command! {
@@ -64,7 +64,7 @@ async fn help(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
     }
   };
 
-  response.send(&core, &args.interaction).await
+  response.send(&core, &args).await
 }
 
 pub const ECHO: BlueprintCommand = blueprint_command! {
@@ -90,7 +90,7 @@ async fn echo(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   info!("Echoing message: {text:?}");
   info!("Echoing message (filtered): {text_filtered:?}");
   BlueprintCommandResponse::new(text_filtered)
-    .send(&core, &args.interaction).await
+    .send(&core, &args).await
 }
 
 pub const TROLL: BlueprintCommand = blueprint_command! {
@@ -148,7 +148,7 @@ async fn troll(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   };
 
   BlueprintCommandResponse::new(response)
-    .send(&core, &args.interaction).await
+    .send(&core, &args).await
 }
 
 pub const AVATAR: BlueprintCommand = blueprint_command! {
@@ -174,11 +174,12 @@ async fn avatar(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   };
 
   let response = match avatar_url {
-    Some(avatar_url) => BlueprintCommandResponse::new_ephemeral(avatar_url),
-    None => BlueprintCommandResponse::new_ephemeral("Failed to get that user's avatar")
+    Some(avatar_url) => avatar_url,
+    None => "Failed to get that user's avatar".to_owned()
   };
 
-  response.send(&core, &args.interaction).await
+  BlueprintCommandResponse::new_ephemeral(response)
+    .send(&core, &args).await
 }
 
 pub const BANNER: BlueprintCommand = blueprint_command! {
@@ -204,11 +205,12 @@ async fn banner(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   };
 
   let response = match banner_url {
-    Some(banner_url) => BlueprintCommandResponse::new_ephemeral(banner_url),
-    None => BlueprintCommandResponse::new_ephemeral("Failed to get that user's banner")
+    Some(banner_url) => banner_url,
+    None => "Failed to get that user's banner".to_owned()
   };
 
-  response.send(&core, &args.interaction).await
+  BlueprintCommandResponse::new_ephemeral(response)
+    .send(&core, &args).await
 }
 
 pub const EMOJI_STATS: BlueprintCommand = blueprint_command! {
@@ -244,10 +246,12 @@ async fn emoji_stats(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
     .enumerate().skip(page_start).take(PER_PAGE as usize)
     .map(|(i, (emoji, count))| format!("`#{}` {emoji} ({count} times)", i + 1))
     .collect::<Vec<String>>();
+
   let response = match entries.is_empty() {
-    true => BlueprintCommandResponse::new("(No results)".to_owned()),
-    false => BlueprintCommandResponse::new(entries.join("\n"))
+    true => "(No results)".to_owned(),
+    false => entries.join("\n")
   };
 
-  response.send(&core, &args.interaction).await
+  BlueprintCommandResponse::new(response)
+    .send(&core, &args).await
 }

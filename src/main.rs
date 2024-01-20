@@ -39,7 +39,7 @@ pub(crate) mod handler;
 pub(crate) mod ratelimiter;
 pub(crate) mod terminal;
 
-use crate::terminal::Flag;
+use crate::utils::Flag;
 
 use serenity::prelude::SerenityError;
 use serenity::model::id::GenericId;

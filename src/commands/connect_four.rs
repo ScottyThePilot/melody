@@ -158,7 +158,7 @@ async fn connect_four_challenge(core: Core, args: BlueprintCommandArgs) -> Melod
   }).await?;
 
   BlueprintCommandResponse::new(response)
-    .send(&core, &args.interaction).await
+    .send(&core, &args).await
 }
 
 async fn connect_four_challenge_computer(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
@@ -184,7 +184,7 @@ async fn connect_four_challenge_computer(core: Core, args: BlueprintCommandArgs)
   }).await?;
 
   BlueprintCommandResponse::new(response)
-    .send(&core, &args.interaction).await
+    .send(&core, &args).await
 }
 
 async fn connect_four_accept(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
@@ -209,7 +209,7 @@ async fn connect_four_accept(core: Core, args: BlueprintCommandArgs) -> MelodyRe
   }).await?;
 
   BlueprintCommandResponse::new(response)
-    .send(&core, &args.interaction).await
+    .send(&core, &args).await
 }
 
 async fn connect_four_decline(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
@@ -224,7 +224,7 @@ async fn connect_four_decline(core: Core, args: BlueprintCommandArgs) -> MelodyR
   }).await?;
 
   BlueprintCommandResponse::new(response)
-    .send(&core, &args.interaction).await
+    .send(&core, &args).await
 }
 
 async fn connect_four_play(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
@@ -233,14 +233,14 @@ async fn connect_four_play(core: Core, args: BlueprintCommandArgs) -> MelodyResu
   let persist_guild_container = core.get_persist_guild(guild_id).await?;
   let mut persist_guild = persist_guild_container.access_owned_mut().await;
 
-  let (deferred, response) = match persist_guild.connect_four.find_game_mut(player) {
+  let response = match persist_guild.connect_four.find_game_mut(player) {
     Some(GameQuery::UserGame(game, player_color)) => {
       let &opponent = game.players().other(&player).unwrap();
       let column = args.resolve_values::<i64>()?;
       let column = crate::feature::connect_four::validate_column(column)
         .ok_or(MelodyError::COMMAND_INVALID_ARGUMENTS_STRUCTURE)?;
 
-      (false, match game.play_move(player_color, column) {
+      match game.play_move(player_color, column) {
         UserGameResult::Victory(board) => {
           let board = board.print(print_piece);
           persist_guild.connect_four.end_user_game(player, opponent);
@@ -257,16 +257,16 @@ async fn connect_four_play(core: Core, args: BlueprintCommandArgs) -> MelodyResu
         },
         UserGameResult::NotYourTurn => "It is not your turn!".to_owned(),
         UserGameResult::IllegalMove => "That move is illegal".to_owned()
-      })
+      }
     },
     Some(GameQuery::ComputerGame(game)) => {
       let column = args.resolve_values::<i64>()?;
       let column = crate::feature::connect_four::validate_column(column)
         .ok_or(MelodyError::COMMAND_INVALID_ARGUMENTS_STRUCTURE)?;
 
-      args.interaction.defer(&core).await.context("failed to defer message")?;
+      args.defer(&core).await?;
 
-      (true, match game.play_move(column).await {
+      match game.play_move(column).await {
         ComputerGameResult::Continuing(board, computer_move) => {
           let board = board.print(print_piece);
           let computer_move = computer_move + 1;
@@ -288,23 +288,16 @@ async fn connect_four_play(core: Core, args: BlueprintCommandArgs) -> MelodyResu
           format!("The game between you and the computer player has ended in a draw\n\n{board}")
         },
         ComputerGameResult::IllegalMove => "That move is illegal".to_owned()
-      })
+      }
     },
-    None => (false, "You are not currently playing a game!".to_owned())
+    None => "You are not currently playing a game!".to_owned()
   };
 
   persist_guild_container.commit_guard(persist_guild.downgrade())
     .await.context("failed to save")?;
 
-  if deferred {
-    BlueprintCommandResponseEdit::new(response)
-      .send(&core, &args.interaction).await?;
-  } else {
-    BlueprintCommandResponse::new(response)
-      .send(&core, &args.interaction).await?;
-  };
-
-  Ok(())
+  BlueprintCommandResponse::new(response)
+    .send(&core, &args).await
 }
 
 async fn connect_four_board(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
@@ -327,7 +320,7 @@ async fn connect_four_board(core: Core, args: BlueprintCommandArgs) -> MelodyRes
   }).await?;
 
   BlueprintCommandResponse::new(response)
-    .send(&core, &args.interaction).await
+    .send(&core, &args).await
 }
 
 async fn connect_four_resign(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
@@ -347,7 +340,7 @@ async fn connect_four_resign(core: Core, args: BlueprintCommandArgs) -> MelodyRe
   }).await?;
 
   BlueprintCommandResponse::new(response)
-    .send(&core, &args.interaction).await
+    .send(&core, &args).await
 }
 
 async fn connect_four_claim_win(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
@@ -382,7 +375,7 @@ async fn connect_four_claim_win(core: Core, args: BlueprintCommandArgs) -> Melod
   }).await?;
 
   BlueprintCommandResponse::new(response)
-    .send(&core, &args.interaction).await
+    .send(&core, &args).await
 }
 
 async fn connect_four_stats(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
@@ -394,7 +387,7 @@ async fn connect_four_stats(core: Core, args: BlueprintCommandArgs) -> MelodyRes
   }).await?;
 
   BlueprintCommandResponse::new(response)
-    .send(&core, &args.interaction).await
+    .send(&core, &args).await
 }
 
 fn print_piece(piece: Option<Color>) -> &'static str {

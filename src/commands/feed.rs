@@ -99,7 +99,7 @@ async fn feeds_add(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   };
 
   BlueprintCommandResponse::new(response)
-    .send(&core, &args.interaction).await
+    .send(&core, &args).await
 }
 
 async fn feeds_remove(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
@@ -117,7 +117,7 @@ async fn feeds_remove(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   };
 
   BlueprintCommandResponse::new(response)
-    .send(&core, &args.interaction).await
+    .send(&core, &args).await
 }
 
 async fn feeds_remove_all(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
@@ -130,7 +130,7 @@ async fn feeds_remove_all(core: Core, args: BlueprintCommandArgs) -> MelodyResul
   };
 
   BlueprintCommandResponse::new(response)
-    .send(&core, &args.interaction).await
+    .send(&core, &args).await
 }
 
 async fn feeds_list(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
@@ -149,7 +149,7 @@ async fn feeds_list(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   };
 
   BlueprintCommandResponse::new(response)
-    .send(&core, &args.interaction).await
+    .send(&core, &args).await
 }
 
 async fn register_feed(core: &Core, feed: Feed, guild_id: GuildId, channel_id: ChannelId) -> MelodyResult<(bool, bool)> {

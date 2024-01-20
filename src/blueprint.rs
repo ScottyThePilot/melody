@@ -1,6 +1,6 @@
 use crate::{MelodyError, MelodyParseCommandError, MelodyResult};
 use crate::data::Core;
-use crate::utils::{Blockify, Contextualize};
+use crate::utils::{Blockify, Contextualize, Flag};
 
 use itertools::Itertools;
 
@@ -24,7 +24,7 @@ use serenity::model::application::{
   CommandType
 };
 use serenity::model::user::User;
-use serenity::model::channel::{Attachment, ChannelType, Message, PartialChannel};
+use serenity::model::channel::{Attachment, ChannelType, PartialChannel};
 use serenity::model::guild::{PartialMember, Role};
 use serenity::model::colour::Color;
 use serenity::model::id::{UserId, ChannelId, RoleId, AttachmentId};
@@ -35,6 +35,8 @@ use std::collections::HashSet;
 use std::fmt;
 use std::num::{NonZeroU64, NonZeroU32, NonZeroUsize};
 use std::str::FromStr;
+
+
 
 pub fn find_command(commands: &'static [BlueprintCommand], name: &str) -> Option<&'static BlueprintCommand> {
   commands.into_iter().find(|command| command.name == name)
@@ -375,9 +377,24 @@ impl BlueprintCommandResponse {
     CreateInteractionResponse::Message(response)
   }
 
-  pub async fn send(self, cache_http: impl CacheHttp, interaction: &CommandInteraction) -> MelodyResult {
-    interaction.create_response(cache_http, self.into_response_builder())
-      .await.context("failed to send interaction response")
+  fn into_response_builder_edit(self) -> EditInteractionResponse {
+    let mut response = EditInteractionResponse::new();
+    if let Some(content) = self.content { response = response.content(content) };
+    if !self.embeds.is_empty() { response = response.embeds(self.embeds) };
+    response
+  }
+
+  pub async fn send(self, cache_http: impl CacheHttp, args: &BlueprintCommandArgs) -> MelodyResult {
+    if args.deferred.get() {
+      if self.ephemeral { warn!("tried to send deferred ephemeral message") };
+      args.interaction.edit_response(cache_http, self.into_response_builder_edit())
+        .await.context("failed to edit interaction response")?;
+    } else {
+      args.interaction.create_response(cache_http, self.into_response_builder())
+        .await.context("failed to send interaction response")?;
+    };
+
+    Ok(())
   }
 }
 
@@ -392,35 +409,6 @@ impl Default for BlueprintCommandResponse {
   }
 }
 
-#[derive(Debug, Clone)]
-pub struct BlueprintCommandResponseEdit {
-  pub content: Option<String>,
-  pub embeds: Vec<CreateEmbed>
-}
-
-impl BlueprintCommandResponseEdit {
-  pub fn new(content: impl Into<String>) -> Self {
-    BlueprintCommandResponseEdit { content: Some(content.into()), embeds: Vec::new() }
-  }
-
-  #[allow(dead_code)]
-  pub fn with_embeds(embeds: Vec<CreateEmbed>) -> Self {
-    BlueprintCommandResponseEdit { content: None, embeds }
-  }
-
-  fn into_response_builder(self) -> EditInteractionResponse {
-    let mut response = EditInteractionResponse::new();
-    if let Some(content) = self.content { response = response.content(content) };
-    if !self.embeds.is_empty() { response = response.embeds(self.embeds) };
-    response
-  }
-
-  pub async fn send(self, cache_http: impl CacheHttp, interaction: &CommandInteraction) -> MelodyResult<Message> {
-    interaction.edit_response(cache_http, self.into_response_builder())
-      .await.context("failed to edit interaction response")
-  }
-}
-
 pub type BlueprintChoices<T> = &'static [(&'static str, T)];
 
 #[derive(Debug, Clone)]
@@ -428,13 +416,21 @@ pub struct BlueprintCommandArgs {
   pub command: String,
   pub subcommands: Vec<String>,
   pub option_values: Vec<BlueprintOptionValue>,
-  pub interaction: CommandInteraction
+  pub interaction: CommandInteraction,
+  pub deferred: Flag
 }
 
 impl BlueprintCommandArgs {
   pub fn resolve_values<'a, R: ResolveArgumentsValues<'a>>(&'a self) -> MelodyResult<R> {
     R::resolve_values(&self.option_values, &self.interaction.data.resolved)
       .ok_or(MelodyError::COMMAND_INVALID_ARGUMENTS_STRUCTURE)
+  }
+
+  pub async fn defer(&self, cache_http: impl CacheHttp) -> MelodyResult {
+    self.interaction.defer(cache_http).await
+      .context("failed to defer message")?;
+    self.deferred.set();
+    Ok(())
   }
 }
 
@@ -447,7 +443,11 @@ pub async fn dispatch(
 ) -> MelodyResult {
   let decomposed = parse_command(&interaction.data, blueprint_commands)?;
   let (command, subcommands, option_values, function) = decomposed;
-  function(core, BlueprintCommandArgs { command, subcommands, interaction, option_values }).await
+  function(core, BlueprintCommandArgs {
+    command, subcommands,
+    interaction, option_values,
+    deferred: Flag::new()
+  }).await
 }
 
 fn parse_command(

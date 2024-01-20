@@ -8,8 +8,7 @@ use crate::feature::cleverbot::{CleverBotLoggerWrapper, CleverBotWrapper};
 use crate::feature::feed::{Feed, FeedManager, FeedEventHandler};
 use crate::feature::message_chains::MessageChains;
 use crate::feature::music_player::MusicPlayer;
-use crate::terminal::Flag;
-use crate::utils::{Contextualize, Loggable};
+use crate::utils::{Contextualize, Flag, Loggable};
 
 use rand::seq::SliceRandom;
 use rss_feed::{TwitterPost, YouTubeVideo};

@@ -99,7 +99,7 @@ async fn role_grant(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   };
 
   BlueprintCommandResponse::new(response)
-    .send(&core, &args.interaction).await
+    .send(&core, &args).await
 }
 
 async fn role_revoke(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
@@ -131,7 +131,7 @@ async fn role_revoke(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   };
 
   BlueprintCommandResponse::new(response)
-    .send(&core, &args.interaction).await
+    .send(&core, &args).await
 }
 
 pub const GRANT_ROLES: BlueprintCommand = blueprint_command! {
@@ -310,7 +310,7 @@ async fn grant_roles_list(core: Core, args: BlueprintCommandArgs) -> MelodyResul
   }).await?;
 
   BlueprintCommandResponse::new(response)
-    .send(&core, &args.interaction).await
+    .send(&core, &args).await
 }
 
 fn stringify_grant_roles(core: &Core, guild_id: GuildId, grant_roles: &HashMap<RoleId, HashSet<Granter>>) -> String {
@@ -435,7 +435,7 @@ async fn join_roles_list(core: Core, args: BlueprintCommandArgs) -> MelodyResult
   }).await?;
 
   BlueprintCommandResponse::new(response)
-    .send(&core, &args.interaction).await
+    .send(&core, &args).await
 }
 
 // TODO: figure out how role positions actually work
@@ -516,7 +516,7 @@ where for<'a> A: ResolveArgumentValue<'a>, F: FnOnce(&mut crate::data::PersistGu
   };
 
   BlueprintCommandResponse::new(response)
-    .send(&core, &args.interaction).await
+    .send(&core, &args).await
 }
 
 fn is_owner(cache: &Cache, guild_id: GuildId, user_id: UserId) -> MelodyResult<bool> {

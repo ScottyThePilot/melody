@@ -2,9 +2,9 @@ use linefeed::{Interface, DefaultTerminal, ReadResult, Signal};
 
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Sender, Receiver};
+
+use crate::utils::Flag;
 
 pub fn run(
   body: impl FnOnce(Flag) + Send + 'static,
@@ -96,22 +96,4 @@ fn terminate_handler(kill_flag: &Flag, terminate: &mut Option<impl FnOnce(Flag)>
   } else {
     kill_flag.set();
   };
-}
-
-#[repr(transparent)]
-#[derive(Debug, Clone)]
-pub struct Flag(Arc<AtomicBool>);
-
-impl Flag {
-  pub fn new() -> Self {
-    Flag(Arc::new(AtomicBool::new(false)))
-  }
-
-  pub fn get(&self) -> bool {
-    self.0.load(Ordering::Relaxed)
-  }
-
-  pub fn set(&self) {
-    self.0.store(true, Ordering::Relaxed);
-  }
 }

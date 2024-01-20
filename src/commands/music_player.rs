@@ -2,7 +2,6 @@ use crate::{MelodyError, MelodyResult};
 use crate::blueprint::*;
 use crate::data::{Core, MusicPlayerKey};
 use crate::feature::music_player::{MusicPlayer, QueueItem, AttachmentItem, YouTubeItem};
-use crate::utils::Contextualize;
 use crate::utils::youtube;
 
 use serenity::model::mention::Mentionable;
@@ -179,7 +178,7 @@ async fn music_player_play_youtube(core: Core, args: BlueprintCommandArgs) -> Me
   let user_id = args.interaction.user.id;
   let video_url = args.resolve_values::<&str>()?;
 
-  send_response_result_deferred(&core, &args, {
+  send_response_result(&core, &args, {
     match ensure_in_channel(&core, guild_id, user_id).await {
       Err(response) => Err(response),
       Ok((music_player, channel_id)) => match youtube::parse_video_url(video_url) {
@@ -188,7 +187,7 @@ async fn music_player_play_youtube(core: Core, args: BlueprintCommandArgs) -> Me
           let item = QueueItem::YouTube(YouTubeItem { id: video_id });
           let item_str = item.to_string();
 
-          args.interaction.defer(&core).await.context("failed to defer message")?;
+          args.defer(&core).await?;
 
           match music_player.play(&core, guild_id, channel_id, vec![item]).await {
             Ok(()) => format!("Added video {item_str} to queue"),
@@ -208,13 +207,13 @@ async fn music_player_play_youtube_playlist(core: Core, args: BlueprintCommandAr
   let user_id = args.interaction.user.id;
   let playlist_url = args.resolve_values::<&str>()?;
 
-  send_response_result_deferred(&core, &args, {
+  send_response_result(&core, &args, {
     match ensure_in_channel(&core, guild_id, user_id).await {
       Err(response) => Err(response),
       Ok((music_player, channel_id)) => match youtube::parse_playlist_url(playlist_url) {
         None => Err("Invalid YouTube link".to_owned()),
         Some(playlist_id) => Ok({
-          args.interaction.defer(&core).await.context("failed to defer message")?;
+          args.defer(&core).await?;
 
           match youtube::get_playlist_info(music_player.ytdlp_path(), &playlist_id).await {
             Ok(playlist_info) => {
@@ -254,11 +253,11 @@ async fn music_player_play_attachment(core: Core, args: BlueprintCommandArgs) ->
   });
   let item_str = item.to_string();
 
-  send_response_result_deferred(&core, &args, {
+  send_response_result(&core, &args, {
     match ensure_in_channel(&core, guild_id, user_id).await {
       Err(response) => Err(response),
       Ok((music_player, channel_id)) => Ok({
-        args.interaction.defer(&core).await.context("failed to defer message")?;
+        args.defer(&core).await?;
 
         match music_player.play(&core, guild_id, channel_id, vec![item]).await {
           Ok(()) => format!("Added attachment {item_str} to queue"),
@@ -425,11 +424,11 @@ async fn music_player_loop(core: Core, args: BlueprintCommandArgs) -> MelodyResu
 async fn music_player_skip(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
 
-  send_response_result_deferred(&core, &args, {
+  send_response_result(&core, &args, {
     match ensure_in_same_channel(&core, guild_id, args.interaction.user.id).await {
       Err(response) => Err(response),
       Ok((music_player, ..)) => Ok({
-        args.interaction.defer(&core).await.context("failed to defer message")?;
+        args.defer(&core).await?;
         music_player.skip(&core, guild_id).await;
 
         "Skipped currently playing track".to_owned()
@@ -441,11 +440,11 @@ async fn music_player_skip(core: Core, args: BlueprintCommandArgs) -> MelodyResu
 async fn music_player_stop(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
 
-  send_response_result_deferred(&core, &args, {
+  send_response_result(&core, &args, {
     match ensure_in_same_channel(&core, guild_id, args.interaction.user.id).await {
       Err(response) => Err(response),
       Ok((music_player, channel_id)) => Ok({
-        args.interaction.defer(&core).await.context("failed to defer message")?;
+        args.defer(&core).await?;
         match music_player.stop(&core, guild_id).await {
           Ok(()) => format!("Left channel {} and cleared the queue", channel_id.mention()),
           Err(err) => {
@@ -495,29 +494,11 @@ async fn send_response_result(
   match result {
     Ok(response) => {
       BlueprintCommandResponse::new(response)
-        .send(&core, &args.interaction).await?;
+        .send(&core, &args).await?;
     },
     Err(response) => {
       BlueprintCommandResponse::new_ephemeral(response)
-        .send(&core, &args.interaction).await?;
-    }
-  };
-
-  Ok(())
-}
-
-async fn send_response_result_deferred(
-  core: &Core, args: &BlueprintCommandArgs,
-  result: Result<String, String>
-) -> MelodyResult {
-  match result {
-    Ok(response) => {
-      BlueprintCommandResponseEdit::new(response)
-        .send(&core, &args.interaction).await?;
-    },
-    Err(response) => {
-      BlueprintCommandResponse::new_ephemeral(response)
-        .send(&core, &args.interaction).await?;
+        .send(&core, &args).await?;
     }
   };
 

@@ -41,12 +41,12 @@ async fn roll(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
       };
 
       BlueprintCommandResponse::new(response)
-        .send(&core, &args.interaction).await
+        .send(&core, &args).await
     },
     Err(error) => {
       let response = Blockify(format_args!("Error: {error}")).to_string();
       BlueprintCommandResponse::new_ephemeral(response)
-        .send(&core, &args.interaction).await
+        .send(&core, &args).await
     }
   }
 }
