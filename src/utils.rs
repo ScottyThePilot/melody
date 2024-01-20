@@ -1,3 +1,5 @@
+pub mod youtube;
+
 use crate::{MelodyError, MelodyFileError, MelodyResult};
 
 use chrono::{DateTime, Utc};
@@ -5,6 +7,7 @@ use itertools::Itertools;
 use once_cell::sync::Lazy;
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
+use rand::seq::SliceRandom;
 use regex::Regex;
 use serenity::model::id::{EmojiId, GuildId, UserId};
 use serenity::cache::Cache;
@@ -14,25 +17,12 @@ use std::fmt;
 
 
 
-pub fn root_dir() -> std::io::Result<std::path::PathBuf> {
-  if let Some(manifest_dir) = std::env::var_os("CARGO_MANIFEST_DIR") {
-    return Ok(std::path::PathBuf::from(manifest_dir));
-  };
-
-  let mut current_exe = dunce::canonicalize(std::env::current_exe()?)?;
-
-  if current_exe.pop() {
-    return Ok(current_exe);
-  };
-
-  Err(std::io::Error::new(
-    std::io::ErrorKind::Other,
-    "failed to find an application root"
-  ))
-}
-
 pub fn create_rng() -> SmallRng {
   SmallRng::from_rng(rand::thread_rng()).expect("failed to seed smallrng")
+}
+
+pub fn shuffle<T>(list: &mut [T]) {
+  list.shuffle(&mut rand::thread_rng());
 }
 
 pub fn capitalize(s: impl AsRef<str>) -> String {

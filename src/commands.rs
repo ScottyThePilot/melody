@@ -1,6 +1,7 @@
 mod connect_four;
 mod feed;
 mod general;
+mod music_player;
 mod role_playing;
 mod roles;
 
@@ -28,6 +29,7 @@ pub const COMMANDS: &[BlueprintCommand] = &[
   self::general::AVATAR,
   self::general::BANNER,
   self::general::EMOJI_STATS,
+  self::music_player::MUSIC_PLAYER,
   self::connect_four::CONNECT_FOUR,
   self::role_playing::ROLL,
   self::roles::ROLE,

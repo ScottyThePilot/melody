@@ -5,16 +5,16 @@ use crate::{MelodyResult, MelodyError};
 use crate::commands::COMMANDS;
 use crate::data::*;
 use crate::feature::cleverbot::{CleverBotLoggerWrapper, CleverBotWrapper};
-use crate::feature::feed::{Feed, FeedManager};
+use crate::feature::feed::{Feed, FeedManager, FeedEventHandler};
 use crate::feature::message_chains::MessageChains;
-use crate::feature::feed::FeedEventHandler;
+use crate::feature::music_player::MusicPlayer;
 use crate::terminal::Flag;
 use crate::utils::{Contextualize, Loggable};
 
 use rand::seq::SliceRandom;
 use rss_feed::{TwitterPost, YouTubeVideo};
 use rss_feed::url::Url;
-use rss_feed::reqwest::Client as ReqwestClient;
+use reqwest::Client as HttpClient;
 use serenity::gateway::{ActivityData, ShardManager};
 use serenity::model::application::Interaction;
 use serenity::model::channel::Message;
@@ -24,6 +24,7 @@ use serenity::model::gateway::{ActivityType, Ready};
 use serenity::model::guild::Member;
 use serenity::model::id::{ChannelId, GuildId, UserId, RoleId};
 use serenity::utils::{content_safe, ContentSafeOptions};
+use songbird::{SerenityInit, Config as SongbirdConfig};
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::UnboundedReceiver as MpscReceiver;
 use tokio::sync::oneshot::Receiver as OneshotReceiver;
@@ -44,14 +45,17 @@ pub async fn launch(
   let persist = Persist::create().await?;
   let persist_guilds = PersistGuilds::create().await?;
 
-  let (token, intents) = config.operate(|config| {
+  let (token, intents, ytdlp_path) = config.operate(|config| {
     info!("YouTube RSS feeds are {}", if config.rss.youtube.is_some() { "enabled" } else { "disabled" });
     info!("Twitter RSS feeds are {}", if config.rss.twitter.is_some() { "enabled" } else { "disabled" });
-    (config.token.clone(), config.intents)
+    let ytdlp_path = config.music_player.as_ref().map(|mp| mp.ytdlp_path.clone());
+    (config.token.clone(), config.intents, ytdlp_path)
   }).await;
 
   let mut client = Client::builder(&token, intents)
-    .event_handler(Handler).await.context("failed to init client")?;
+    .event_handler(Handler)
+    .register_songbird_from_config(SongbirdConfig::default())
+    .await.context("failed to init client")?;
   let core = Core::from(&client);
 
   // Insert data into the shared TypeMap
@@ -62,14 +66,19 @@ pub async fn launch(
   let cleverbot_logger = CleverBotLoggerWrapper::create()
     .await.context("failed to create cleverbot logger")?;
 
+  let http_client = HttpClient::new();
+
   core.init(|data| {
     data.insert::<ConfigKey>(config);
     data.insert::<PersistKey>(persist);
     data.insert::<PersistGuildsKey>(persist_guilds.into());
     data.insert::<CleverBotKey>(CleverBotWrapper::new(Duration::from_secs_f64(cleverbot_delay)));
     data.insert::<CleverBotLoggerKey>(cleverbot_logger);
+    data.insert::<FeedKey>(Arc::new(Mutex::new(FeedManager::new(http_client.clone(), FeedHandler))));
     data.insert::<MessageChainsKey>(MessageChains::new().into());
-    data.insert::<FeedKey>(Arc::new(Mutex::new(FeedManager::new(ReqwestClient::new(), FeedHandler))));
+    data.insert::<MusicPlayerKey>(ytdlp_path.map(|ytdlp_path| {
+      Arc::new(MusicPlayer::new(ytdlp_path, http_client.clone()))
+    }));
     data.insert::<ShardManagerKey>(client.shard_manager.clone());
     data.insert::<PreviousBuildIdKey>(previous_build_id);
     data.insert::<RestartKey>(false);

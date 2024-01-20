@@ -45,6 +45,7 @@ key!(pub struct CleverBotKey, crate::feature::cleverbot::CleverBotWrapper);
 key!(pub struct CleverBotLoggerKey, crate::feature::cleverbot::CleverBotLoggerWrapper);
 key!(pub struct FeedKey, crate::feature::feed::FeedWrapper);
 key!(pub struct MessageChainsKey, crate::feature::message_chains::MessageChainsWrapper);
+key!(pub struct MusicPlayerKey, Option<Arc<crate::feature::music_player::MusicPlayer>>);
 key!(pub struct TasksKey, TasksWrapper);
 key!(pub struct PreviousBuildIdKey, u64);
 key!(pub struct RestartKey, bool);

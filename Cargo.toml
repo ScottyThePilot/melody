@@ -21,12 +21,17 @@ log = { version = "0.4" }
 once_cell = { version = "1.18" }
 rand = { version = "0.8", features = ["small_rng"] }
 regex = { version = "1.8.4" }
+reqwest = { version = "0.11" }
 rss-feed = { path = "./libs/rss-feed" }
 serde = { version = "1.0", features = ["derive", "rc"] }
+serde_json = { version = "1.0" }
 singlefile = { version = "0.2.1", features = ["shared-async"] }
 singlefile-formats = { version = "0.2.1", features = ["cbor-serde", "toml-serde"] }
+songbird = { version = "0.4" }
+symphonia = { version = "0.5.2", features = ["aac", "alac", "mp3"] }
 thiserror = { version = "1.0" }
-tokio = { version = "1.29", features = ["full", "parking_lot"] }
+tokio = { version = "1.35", features = ["full", "parking_lot"] }
+url = { version = "2.4", features = ["serde"] }
 
 [dependencies.serenity]
 version = "0.12"
@@ -45,6 +50,9 @@ features = ["serde"]
 [dependencies.uord]
 git = "https://github.com/ScottyThePilot/misc-crates"
 features = ["serde"]
+
+[dependencies.yggdrasil]
+git = "https://github.com/ScottyThePilot/misc-crates"
 
 [workspace]
 resolver = "2"

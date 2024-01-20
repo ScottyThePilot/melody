@@ -33,7 +33,9 @@ pub struct Config {
   #[serde(default, deserialize_with = "deserialize_intents")]
   pub intents: GatewayIntents,
   #[serde(default)]
-  pub rss: ConfigRss
+  pub rss: ConfigRss,
+  #[serde(default)]
+  pub music_player: Option<ConfigMusicPlayer>
 }
 
 impl Config {
@@ -49,6 +51,12 @@ impl Config {
 
 fn default_cleverbot_ratelimit() -> f64 {
   5.0
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfigMusicPlayer {
+  /// The path to the `yt-dlp` executable.
+  pub ytdlp_path: PathBuf
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
