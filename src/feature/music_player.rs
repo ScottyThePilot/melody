@@ -335,7 +335,7 @@ impl YouTubeItem {
 
 impl fmt::Display for YouTubeItem {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    fmt::Display::fmt(&youtube::display_video_url(&self.id), f)
+    write!(f, "<{}>", youtube::display_video_url(&self.id))
   }
 }
 

@@ -14,6 +14,11 @@ use std::sync::Arc;
 pub const MUSIC_PLAYER: BlueprintCommand = blueprint_command! {
   name: "music-player",
   description: "Play audio from various sources in voice channels",
+  info: [
+    "Player functionality may be spotty or unreliable.",
+    "If the player breaks or stops on a track indefinitely, command the bot to skip, leave the channel, and join the channel again.",
+    "Issuing the stop command will clear the queue, the leave command will not."
+  ],
   usage: [
     "/music-player play youtube <video-url>",
     "/music-player play attachment <attachment>",
@@ -60,6 +65,11 @@ pub const MUSIC_PLAYER: BlueprintCommand = blueprint_command! {
               description: "The URL of the YouTube playlist to play",
               required: true,
               max_length: 512
+            }),
+            blueprint_argument!(Boolean {
+              name: "shuffle",
+              description: "Whether to randomly shuffle the playlist or not",
+              required: false
             })
           ],
           function: music_player_play_youtube_playlist
@@ -205,7 +215,8 @@ async fn music_player_play_youtube(core: Core, args: BlueprintCommandArgs) -> Me
 async fn music_player_play_youtube_playlist(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let user_id = args.interaction.user.id;
-  let playlist_url = args.resolve_values::<&str>()?;
+  let (playlist_url, shuffle) = args.resolve_values::<(&str, Option<bool>)>()?;
+  let shuffle = shuffle.unwrap_or(false);
 
   send_response_result(&core, &args, {
     match ensure_in_channel(&core, guild_id, user_id).await {
@@ -217,10 +228,14 @@ async fn music_player_play_youtube_playlist(core: Core, args: BlueprintCommandAr
 
           match youtube::get_playlist_info(music_player.ytdlp_path(), &playlist_id).await {
             Ok(playlist_info) => {
-              let items = playlist_info.entries.into_iter()
+              let mut items = playlist_info.entries.into_iter()
                 .map(|video_info| QueueItem::YouTube(YouTubeItem { id: video_info.id }))
                 .collect::<Vec<QueueItem>>();
               let items_count = items.len();
+
+              if shuffle {
+                crate::utils::shuffle(&mut items);
+              };
 
               match music_player.play(&core, guild_id, channel_id, items).await {
                 Ok(()) => format!("Added playlist of {items_count} videos to queue"),
@@ -287,13 +302,16 @@ async fn music_player_queue_show(core: Core, args: BlueprintCommandArgs) -> Melo
         let entries = queue_list.into_iter()
           .enumerate().skip(page_start).take(PER_PAGE as usize)
           .map(|(i, queue_item)| match i == 0 {
-            true => format!("Now Playing <{queue_item}>"),
-            false => format!("`#{}` <{queue_item}>", i)
+            true => format!("Now Playing {queue_item}"),
+            false => format!("`#{}` {queue_item}", i)
           })
           .collect::<Vec<String>>();
-        match entries.is_empty() {
-          true => "(No results)".to_owned(),
-          false => entries.join("\n")
+        if entries.is_empty() {
+          "(Nothing is playing)".to_owned()
+        } else {
+          let mut response = entries.join("\n");
+          response.push_str("(The queue will automatically loop)");
+          response
         }
       })
     }
@@ -351,7 +369,7 @@ async fn music_player_join(core: Core, args: BlueprintCommandArgs) -> MelodyResu
   let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
 
   send_response_result(&core, &args, {
-    match ensure_in_same_channel(&core, guild_id, args.interaction.user.id).await {
+    match ensure_in_channel(&core, guild_id, args.interaction.user.id).await {
       Err(response) => Err(response),
       Ok((music_player, channel_id)) => Ok({
         match music_player.join(&core, guild_id, channel_id).await {

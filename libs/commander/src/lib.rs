@@ -3,6 +3,7 @@ extern crate thiserror;
 
 use std::collections::VecDeque;
 use std::str::FromStr;
+use std::any::type_name;
 
 
 
@@ -42,8 +43,10 @@ pub struct CommandOutput<T: 'static> {
 pub enum CommandError {
   #[error("empty command group")]
   EmptyCommandGroup,
-  #[error("insufficient arguments")]
-  InsufficientArgs,
+  #[error("insufficient arguments, expected one of {0:?}")]
+  InsufficientArgsCommand(Vec<&'static str>),
+  #[error("insufficient arguments, expected {0}")]
+  InsufficientArgs(&'static str),
   #[error("command {0:?} not found")]
   CommandNotFound(String),
   #[error("illegal character {0:?}")]
@@ -75,7 +78,8 @@ fn find_target_args<T: 'static>(
   args: &mut VecDeque<String>,
   commands: &'static [Command<T>]
 ) -> Result<&'static T, CommandError> {
-  let first_arg = args.pop_front().ok_or(CommandError::InsufficientArgs)?;
+  let first_arg = args.pop_front()
+    .ok_or_else(|| CommandError::InsufficientArgsCommand(command_names(commands)))?;
   let body = commands.iter()
     .find_map(|command| command.name.eq_ignore_ascii_case(&first_arg).then_some(&command.body))
     .ok_or_else(|| CommandError::CommandNotFound(first_arg))?;
@@ -84,6 +88,10 @@ fn find_target_args<T: 'static>(
     CommandBody::Group { commands } => find_target_args(args, commands),
     CommandBody::Target { target } => Ok(target)
   }
+}
+
+fn command_names<T>(commands: &'static [Command<T>]) -> Vec<&'static str> {
+  commands.iter().map(|command| command.name).collect()
 }
 
 #[inline]
@@ -107,14 +115,15 @@ where T: FromStr, T::Err: std::error::Error + Send + Sync + 'static {
     match arg {
       Some(arg) => arg.parse::<T>().map(Parsed)
         .map_err(|err| CommandError::ArgsFromStrError(err.into())),
-      None => Err(CommandError::InsufficientArgs)
+      None => Err(CommandError::InsufficientArgs(type_name::<T>()))
     }
   }
 }
 
 impl ResolveArg for String {
   fn resolve_arg(arg: Option<&str>) -> Result<Self, CommandError> {
-    arg.map(str::to_owned).ok_or(CommandError::InsufficientArgs)
+    arg.map(str::to_owned)
+      .ok_or_else(|| CommandError::InsufficientArgs(type_name::<String>()))
   }
 }
 

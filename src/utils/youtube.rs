@@ -40,12 +40,17 @@ pub struct VideoInfo {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PlaylistVideoInfo {
+  pub id: String
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PlaylistInfo {
   pub id: String,
   pub title: Option<String>,
   pub channel: Option<String>,
   pub uploader: Option<String>,
-  pub entries: Vec<VideoInfo>,
+  pub entries: Vec<PlaylistVideoInfo>,
   pub webpage_url: Option<String>
 }
 
@@ -70,7 +75,7 @@ impl VideoInfo {
 
 pub async fn get_video_info(yt_dlp: impl AsRef<Path>, video_id: &str) -> Result<VideoInfo, YtDlpError> {
   let yt_dlp = yt_dlp.as_ref();
-  assert!(is_id_str(video_id), "video id {video_id:?} was invalid");
+  assert!(is_id_str(video_id, 16), "video id {video_id:?} was invalid");
   let url = display_video_url(video_id).to_string();
   let args = ["-j", url.as_str(), "-f", "ba[abr>0][vcodec=none]/best", "--no-playlist"];
   let output = Command::new(yt_dlp).args(args).output().await
@@ -83,7 +88,7 @@ pub async fn get_video_info(yt_dlp: impl AsRef<Path>, video_id: &str) -> Result<
 
 pub async fn get_playlist_info(yt_dlp: impl AsRef<Path>, playlist_id: &str) -> Result<PlaylistInfo, YtDlpError> {
   let yt_dlp = yt_dlp.as_ref();
-  assert!(is_id_str(playlist_id), "playlist id {playlist_id:?} was invalid");
+  assert!(is_id_str(playlist_id, 40), "playlist id {playlist_id:?} was invalid");
   let url = display_playlist_url(playlist_id).to_string();
   let args = ["-J", url.as_str(), "--compat-options", "no-youtube-unavailable-videos", "--yes-playlist"];
   let output = Command::new(yt_dlp).args(args).output().await
@@ -165,8 +170,8 @@ impl Compose for YtDlpSource {
   }
 }
 
-fn is_id_str(s: &str) -> bool {
-  s.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-')
+fn is_id_str(s: &str, l: usize) -> bool {
+  s.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-') && s.len() < l
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -204,18 +209,18 @@ pub fn parse_video_url(url: &str) -> Option<String> {
   let domain = url.domain()?;
   if domain.ends_with("youtube.com") {
     url.query_pairs()
-      .find_map(|(k, v)| (k == "v" && is_id_str(&v)).then_some(v))
+      .find_map(|(k, v)| (k == "v" && is_id_str(&v, 16)).then_some(v))
       .map(std::borrow::Cow::into_owned)
       .or_else(|| {
         let path = url.path();
         ["/v/", "/embed/", "/"].into_iter()
           .filter_map(|s| path.strip_prefix(s))
-          .find(|&p| is_id_str(p))
+          .find(|&p| is_id_str(p, 16))
           .map(str::to_owned)
       })
   } else if domain == "youtu.be" {
     url.path().strip_prefix("/")
-      .filter(|&p| is_id_str(p))
+      .filter(|&p| is_id_str(p, 16))
       .map(str::to_owned)
   } else {
     None
@@ -229,7 +234,7 @@ pub fn parse_playlist_url(url: &str) -> Option<String> {
   let domain = url.domain()?;
   if domain.ends_with("youtube.com") || domain == "youtu.be" {
     url.query_pairs()
-      .find_map(|(k, v)| (k == "list" && is_id_str(&v)).then_some(v))
+      .find_map(|(k, v)| (k == "list" && is_id_str(&v, 40)).then_some(v))
       .map(std::borrow::Cow::into_owned)
   } else {
     None

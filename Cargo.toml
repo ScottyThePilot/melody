@@ -68,9 +68,8 @@ members = [
 opt-level = 0
 lto = "off"
 
-[profile.dev.symphonia]
+[profile.dev.package.symphonia]
 opt-level = 3
-lto = "thin"
 
 [profile.release]
 opt-level = 3
