@@ -104,8 +104,8 @@ impl MusicPlayer {
     self.queue_manipulate(guild_id, |queue| queue.remove(index)).await
   }
 
-  pub async fn queue_list(&self, guild_id: GuildId) -> Vec<QueueItem> {
-    self.queue_manipulate(guild_id, |queue| queue.to_vec()).await
+  pub async fn queue_list(&self, guild_id: GuildId) -> (Vec<QueueItem>, bool) {
+    self.queue_manipulate(guild_id, |queue| (queue.to_vec(), queue.looped)).await
   }
 
   async fn queue_manipulate<F, R>(&self, guild_id: GuildId, f: F) -> R

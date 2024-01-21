@@ -302,7 +302,7 @@ async fn music_player_queue_show(core: Core, args: BlueprintCommandArgs) -> Melo
     match ensure_in_same_channel(&core, guild_id, args.interaction.user.id).await {
       Err(response) => Err(response),
       Ok((music_player, ..)) => Ok({
-        let queue_list = music_player.queue_list(guild_id).await;
+        let (queue_list, queue_looped) = music_player.queue_list(guild_id).await;
 
         let page_start = (page * PER_PAGE) as usize;
         let entries = queue_list.into_iter()
@@ -316,7 +316,10 @@ async fn music_player_queue_show(core: Core, args: BlueprintCommandArgs) -> Melo
           "(Nothing is playing)".to_owned()
         } else {
           let mut response = entries.join("\n");
-          response.push_str("\n(The queue will automatically loop)");
+          if queue_looped {
+            response.push_str("\n(The queue will automatically loop)");
+          };
+
           response
         }
       })
