@@ -21,11 +21,17 @@ pub const MUSIC_PLAYER: BlueprintCommand = blueprint_command! {
   ],
   usage: [
     "/music-player play youtube <video-url>",
+    "/music-player play youtube-playlist <playlist-url>",
     "/music-player play attachment <attachment>",
+    "/music-player queue show [page]",
+    "/music-player queue clear",
+    "/music-player queue remove <index>",
+    "/music-player queue shuffle",
     "/music-player join",
     "/music-player leave",
     "/music-player pause <true|false>",
     "/music-player loop <true|false>",
+    "/music-player skip",
     "/music-player stop"
   ],
   examples: [
@@ -310,7 +316,7 @@ async fn music_player_queue_show(core: Core, args: BlueprintCommandArgs) -> Melo
           "(Nothing is playing)".to_owned()
         } else {
           let mut response = entries.join("\n");
-          response.push_str("(The queue will automatically loop)");
+          response.push_str("\n(The queue will automatically loop)");
           response
         }
       })
