@@ -63,3 +63,15 @@ members = [
   "libs/commander",
   "libs/rss-feed"
 ]
+
+[profile.dev]
+opt-level = 0
+lto = "off"
+
+[profile.dev.symphonia]
+opt-level = 3
+lto = "thin"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
