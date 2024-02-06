@@ -10,25 +10,26 @@ chrono = { version = "0.4", features = ["serde"] }
 chumsky = { version = "0.9.2" }
 cleverbot = { path = "./libs/cleverbot" }
 cleverbot-logs = { path = "./libs/cleverbot-logs" }
-commander = { path = "./libs/commander" }
 const-random = { version = "0.1.15" }
 dunce = { version = "1.0.4" }
 fern = { version = "0.6" }
 float-ord = { version = "0.3.2" }
 itertools = { version = "0.10" }
-linefeed = { version = "0.6.0" }
 log = { version = "0.4" }
+melody-commander = { path = "./libs/melody-commander" }
+melody-flag = { path = "./libs/melody-flag" }
+melody-rss-feed = { path = "./libs/melody-rss-feed" }
 once_cell = { version = "1.18" }
 rand = { version = "0.8", features = ["small_rng"] }
 regex = { version = "1.8.4" }
 reqwest = { version = "0.11" }
-rss-feed = { path = "./libs/rss-feed" }
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = { version = "1.0" }
 singlefile = { version = "0.2.1", features = ["shared-async"] }
 singlefile-formats = { version = "0.2.1", features = ["cbor-serde", "toml-serde"] }
 songbird = { version = "0.4" }
 symphonia = { version = "0.5.2", features = ["aac", "alac", "mp3"] }
+term-stratum = { path = "./libs/term-stratum" }
 thiserror = { version = "1.0" }
 tokio = { version = "1.35", features = ["full", "parking_lot"] }
 url = { version = "2.4", features = ["serde"] }
@@ -60,8 +61,11 @@ members = [
   "libs/cacheable",
   "libs/cleverbot",
   "libs/cleverbot-logs",
-  "libs/commander",
-  "libs/rss-feed"
+  "libs/melody-commander",
+  "libs/melody-flag",
+  "libs/melody-rss-feed",
+  "libs/melody-timer",
+  "libs/term-stratum",
 ]
 
 [profile.dev]

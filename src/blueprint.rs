@@ -1,9 +1,9 @@
 use crate::{MelodyError, MelodyParseCommandError, MelodyResult};
 use crate::data::Core;
-use crate::utils::{Blockify, Contextualize, Flag};
+use crate::utils::{Blockify, Contextualize};
 
 use itertools::Itertools;
-
+use melody_flag::Flag;
 use serenity::builder::{
   CreateCommand,
   CreateCommandOption,
@@ -429,7 +429,7 @@ impl BlueprintCommandArgs {
   pub async fn defer(&self, cache_http: impl CacheHttp) -> MelodyResult {
     self.interaction.defer(cache_http).await
       .context("failed to defer message")?;
-    self.deferred.set();
+    self.deferred.set(true);
     Ok(())
   }
 }
@@ -446,7 +446,7 @@ pub async fn dispatch(
   function(core, BlueprintCommandArgs {
     command, subcommands,
     interaction, option_values,
-    deferred: Flag::new()
+    deferred: Flag::new(false)
   }).await
 }
 

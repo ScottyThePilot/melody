@@ -1,29 +1,16 @@
 use crate::MelodyResult;
 use crate::data::Core;
-use crate::utils::Loggable;
 
-use commander::{Command, CommandError, CommandOutput, Parsed, resolve_args};
 use itertools::Itertools;
+use melody_commander::{Command, CommandError, CommandOutput, Parsed, resolve_args};
 use serenity::model::id::GuildId;
-use tokio::sync::Mutex;
-use tokio::sync::mpsc::UnboundedReceiver as MpscReceiver;
 
 use std::collections::HashSet;
-use std::sync::Arc;
 
 
-
-pub async fn input_task(input: Arc<Mutex<MpscReceiver<String>>>, core: Core) {
-  let agent = InputAgent::new(core);
-  let mut input = input.lock().await;
-  while let Some(line) = input.recv().await {
-    agent.line(line).await.log();
-  };
-}
 
 const COMMANDS: &[Command<Target>] = &[
   Command::new_target("stop", Target::Stop),
-  Command::new_target("restart", Target::Restart),
   Command::new_group("plugin", &[
     Command::new_target("list", Target::PluginList),
     Command::new_target("enable", Target::PluginEnable),
@@ -39,7 +26,6 @@ const COMMANDS: &[Command<Target>] = &[
 #[derive(Debug, Clone, Copy)]
 enum Target {
   Stop,
-  Restart,
   PluginList,
   PluginEnable,
   PluginDisable,
@@ -51,7 +37,6 @@ enum Target {
 #[derive(Debug, Clone)]
 enum TargetArgs {
   Stop,
-  Restart,
   PluginList(GuildId),
   PluginEnable(String, GuildId),
   PluginDisable(String, GuildId),
@@ -66,7 +51,6 @@ impl TryFrom<CommandOutput<Target>> for TargetArgs {
   fn try_from(output: CommandOutput<Target>) -> Result<Self, Self::Error> {
     match output.target.clone() {
       Target::Stop => Ok(TargetArgs::Stop),
-      Target::Restart => Ok(TargetArgs::Restart),
       Target::PluginList => {
         let Parsed(guild_id) = resolve_args::<Parsed<GuildId>>(&output.remaining_args)?;
         Ok(TargetArgs::PluginList(guild_id))
@@ -92,10 +76,6 @@ impl TargetArgs {
       TargetArgs::Stop => {
         info!("Shutdown triggered");
         agent.core.trigger_shutdown().await;
-      },
-      TargetArgs::Restart => {
-        info!("Restart triggered");
-        agent.core.trigger_shutdown_restart().await;
       },
       TargetArgs::PluginList(guild_id) => {
         let plugins = agent.plugin_list(guild_id).await;
@@ -130,17 +110,17 @@ impl TargetArgs {
 }
 
 #[derive(Debug, Clone)]
-struct InputAgent {
+pub struct InputAgent {
   core: Core
 }
 
 impl InputAgent {
-  fn new(core: impl Into<Core>) -> Self {
+  pub fn new(core: impl Into<Core>) -> Self {
     InputAgent { core: core.into() }
   }
 
-  async fn line(&self, line: String) -> MelodyResult {
-    match commander::apply(&line, COMMANDS).and_then(TargetArgs::try_from) {
+  pub async fn line(&self, line: String) -> MelodyResult {
+    match melody_commander::apply(&line, COMMANDS).and_then(TargetArgs::try_from) {
       Ok(target_args) => target_args.execute(self).await?,
       Err(err) => error!("{err}")
     };

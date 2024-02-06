@@ -1,7 +1,7 @@
 [package]
-name = "commander"
+name = "term-stratum"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-thiserror = { version = "1.0" }
+linefeed = { version = "0.6.0" }

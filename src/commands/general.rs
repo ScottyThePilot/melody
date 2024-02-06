@@ -1,7 +1,6 @@
 use crate::{MelodyError, MelodyResult};
 use crate::blueprint::*;
 use crate::data::Core;
-use crate::utils::Loggable;
 
 use chrono::{Utc, Duration};
 use rand::Rng;
@@ -118,7 +117,7 @@ async fn troll(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
       if target == core.current_user_id() {
         // Shadows `time`, changing it to be 30 seconds instead of 10.
         let time = Timestamp::from(Utc::now() + Duration::seconds(30));
-        match member.disable_communication_until_datetime(&core, time).await.log_some() {
+        match log_result!(member.disable_communication_until_datetime(&core, time).await) {
           Some(()) => "Impossible. Heresy. Unspeakable. Heresy. Heresy. Silence.".to_owned(),
           None => "Not happening, buddy.".to_owned()
         }
@@ -127,12 +126,12 @@ async fn troll(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
           let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
           let mut target_member = core.cache.member(guild_id, target)
             .ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?.clone();
-          match target_member.disable_communication_until_datetime(&core, time).await.log_some() {
+          match log_result!(target_member.disable_communication_until_datetime(&core, time).await) {
             Some(()) => format!("{} has successfully trolled {}.", member.user.id.mention(), target.mention()),
             None => "Sorry, even though you succeeded, I don't have permission to do that.".to_owned()
           }
         } else {
-          match member.disable_communication_until_datetime(&core, time).await.log_some() {
+          match log_result!(member.disable_communication_until_datetime(&core, time).await) {
             Some(()) => format!("{}'s attempt at trollage was a royal failure.", member.user.id.mention()),
             None => "Sorry, I cannot do that.".to_owned()
           }
@@ -140,7 +139,7 @@ async fn troll(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
       }
     },
     None => {
-      match member.disable_communication_until_datetime(&core, time).await.log_some() {
+      match log_result!(member.disable_communication_until_datetime(&core, time).await) {
         Some(()) => format!("{} has been trolled.", member.user.id.mention()),
         None => "Sorry, I cannot do that.".to_owned()
       }

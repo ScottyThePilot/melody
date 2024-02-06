@@ -1,10 +1,9 @@
 use crate::data::{Core, ConfigRssTwitter, ConfigRssYouTube};
-use crate::utils::Loggable;
 
 use chrono::{DateTime, Utc};
+use melody_rss_feed::{FeedError, TwitterPost, YouTubeVideo};
+use melody_rss_feed::reqwest::Client;
 use rand::Rng;
-use rss_feed::{FeedError, TwitterPost, YouTubeVideo};
-use rss_feed::reqwest::Client;
 use serenity::model::id::{ChannelId, GuildId};
 use tokio::sync::Mutex;
 use tokio::time::{sleep, sleep_until, Instant};
@@ -179,13 +178,13 @@ impl Hash for Feed {
 }
 
 async fn set_last_updated(core: &Core, feed: &Feed, last_update: DateTime<Utc>) {
-  core.operate_persist_commit(|persist| {
+  log_result!(core.operate_persist_commit(|persist| {
     if let Some(feed_state) = persist.feeds.get_mut(&feed) {
       feed_state.last_update = last_update;
     };
 
     Ok(())
-  }).await.log();
+  }).await);
 }
 
 const MAX_FAILURES: usize = 32;
@@ -206,7 +205,7 @@ async fn youtube_task(
       let deadline = Instant::now() + config_rss_youtube.interval;
 
       trace!("RSS Feed (YouTube): making fetch to {url}");
-      let result = match rss_feed::get_youtube_feed(&client, &url).await {
+      let result = match melody_rss_feed::get_youtube_feed(&client, &url).await {
         Ok(mut videos) => Ok({
           // failures count is reset upon a success
           failures = 0;
@@ -267,7 +266,7 @@ async fn twitter_task(
       let deadline = Instant::now() + config_rss_twitter.interval;
 
       trace!("RSS Feed (Twitter): making fetch to {url}");
-      let result = match rss_feed::get_twitter_feed(&client, &url).await {
+      let result = match melody_rss_feed::get_twitter_feed(&client, &url).await {
         Ok(mut posts) => Ok({
           // failures count is reset upon a success
           failures = 0;

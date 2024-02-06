@@ -4,20 +4,20 @@ extern crate chrono;
 extern crate chumsky;
 extern crate cleverbot;
 extern crate cleverbot_logs;
-extern crate commander;
 extern crate const_random;
 extern crate dunce;
 extern crate fern;
 extern crate float_ord;
 extern crate ids;
 extern crate itertools;
-extern crate linefeed;
 #[macro_use]
 extern crate log;
+extern crate melody_commander;
+extern crate melody_flag;
+extern crate melody_rss_feed;
 extern crate once_cell;
 extern crate rand;
 extern crate regex;
-extern crate rss_feed;
 #[macro_use]
 extern crate serde;
 extern crate serenity;
@@ -37,49 +37,59 @@ pub(crate) mod data;
 pub(crate) mod feature;
 pub(crate) mod handler;
 pub(crate) mod ratelimiter;
-pub(crate) mod terminal;
-
-use crate::utils::Flag;
 
 use serenity::prelude::SerenityError;
 use serenity::model::id::GenericId;
-use tokio::sync::Mutex;
-use tokio::sync::mpsc::{unbounded_channel as mpsc_channel, UnboundedReceiver as MpscReceiver};
-use tokio::sync::oneshot::{channel as oneshot_channel, Receiver as OneshotReceiver};
+use term_stratum::StratumEvent;
+use tokio::sync::mpsc::UnboundedReceiver as AsyncReceiver;
 
-use std::sync::Arc;
+use std::sync::mpsc::Sender as SyncSender;
 
 pub const BUILD_ID: u64 = const_random::const_random!(u64);
 
 fn main() {
   yggdrasil::reroot().expect("unable to set root dir");
+  let (logger_sender, logger_receiver) = std::sync::mpsc::channel();
+  let (event_sender, event_receiver) = tokio::sync::mpsc::unbounded_channel();
+  setup_logger(logger_sender).expect("failed to setup logger");
 
-  let (terminate_sender, terminate_receiver) = oneshot_channel();
-  let (input_sender, input_receiver) = mpsc_channel();
-  crate::terminal::run(
-    // Main task to be run for the duration of the terminal
-    move |kill_flag| run(kill_flag, terminate_receiver, input_receiver),
-    // One-time code to be executed when the terminate signal is sent from the terminal
-    move |kill_flag| terminate_sender.send(kill_flag).unwrap(),
-    // Code to be executed when input is sent from the terminal
-    move |line| input_sender.send(line).unwrap()
+  term_stratum::run(
+    env!("CARGO_PKG_NAME"),
+    logger_receiver,
+    move || run(event_receiver),
+    move |event| event_sender.send(event).unwrap()
   );
-
-  println!();
 }
 
 #[tokio::main]
-async fn run(kill_flag: Flag, terminate: OneshotReceiver<Flag>, input: MpscReceiver<String>) {
-  let terminate = Arc::new(Mutex::new(terminate));
-  let input = Arc::new(Mutex::new(input));
-
-  loop {
-    match crate::handler::launch(terminate.clone(), input.clone()).await {
-      Err(error) => return error!("{error}"),
-      Ok(true) if !kill_flag.get() => continue,
-      Ok(..) => break
-    };
+async fn run(event_reciever: AsyncReceiver<StratumEvent>) {
+  match crate::handler::launch(event_reciever).await {
+    Err(error) => error!("{error}"),
+    Ok(()) => ()
   };
+}
+
+fn setup_logger(sender: SyncSender<String>) -> Result<(), fern::InitError> {
+  let me = env!("CARGO_PKG_NAME").replace('-', "_");
+  fern::Dispatch::new()
+    .format(move |out, message, record| {
+      out.finish(format_args!(
+        "{}[{}]({}) {}",
+        chrono::Local::now().format("[%H:%M:%S]"),
+        record.level(),
+        record.target(),
+        message
+      ))
+    })
+    .level(log::LevelFilter::Warn)
+    .level_for(me, log::LevelFilter::Trace)
+    .chain(sender)
+    .chain({
+      std::fs::create_dir_all("./data/")?;
+      fern::log_file("./data/latest.log")?
+    })
+    .apply()?;
+  Ok(())
 }
 
 pub type MelodyResult<T = ()> = Result<T, MelodyError>;

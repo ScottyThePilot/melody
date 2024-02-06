@@ -82,7 +82,7 @@ async fn role_grant(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
 
   let response = if is_granter {
     let member2 = guild_id.member(&core, user_id).await.context("failed to find member")?;
-    if member2.add_role(&core, role.id).await.context_log("failed to add role") {
+    if log_result!(member2.add_role(&core, role.id).await.context("failed to add role")).is_some() {
       info!(
         "User {user1} ({user1_id}) granted role {role} ({role_id}) to user {user2} ({user2_id}) in guild {guild_id}",
         role = role.name, role_id = role.id, guild_id = guild_id,
@@ -114,7 +114,7 @@ async fn role_revoke(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
 
   let response = if is_granter {
     let member2 = guild_id.member(&core, user_id).await.context("failed to find member")?;
-    if member2.remove_role(&core, role.id).await.context_log("failed to add role") {
+    if log_result!(member2.remove_role(&core, role.id).await.context("failed to add role")).is_some() {
       info!(
         "User {user1} ({user1_id}) revoked role {role} ({role_id}) from user {user2} ({user2_id}) in guild {guild_id}",
         role = role.name, role_id = role.id, guild_id = guild_id,

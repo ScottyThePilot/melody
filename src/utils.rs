@@ -12,8 +12,6 @@ use regex::Regex;
 use serenity::model::id::{EmojiId, GuildId, UserId};
 use serenity::cache::Cache;
 
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::error::Error;
 use std::fmt;
 
@@ -162,11 +160,6 @@ pub trait Contextualize {
   type Output;
 
   fn context(self, context: impl Into<String>) -> Self::Output;
-
-  fn context_log(self, context: impl Into<String>) -> bool
-  where Self: Sized, Self::Output: Loggable {
-    self.context(context).log()
-  }
 }
 
 impl<T> Contextualize for std::io::Result<T> {
@@ -223,41 +216,19 @@ impl<T> Contextualize for Result<T, serenity::Error> {
   }
 }
 
-pub trait Loggable {
-  type Ok;
-  type Err: Error;
-
-  fn log(self) -> bool;
-  fn log_some(self) -> Option<Self::Ok>;
-}
-
-impl<T, E: Error> Loggable for Result<T, E> {
-  type Ok = T;
-  type Err = E;
-
-  fn log(self) -> bool {
-    match self {
-      Ok(..) => {
-        true
+#[macro_export]
+macro_rules! log_result {
+  ($result:expr) => {
+    match $result {
+      Result::Ok(_value) => {
+        Option::Some(_value)
       },
-      Err(error) => {
-        error!("{error}");
-        false
+      Result::Err(_value) => {
+        error!("{}", _value);
+        Option::None
       }
     }
-  }
-
-  fn log_some(self) -> Option<T> {
-    match self {
-      Ok(value) => {
-        Some(value)
-      },
-      Err(error) => {
-        error!("{error}");
-        None
-      }
-    }
-  }
+  };
 }
 
 #[macro_export]
@@ -265,22 +236,4 @@ macro_rules! operate {
   ($core:expr, $function:ident::<$Key:ty>, $operation:expr) => {
     crate::data::$function($core.get::<$Key>().await, $operation).await
   };
-}
-
-#[repr(transparent)]
-#[derive(Debug, Clone)]
-pub struct Flag(Arc<AtomicBool>);
-
-impl Flag {
-  pub fn new() -> Self {
-    Flag(Arc::new(AtomicBool::new(false)))
-  }
-
-  pub fn get(&self) -> bool {
-    self.0.load(Ordering::Relaxed)
-  }
-
-  pub fn set(&self) {
-    self.0.store(true, Ordering::Relaxed);
-  }
 }

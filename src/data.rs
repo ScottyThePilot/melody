@@ -48,7 +48,6 @@ key!(pub struct MessageChainsKey, crate::feature::message_chains::MessageChainsW
 key!(pub struct MusicPlayerKey, Option<Arc<crate::feature::music_player::MusicPlayer>>);
 key!(pub struct TasksKey, TasksWrapper);
 key!(pub struct PreviousBuildIdKey, u64);
-key!(pub struct RestartKey, bool);
 
 
 
@@ -103,7 +102,7 @@ impl Core {
 
   #[inline]
   pub async fn get_checked<K>(&self) -> Option<K::Value>
-  where K: TypeMapKey, K::Value: Clone + Send + 'static {
+  where K: TypeMapKey, K::Value: Clone {
     self.data.read().await.get::<K>().cloned()
   }
 
@@ -142,11 +141,6 @@ impl Core {
 
   pub async fn trigger_shutdown(&self) {
     self.get::<ShardManagerKey>().await.shutdown_all().await
-  }
-
-  pub async fn trigger_shutdown_restart(&self) {
-    self.trigger_shutdown().await;
-    self.data.write().await.insert::<RestartKey>(true)
   }
 
   pub async fn set_activities<F>(&self, mut f: F)

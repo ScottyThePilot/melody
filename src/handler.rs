@@ -8,11 +8,12 @@ use crate::feature::cleverbot::{CleverBotLoggerWrapper, CleverBotWrapper};
 use crate::feature::feed::{Feed, FeedManager, FeedEventHandler};
 use crate::feature::message_chains::MessageChains;
 use crate::feature::music_player::MusicPlayer;
-use crate::utils::{Contextualize, Flag, Loggable};
+use crate::utils::Contextualize;
+use self::input::InputAgent;
 
+use melody_rss_feed::{TwitterPost, YouTubeVideo};
+use melody_rss_feed::url::Url;
 use rand::seq::SliceRandom;
-use rss_feed::{TwitterPost, YouTubeVideo};
-use rss_feed::url::Url;
 use reqwest::Client as HttpClient;
 use serenity::gateway::{ActivityData, ShardManager};
 use serenity::model::application::Interaction;
@@ -24,9 +25,9 @@ use serenity::model::guild::Member;
 use serenity::model::id::{ChannelId, GuildId, UserId, RoleId};
 use serenity::utils::{content_safe, ContentSafeOptions};
 use songbird::{SerenityInit, Config as SongbirdConfig};
+use term_stratum::StratumEvent;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::UnboundedReceiver as MpscReceiver;
-use tokio::sync::oneshot::Receiver as OneshotReceiver;
 use tokio::time::MissedTickBehavior;
 
 use std::collections::HashSet;
@@ -36,10 +37,7 @@ use std::time::Duration;
 
 
 /// Performs a clean launch of the bot, returning true if the bot expects to be restarted, and false if not.
-pub async fn launch(
-  terminate: Arc<Mutex<OneshotReceiver<Flag>>>,
-  input: Arc<Mutex<MpscReceiver<String>>>
-) -> MelodyResult<bool> {
+pub async fn launch(event_receiver: MpscReceiver<StratumEvent>) -> MelodyResult {
   let config = Config::create().await?;
   let persist = Persist::create().await?;
   let persist_guilds = PersistGuilds::create().await?;
@@ -80,28 +78,17 @@ pub async fn launch(
     }));
     data.insert::<ShardManagerKey>(client.shard_manager.clone());
     data.insert::<PreviousBuildIdKey>(previous_build_id);
-    data.insert::<RestartKey>(false);
   }).await;
 
-  // Handles command-line input from the terminal wrapper
-  let input_task = tokio::spawn(self::input::input_task(input, core.clone()));
-  // Handles an interrupt signal from the terminal wrapper
-  let termination_task = tokio::spawn(termination_task(terminate, client.shard_manager.clone()));
+  let events_task = tokio::spawn(events_task(
+    core.clone(), client.shard_manager.clone(), event_receiver
+  ));
 
   client.start().await.context("failed to start client")?;
-
   core.abort().await;
+  events_task.abort();
 
-  input_task.abort();
-  termination_task.abort();
-  if core.take::<RestartKey>().await {
-    info!("Restarting in 3 seconds...");
-    tokio::time::sleep(Duration::from_secs(3)).await;
-
-    Ok(true)
-  } else {
-    Ok(false)
-  }
+  Ok(())
 }
 
 #[derive(Debug)]
@@ -145,7 +132,7 @@ impl EventHandler for Handler {
 
     if core.is_new_build().await {
       info!("New build detected, registering commands");
-      crate::commands::register_commands(&core, &guilds).await.log();
+      log_result!(crate::commands::register_commands(&core, &guilds).await);
     } else {
       info!("Old build detected, commands will not be re-registered");
     };
@@ -154,7 +141,7 @@ impl EventHandler for Handler {
   async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
     let core = Core::from(ctx);
     if let Interaction::Command(interaction) = interaction {
-      crate::blueprint::dispatch(core, interaction, COMMANDS).await.log();
+      log_result!(crate::blueprint::dispatch(core, interaction, COMMANDS).await);
     };
   }
 
@@ -166,19 +153,18 @@ impl EventHandler for Handler {
 
     if let Some(guild_id) = message.guild_id {
       let emojis = crate::utils::parse_emojis(&message.content);
-      core.operate_persist_guild_commit(guild_id, |persist_guild| {
+      log_result!(core.operate_persist_guild_commit(guild_id, |persist_guild| {
         // don't be greedy
         let mut rng = rand::thread_rng();
         if let Some(&emoji) = emojis.choose(&mut rng) {
           persist_guild.emoji_stats.increment_emoji_uses(emoji, message.author.id);
         };
         Ok(())
-      }).await.log();
+      }).await);
     };
 
     if should_contribute_message_chain(&core, &message).await {
-      message.channel_id.say(&core, &message.content)
-        .await.context_log("failed to send message");
+      log_result!(message.channel_id.say(&core, &message.content).await.context("failed to send message"));
     };
 
     if let Some(content) = get_message_replying_to(&message, me) {
@@ -190,13 +176,14 @@ impl EventHandler for Handler {
         Ok(reply) => {
           info!("Recieved reply from cleverbot: {reply:?}");
           let reply = content_safe(&core, reply, &options, &[]);
-          crate::feature::cleverbot::send_reply(&core, &message, &reply).await.log();
-          core.get::<CleverBotLoggerKey>().await.log(message.channel_id, content, reply).await.log();
+          log_result!(crate::feature::cleverbot::send_reply(&core, &message, &reply).await);
+          log_result!(core.get::<CleverBotLoggerKey>().await.log(message.channel_id, content, reply).await);
         },
         Err(error) => {
-          message.reply(&core, "There was an error getting a reply from cleverbot").await
-            .context_log("failed to send cleverbot failure message");
           error!("Unable to get reply from cleverbot: {error}");
+          let result = message.reply(&core, "There was an error getting a reply from cleverbot").await
+            .context("failed to send cleverbot failure message");
+          log_result!(result);
         }
       };
     };
@@ -204,17 +191,17 @@ impl EventHandler for Handler {
 
   async fn guild_member_addition(&self, ctx: Context, mut member: Member) {
     let core = Core::from(ctx);
-    add_join_roles(&core, &mut member).await.log();
+    log_result!(add_join_roles(&core, &mut member).await);
   }
 
   async fn reaction_add(&self, ctx: Context, reaction: Reaction) {
     let core = Core::from(ctx);
 
     if let (Some(guild_id), Some(user_id), ReactionType::Custom { id: emoji_id, .. }) = (reaction.guild_id, reaction.user_id, reaction.emoji) {
-      core.operate_persist_guild_commit(guild_id, |persist_guild| {
+      log_result!(core.operate_persist_guild_commit(guild_id, |persist_guild| {
         persist_guild.emoji_stats.increment_emoji_uses(emoji_id, user_id);
         Ok(())
-      }).await.log();
+      }).await);
     };
   }
 
@@ -222,10 +209,10 @@ impl EventHandler for Handler {
     let core = Core::from(ctx);
 
     if let (Some(guild_id), Some(user_id), ReactionType::Custom { id: emoji_id, .. }) = (reaction.guild_id, reaction.user_id, reaction.emoji) {
-      core.operate_persist_guild_commit(guild_id, |persist_guild| {
+      log_result!(core.operate_persist_guild_commit(guild_id, |persist_guild| {
         persist_guild.emoji_stats.decrement_emoji_uses(emoji_id, user_id);
         Ok(())
-      }).await.log();
+      }).await);
     };
   }
 }
@@ -251,8 +238,7 @@ impl FeedEventHandler for FeedHandler {
     }).await;
 
     for channel in delivery_channels {
-      channel.say(&core, link.as_str())
-        .await.context_log("failed to send youtube video message");
+      log_result!(channel.say(&core, link.as_str()).await.context("failed to send youtube video message"));
       tokio::time::sleep(FEED_POST_DELAY).await;
     };
   }
@@ -271,8 +257,7 @@ impl FeedEventHandler for FeedHandler {
     }).await;
 
     for channel in delivery_channels {
-      channel.say(&core, link.as_str())
-        .await.context_log("failed to send twitter post message");
+      log_result!(channel.say(&core, link.as_str()).await.context("failed to send twitter post message"));
       tokio::time::sleep(FEED_POST_DELAY).await;
     };
   }
@@ -348,15 +333,25 @@ fn random_game(core: &Core) -> Option<String> {
   games.choose(&mut rng).cloned()
 }
 
-async fn termination_task(
-  terminate: Arc<Mutex<OneshotReceiver<Flag>>>,
-  shard_manager: Arc<ShardManager>
+async fn events_task(
+  core: Core,
+  shard_manager: Arc<ShardManager>,
+  mut event_receiver: MpscReceiver<StratumEvent>
 ) {
-  let mut terminate = terminate.lock().await;
-  let kill_flag = (&mut *terminate).await.unwrap();
-
-  kill_flag.set();
-  shard_manager.shutdown_all().await;
+  let input_agent = InputAgent::new(core);
+  while let Some(event) = event_receiver.recv().await {
+    match event {
+      StratumEvent::Input(line) => {
+        match input_agent.line(line).await {
+          Ok(()) => (),
+          Err(err) => error!("{err}")
+        }
+      },
+      StratumEvent::Terminate => {
+        shard_manager.shutdown_all().await;
+      }
+    };
+  };
 }
 
 // Yes, a tasks-task, what a mouthfull
