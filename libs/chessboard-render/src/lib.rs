@@ -1,12 +1,11 @@
-pub extern crate chess_engine;
+pub extern crate shakmaty;
 pub extern crate image;
 
-use chess_engine::{Board, Color, Piece, Position};
+use shakmaty::{Color, Piece, Role, Square, File, Rank, Position};
 use image::{DynamicImage, GenericImageView, GrayAlphaImage, ImageResult, Pixel, Rgb, Rgba, RgbImage, RgbaImage};
 use once_cell::sync::OnceCell;
 
-use std::io::{Write, BufWriter};
-use std::path::Path;
+use std::io::{Read, Write};
 
 type GrayAlphaSubImage<'a> = image::SubImage<&'a GrayAlphaImage>;
 type Pos = (u32, u32);
@@ -26,12 +25,14 @@ const RANKS: Pos = (0, EDGE);
 const FILES: Pos = (EDGE, BOARD + EDGE);
 
 /// Returns true if the given position has a king that is in check
-fn should_show_check(board: &Board, position: Position) -> bool {
-  if let Some(Piece::King(color, ..)) = board.get_piece(position) {
-    board.is_threatened(position, color)
-  } else {
-    false
-  }
+fn should_show_check(position: &impl Position, square: Square) -> bool {
+  position.board().piece_at(square).map_or(false, |king| {
+    king.role == Role::King &&
+    position.king_attackers(
+      square, king.color.other(),
+      position.board().occupied()
+    ).any()
+  })
 }
 
 /// Pre-initializes all static resources for chessboard rendering
@@ -42,7 +43,7 @@ pub fn init() {
 /// Renders the given chessboard to a image buffer.
 /// The chessboard will be oriented from the perspective specified by `side`.
 /// Squares included in `highlighted` will be highlighted in green.
-pub fn render_board(board: &Board, side: Color, highlighted: &[Position]) -> RgbImage {
+pub fn render_board(position: &impl Position, side: Color, highlighted: &[Square]) -> RgbImage {
   let assets = Assets::instance();
   let mut img = RgbImage::from_pixel(BOARD_FULL, BOARD_FULL, NEUTRAL);
   // get the correct textures for the files and ranks markings and copy them to the image buffer
@@ -58,10 +59,10 @@ pub fn render_board(board: &Board, side: Color, highlighted: &[Position]) -> Rgb
       };
 
       let pos = (x * TILE + EDGE, y * TILE + EDGE);
-      let position = Position::new(by as i32, bx as i32);
+      let square = Square::from_coords(File::new(bx), Rank::new(by));
       // the chess board always has dark squares in the bottom left and top right
       let is_dark = bx % 2 == by % 2;
-      let color = if highlighted.contains(&position) {
+      let color = if highlighted.contains(&square) {
         if is_dark { DARK_HIGHLIGHT } else { LIGHT_HIGHLIGHT }
       } else {
         if is_dark { DARK } else { LIGHT }
@@ -69,28 +70,17 @@ pub fn render_board(board: &Board, side: Color, highlighted: &[Position]) -> Rgb
 
       fill_square(&mut img, color, pos, TILE);
 
-      if should_show_check(board, position) {
+      if should_show_check(position, square) {
         copy(&mut img, &assets.check, pos);
       };
 
-      if let Some(piece) = board.get_piece(position) {
+      if let Some(piece) = position.board().piece_at(square) {
         copy(&mut img, &*assets.get_piece(piece), pos);
       };
     };
   };
 
   img
-}
-
-pub fn encode_image<W: Write>(img: &RgbImage, writer: W) -> ImageResult<()> {
-  use image::{ColorType, ImageEncoder};
-  use image::codecs::png::{CompressionType, FilterType, PngEncoder};
-  PngEncoder::new_with_quality(writer, CompressionType::Best, FilterType::Adaptive)
-    .write_image(img.as_raw(), img.width(), img.height(), ColorType::Rgb8)
-}
-
-pub fn save_image(img: &RgbImage, path: impl AsRef<Path>) -> ImageResult<()> {
-  encode_image(img, BufWriter::new(std::fs::File::create(path)?))
 }
 
 struct Assets {
@@ -116,16 +106,16 @@ impl Assets {
   }
 
   fn get_piece(&self, piece: Piece) -> GrayAlphaSubImage {
-    let (column, color) = match piece {
-      Piece::Queen(color, ..) => (0, color),
-      Piece::King(color, ..) => (1, color),
-      Piece::Rook(color, ..) => (2, color),
-      Piece::Bishop(color, ..) => (3, color),
-      Piece::Knight(color, ..) => (4, color),
-      Piece::Pawn(color, ..) => (5, color),
+    let column = match piece.role {
+      Role::Queen => 0,
+      Role::King => 1,
+      Role::Rook => 2,
+      Role::Bishop => 3,
+      Role::Knight => 4,
+      Role::Pawn => 5,
     };
 
-    let row = match color {
+    let row = match piece.color {
       Color::White => 0,
       Color::Black => 1
     };
@@ -140,10 +130,10 @@ impl Assets {
 
   fn load() -> Self {
     Assets {
-      files: decode_image(include_bytes!("../assets/files.png")).into_luma_alpha8(),
-      ranks: decode_image(include_bytes!("../assets/ranks.png")).into_luma_alpha8(),
-      pieces: decode_image(include_bytes!("../assets/pieces.png")).into_luma_alpha8(),
-      check: decode_image(include_bytes!("../assets/check.png")).into_rgba8()
+      files: decode_static_image(include_bytes!("../assets/files.png")).into_luma_alpha8(),
+      ranks: decode_static_image(include_bytes!("../assets/ranks.png")).into_luma_alpha8(),
+      pieces: decode_static_image(include_bytes!("../assets/pieces.png")).into_luma_alpha8(),
+      check: decode_static_image(include_bytes!("../assets/check.png")).into_rgba8()
     }
   }
 }
@@ -178,8 +168,17 @@ fn blend(p1: Rgb<u8>, p2: Rgba<u8>) -> Rgb<u8> {
   p1.to_rgb()
 }
 
-fn decode_image(data: &'static [u8]) -> DynamicImage {
-  use image::codecs::png::PngDecoder;
-  let decoder = PngDecoder::new(data).expect("failed to decode image");
-  DynamicImage::from_decoder(decoder).expect("failed to decode image")
+pub fn encode_image<W: Write>(img: &RgbImage, writer: W) -> ImageResult<()> {
+  use image::{ColorType, ImageEncoder};
+  use image::codecs::png::{CompressionType, FilterType, PngEncoder};
+  PngEncoder::new_with_quality(writer, CompressionType::Best, FilterType::Adaptive)
+    .write_image(img.as_raw(), img.width(), img.height(), ColorType::Rgb8)
+}
+
+pub fn decode_image<R: Read>(reader: R) -> ImageResult<DynamicImage> {
+  image::codecs::png::PngDecoder::new(reader).and_then(DynamicImage::from_decoder)
+}
+
+fn decode_static_image(data: &'static [u8]) -> DynamicImage {
+  decode_image(data).expect("failed to decode static image")
 }
