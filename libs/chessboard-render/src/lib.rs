@@ -8,8 +8,6 @@ use once_cell::sync::OnceCell;
 use std::io::{Write, BufWriter};
 use std::path::Path;
 
-type Image<P> = image::ImageBuffer<P, Vec<u8>>;
-type SubImage<'a, P> = image::SubImage<&'a Image<P>>;
 type GrayAlphaSubImage<'a> = image::SubImage<&'a GrayAlphaImage>;
 type Pos = (u32, u32);
 
@@ -48,8 +46,8 @@ pub fn render_board(board: &Board, side: Color, highlighted: &[Position]) -> Rgb
   let assets = Assets::instance();
   let mut img = RgbImage::from_pixel(BOARD_FULL, BOARD_FULL, NEUTRAL);
   // get the correct textures for the files and ranks markings and copy them to the image buffer
-  copy(&mut img, assets.get_files(side), FILES);
-  copy(&mut img, assets.get_ranks(side), RANKS);
+  copy(&mut img, &*assets.get_files(side), FILES);
+  copy(&mut img, &*assets.get_ranks(side), RANKS);
   for bx in 0u32..8u32 {
     for by in 0u32..8u32 {
       // the board is flipped vertically, to put the player on the bottom
@@ -76,7 +74,7 @@ pub fn render_board(board: &Board, side: Color, highlighted: &[Position]) -> Rgb
       };
 
       if let Some(piece) = board.get_piece(position) {
-        copy(&mut img, assets.get_piece(piece), pos);
+        copy(&mut img, &*assets.get_piece(piece), pos);
       };
     };
   };
@@ -160,10 +158,11 @@ fn fill_square(destination: &mut RgbImage, pixel: Rgb<u8>, (x, y): Pos, size: u3
   };
 }
 
-fn copy(destination: &mut RgbImage, source: impl Source, (x, y): Pos) {
+fn copy<P, S>(destination: &mut RgbImage, source: &S, (x, y): Pos)
+where P: Pixel<Subpixel = u8>, S: GenericImageView<Pixel = P> {
   for sx in 0..source.width() {
     for sy in 0..source.height() {
-      let source_pixel = source.get_pixel(sx, sy);
+      let source_pixel = source.get_pixel(sx, sy).to_rgba();
       // don't do anything if the source pixel is transparent
       if source_pixel[3] != 0x00 {
         let destination_pixel = destination.get_pixel_mut(sx + x, sy + y);
@@ -171,56 +170,6 @@ fn copy(destination: &mut RgbImage, source: impl Source, (x, y): Pos) {
       };
     };
   };
-}
-
-/// It's very annoying that `image` doesn't actually implement [`GenericImageView`] for
-/// [`SubImage`], so I'm forced to implement this stupid hack to get around it.
-trait Source {
-  fn width(&self) -> u32;
-  fn height(&self) -> u32;
-  fn get_pixel(&self, x: u32, y: u32) -> Rgba<u8>;
-}
-
-impl<P: Pixel<Subpixel = u8>> Source for Image<P> {
-  fn width(&self) -> u32 {
-    self.width()
-  }
-
-  fn height(&self) -> u32 {
-    self.height()
-  }
-
-  fn get_pixel(&self, x: u32, y: u32) -> Rgba<u8> {
-    self.get_pixel(x, y).to_rgba()
-  }
-}
-
-impl<'a, P: Pixel<Subpixel = u8>> Source for SubImage<'a, P> {
-  fn width(&self) -> u32 {
-    (**self).width()
-  }
-
-  fn height(&self) -> u32 {
-    (**self).height()
-  }
-
-  fn get_pixel(&self, x: u32, y: u32) -> Rgba<u8> {
-    (**self).get_pixel(x, y).to_rgba()
-  }
-}
-
-impl<T: Source> Source for &T {
-  fn width(&self) -> u32 {
-    (*self).width()
-  }
-
-  fn height(&self) -> u32 {
-    (*self).height()
-  }
-
-  fn get_pixel(&self, x: u32, y: u32) -> Rgba<u8> {
-    (*self).get_pixel(x, y)
-  }
 }
 
 fn blend(p1: Rgb<u8>, p2: Rgba<u8>) -> Rgb<u8> {
