@@ -371,74 +371,18 @@ async fn respawn_feed_tasks_task(core: Core) {
 }
 
 async fn cycle_activity_task(core: Core) {
-  const NUMBERS: &[char] = &['1', '2', '3'];
-  const FRACTIONS: &[char] = &[
-    '\u{00bd}', '\u{00bc}', '\u{00be}',
-    '\u{215b}', '\u{215c}', '\u{215d}', '\u{215e}'
-  ];
-
   const ACTIVITY_CYCLE_TIME: Duration = Duration::from_secs(120);
-  const ACTIVITIES: &[fn(&Core) -> ActivityData] = &[
-    |_| ActivityData::playing("Minecraft 2"),
-    |_| ActivityData::playing("Portal 3"),
-    |_| ActivityData::playing("Pokemon\u{2122} Gun"),
-    |_| ActivityData::playing("ULTRAKILL"),
-    |_| ActivityData::playing("Mordhau"),
-    |_| ActivityData::playing("Genshin Impact"),
-    |_| ActivityData::playing("Honkai Star Rail"),
-    |_| ActivityData::playing("Tower of Fantasy"),
-    |_| ActivityData::playing("Arknights"),
-    |_| ActivityData::playing("Azur Lane"),
-    |_| ActivityData::playing("Girls' Frontline"),
-    |_| ActivityData::playing("Blue Archive"),
-    |_| ActivityData::playing("The Battle Cats"),
-    |_| ActivityData::playing("Artifact"),
-    |_| ActivityData::playing("Group Fortification: The Sequel"),
-    |_| ActivityData::playing("Band Bastion: The Second Coming"),
-    |_| ActivityData::playing("Fortress II (With Team)"),
-    |_| ActivityData::playing("Gang Garrison: Second Edition"),
-    |_| ActivityData::playing("Club Citadel II"),
-    |_| ActivityData::playing("Squad Castle Defense 2"),
-    |_| ActivityData::playing("Blazing Badge: Four Houses"),
-    |_| ActivityData::playing("Arma 4"),
-    |_| ActivityData::playing("Farming Simulator 25"),
-    |_| ActivityData::playing("League of Legends"),
-    |_| ActivityData::playing("DOTA 2"),
-    |_| ActivityData::playing("Katawa Shoujou"),
-    |_| {
-      let mut rng = rand::thread_rng();
-      let number = *NUMBERS.choose(&mut rng).unwrap();
-      let fraction = *FRACTIONS.choose(&mut rng).unwrap();
-      ActivityData::playing(format!("Overwatch {number}{fraction}"))
-    },
-    |_| ActivityData::watching("you"),
-    |core| match random_game(core) {
-      Some(game) => ActivityData::watching(format!("you play {game}")),
-      None => ActivityData::watching("nobody :(")
-    },
-    |core| ActivityData::watching(format!("{} guilds", core.cache.guild_count())),
-    |core| ActivityData::watching(format!("{} users", core.cache.user_count())),
-    |_| ActivityData::watching("Bocchi the Rock!"),
-    |_| ActivityData::watching("Lucky\u{2606}Star"),
-    |_| ActivityData::watching("Chainsaw Man"),
-    |_| ActivityData::watching("Made In Abyss"),
-    |_| ActivityData::watching("the fog approach"),
-    |_| ActivityData::listening("the screams"),
-    |_| ActivityData::listening("the intrusive thoughts"),
-    |_| ActivityData::listening("soft loli breathing 10 hours"),
-    |_| ActivityData::competing("big balls competition"),
-    |_| ActivityData::competing("taco eating competition"),
-    |_| ActivityData::competing("shadow wizard money gang")
-  ];
 
-  let mut rng = crate::utils::create_rng();
   let mut interval = tokio::time::interval(ACTIVITY_CYCLE_TIME);
   interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
   loop {
     interval.tick().await;
-    core.set_activities(|_| {
-      ACTIVITIES.choose(&mut rng).map(|f| f(&core))
+
+    let activity_data = core.operate_config(|config| {
+      log_result!(config.select_activity(&core))
     }).await;
+
+    core.set_activities(|_| activity_data.clone()).await;
   };
 }

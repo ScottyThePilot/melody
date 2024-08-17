@@ -1,11 +1,16 @@
+pub mod activities;
+
 use crate::MelodyResult;
+use crate::data::Core;
 use crate::utils::Contextualize;
+use self::activities::{ConfigActivity, ConfigActivityError};
 
 use rand::seq::SliceRandom;
 use serde::de::{Deserialize, Deserializer, Unexpected};
 use serenity::model::id::UserId;
 use serenity::model::gateway::GatewayIntents;
 use serenity::model::colour::Color;
+use serenity::gateway::ActivityData;
 use singlefile::container_shared_async::ContainerSharedAsyncReadonly;
 use singlefile_formats::toml_serde::Toml;
 
@@ -35,7 +40,9 @@ pub struct Config {
   #[serde(default)]
   pub rss: ConfigRss,
   #[serde(default)]
-  pub music_player: Option<ConfigMusicPlayer>
+  pub music_player: Option<ConfigMusicPlayer>,
+  #[serde(default)]
+  pub activities: Vec<ConfigActivity>
 }
 
 impl Config {
@@ -46,6 +53,10 @@ impl Config {
       .await.context("failed to load config.toml")?;
     trace!("Loaded config.toml");
     Ok(container)
+  }
+
+  pub fn select_activity(&self, core: &Core) -> Result<ActivityData, ConfigActivityError> {
+    self::activities::select(&self.activities, core)
   }
 }
 
