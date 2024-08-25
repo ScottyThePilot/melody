@@ -26,7 +26,7 @@ reqwest = { version = "0.11" }
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = { version = "1.0" }
 singlefile = { version = "0.2.1", features = ["shared-async"] }
-singlefile-formats = { version = "0.2.1", features = ["cbor-serde", "toml-serde"] }
+singlefile-formats = { version = "0.2.1", features = ["cbor-serde", "json-serde", "toml-serde"] }
 songbird = { version = "0.4" }
 symphonia = { version = "0.5.2", features = ["aac", "alac", "mp3"] }
 term-stratum = { path = "./libs/term-stratum" }

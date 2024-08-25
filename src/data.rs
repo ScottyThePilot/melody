@@ -1,10 +1,12 @@
 //! Items associated with managing the bot's serenity state
+mod activities;
 mod config;
 mod persist;
 
 use crate::MelodyResult;
 use crate::ratelimiter::RateLimiter;
 use crate::utils::Contextualize;
+pub use self::activities::{ActivitiesContainer, Activities, ActivityError};
 pub use self::config::*;
 pub use self::persist::*;
 
@@ -40,6 +42,7 @@ macro_rules! key {
 key!(pub struct ConfigKey, ConfigContainer);
 key!(pub struct PersistKey, PersistContainer);
 key!(pub struct PersistGuildsKey, PersistGuildsWrapper);
+key!(pub struct ActivitiesKey, ActivitiesContainer);
 key!(pub struct ShardManagerKey, Arc<ShardManager>);
 key!(pub struct CleverBotKey, crate::feature::cleverbot::CleverBotWrapper);
 key!(pub struct CleverBotLoggerKey, crate::feature::cleverbot::CleverBotLoggerWrapper);
@@ -139,18 +142,23 @@ impl Core {
     PersistGuilds::get_default(persist_guilds, id).await
   }
 
+  pub async fn get_activities(&self) -> ActivitiesContainer {
+    self.get::<ActivitiesKey>().await
+  }
+
   pub async fn trigger_shutdown(&self) {
     self.get::<ShardManagerKey>().await.shutdown_all().await
   }
 
-  pub async fn set_activities<F>(&self, mut f: F)
-  where F: FnMut(ShardId) -> Option<ActivityData> {
-    // TODO: does not need annotations, despite its insistence to the contrary
-    operate_lock(self.get_shard_runners().await, |shard_runners: &mut ShardRunners| {
-      for (&shard_id, shard_runner) in shard_runners.iter() {
-        shard_runner.runner_tx.set_activity(f(shard_id));
+  pub async fn randomize_activities(&self) {
+    let shard_runners = self.get_shard_runners().await;
+    let shard_runners_lock = shard_runners.lock().await;
+    self.operate_activities(|activities| {
+      for (_, shard_runner) in shard_runners_lock.iter() {
+        let activitiy = log_result!(activities.select(self));
+        shard_runner.runner_tx.set_activity(activitiy);
       };
-    }).await
+    }).await;
   }
 
   pub async fn is_new_build(&self) -> bool {
@@ -270,6 +278,7 @@ impl Core {
   member_operate_fn!(pub async fn operate_persist_mut(), get_persist, operate_mut, &mut Persist);
   member_operate_fn!(pub async fn operate_persist_guild(id: GuildId), get_persist_guild?, operate, &PersistGuild);
   member_operate_fn!(pub async fn operate_persist_guild_mut(id: GuildId), get_persist_guild?, operate_mut, &mut PersistGuild);
+  member_operate_fn!(pub async fn operate_activities(), get_activities, operate, &Activities);
 
   pub async fn operate_persist_commit<F, R>(&self, operation: F) -> MelodyResult<R>
   where F: FnOnce(&mut Persist) -> MelodyResult<R> {

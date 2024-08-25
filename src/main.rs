@@ -128,6 +128,8 @@ pub enum MelodyFileError {
   #[error(transparent)]
   Toml(#[from] singlefile::Error<singlefile_formats::toml_serde::TomlError>),
   #[error(transparent)]
+  Json(#[from] singlefile::Error<singlefile_formats::json_serde::JsonError>),
+  #[error(transparent)]
   Cbor(#[from] singlefile::Error<singlefile_formats::cbor_serde::CborError>),
   #[error(transparent)]
   CleverBotLog(#[from] cleverbot_logs::Error)

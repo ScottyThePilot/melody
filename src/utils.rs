@@ -12,7 +12,6 @@ use regex::Regex;
 use serenity::model::id::{EmojiId, GuildId, UserId};
 use serenity::cache::Cache;
 
-use std::error::Error;
 use std::fmt;
 
 

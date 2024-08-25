@@ -15,12 +15,12 @@ use melody_rss_feed::{TwitterPost, YouTubeVideo};
 use melody_rss_feed::url::Url;
 use rand::seq::SliceRandom;
 use reqwest::Client as HttpClient;
-use serenity::gateway::{ActivityData, ShardManager};
+use serenity::gateway::ShardManager;
 use serenity::model::application::Interaction;
 use serenity::model::channel::Message;
 use serenity::client::{Context, Client, EventHandler};
 use serenity::model::channel::{Reaction, ReactionType};
-use serenity::model::gateway::{ActivityType, Ready};
+use serenity::model::gateway::Ready;
 use serenity::model::guild::Member;
 use serenity::model::id::{ChannelId, GuildId, UserId, RoleId};
 use serenity::utils::{content_safe, ContentSafeOptions};
@@ -30,7 +30,6 @@ use tokio::sync::Mutex;
 use tokio::sync::mpsc::UnboundedReceiver as MpscReceiver;
 use tokio::time::MissedTickBehavior;
 
-use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -41,6 +40,7 @@ pub async fn launch(event_receiver: MpscReceiver<StratumEvent>) -> MelodyResult 
   let config = Config::create().await?;
   let persist = Persist::create().await?;
   let persist_guilds = PersistGuilds::create().await?;
+  let activities = Activities::create().await?;
 
   let (token, intents, ytdlp_path) = config.operate(|config| {
     info!("YouTube RSS feeds are {}", if config.rss.youtube.is_some() { "enabled" } else { "disabled" });
@@ -69,6 +69,7 @@ pub async fn launch(event_receiver: MpscReceiver<StratumEvent>) -> MelodyResult 
     data.insert::<ConfigKey>(config);
     data.insert::<PersistKey>(persist);
     data.insert::<PersistGuildsKey>(persist_guilds.into());
+    data.insert::<ActivitiesKey>(activities);
     data.insert::<CleverBotKey>(CleverBotWrapper::new(Duration::from_secs_f64(cleverbot_delay)));
     data.insert::<CleverBotLoggerKey>(cleverbot_logger);
     data.insert::<FeedKey>(Arc::new(Mutex::new(FeedManager::new(http_client.clone(), FeedHandler))));
@@ -313,26 +314,6 @@ fn with_domain(url: &Url, domain: &str) -> Url {
   url
 }
 
-/// Gets a list of games people are playing in a given guild
-fn games(core: &Core, guild_id: GuildId) -> HashSet<String> {
-  core.cache.guild(guild_id).map_or_else(HashSet::new, |guild| {
-    guild.presences.values()
-      .filter(|&presence| presence.user.bot != Some(true))
-      .flat_map(|presence| presence.activities.iter())
-      .filter(|&activity| activity.kind == ActivityType::Playing)
-      .map(|activity| activity.name.clone())
-      .collect::<HashSet<String>>()
-  })
-}
-
-fn random_game(core: &Core) -> Option<String> {
-  let mut rng = crate::utils::create_rng();
-  let games = core.cache.guilds().into_iter()
-    .flat_map(|guild_id| games(core, guild_id))
-    .collect::<Vec<String>>();
-  games.choose(&mut rng).cloned()
-}
-
 async fn events_task(
   core: Core,
   shard_manager: Arc<ShardManager>,
@@ -378,11 +359,6 @@ async fn cycle_activity_task(core: Core) {
 
   loop {
     interval.tick().await;
-
-    let activity_data = core.operate_config(|config| {
-      log_result!(config.select_activity(&core))
-    }).await;
-
-    core.set_activities(|_| activity_data.clone()).await;
+    core.randomize_activities().await;
   };
 }
