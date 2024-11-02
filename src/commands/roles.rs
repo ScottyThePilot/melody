@@ -341,6 +341,7 @@ fn stringify_granters_list(core: &Core, guild_id: GuildId, granters: &HashSet<Gr
 }
 
 fn role_description(core: &Core, guild_id: GuildId, role_id: RoleId) -> String {
+  #[allow(deprecated)]
   core.cache.role(guild_id, role_id)
     .map(|role| format!("role `@{}`", role.name))
     .unwrap_or_else(|| format!("role `{role_id}`"))
@@ -526,6 +527,7 @@ fn is_owner(cache: &Cache, guild_id: GuildId, user_id: UserId) -> MelodyResult<b
 }
 
 fn get_role(cache: &Cache, guild_id: GuildId, role_id: RoleId) -> MelodyResult<Role> {
+  #[allow(deprecated)]
   cache.as_ref().role(guild_id, role_id)
     .ok_or(MelodyError::command_cache_failure("role"))
     .map(|role_ref| role_ref.clone())

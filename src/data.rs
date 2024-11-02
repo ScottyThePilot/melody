@@ -6,12 +6,12 @@ mod persist;
 use crate::MelodyResult;
 use crate::ratelimiter::RateLimiter;
 use crate::utils::Contextualize;
-pub use self::activities::{ActivitiesContainer, Activities, ActivityError};
+pub use self::activities::{ActivitiesContainer, Activities};
 pub use self::config::*;
 pub use self::persist::*;
 
 use serenity::client::{Client, Context};
-use serenity::gateway::{ActivityData, ShardManager, ShardRunnerInfo};
+use serenity::gateway::{ShardManager, ShardRunnerInfo};
 use serenity::model::id::{GuildId, UserId, ShardId};
 use serenity::model::guild::Member;
 use serenity::cache::Cache;

@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use reqwest::Client as HttpClient;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use songbird::input::{AuxMetadata, AudioStream, AudioStreamError, Compose, HttpRequest, Input};
@@ -23,17 +24,22 @@ pub enum YtDlpError {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct VideoInfo {
   pub id: String,
-  pub title: Option<String>,
-  pub thumbnail: Option<String>,
-  pub duration: Option<f64>,
-  pub webpage_url: Option<String>,
+  pub title: String,
+  pub thumbnail: String,
+  pub description: String,
+  pub duration: f64,
+  pub webpage_url: String,
+  #[serde(with = "chrono::serde::ts_milliseconds_option", default)]
+  pub timestamp: Option<DateTime<Utc>>,
   pub album: Option<String>,
   pub artist: Option<String>,
   pub track: Option<String>,
-  pub release_date: Option<String>,
   pub channel: Option<String>,
+  pub channel_id: Option<String>,
+  pub channel_url: Option<String>,
   pub uploader: Option<String>,
-  pub upload_date: Option<String>,
+  pub uploader_id: Option<String>,
+  pub uploader_url: Option<String>,
   pub filesize: Option<u64>,
   pub http_headers: Option<HashMap<String, String>>,
   pub url: String
@@ -60,14 +66,14 @@ impl VideoInfo {
       track: self.track,
       artist: self.artist.or(self.uploader),
       album: self.album,
-      date: self.release_date.or(self.upload_date),
+      date: None,
       channels: Some(2),
       channel: self.channel,
-      duration: self.duration.map(Duration::from_secs_f64),
+      duration: Some(Duration::from_secs_f64(self.duration)),
       sample_rate: Some(48000),
-      source_url: self.webpage_url,
-      title: self.title,
-      thumbnail: self.thumbnail,
+      source_url: Some(self.webpage_url),
+      title: Some(self.title),
+      thumbnail: Some(self.thumbnail),
       ..AuxMetadata::default()
     }
   }

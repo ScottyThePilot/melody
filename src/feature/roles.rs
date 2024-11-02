@@ -55,6 +55,7 @@ impl<'a> DisplayRole<'a> {
 
 impl<'a> fmt::Display for DisplayRole<'a> {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    #[allow(deprecated)]
     let role = self.cache.role(self.guild_id, self.role_id);
     match role {
       Some(role) => write!(f, "role `@{}`", role.name),

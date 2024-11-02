@@ -53,11 +53,19 @@ impl MusicPlayer {
     Ok(())
   }
 
-  pub async fn stop(&self, core: &Core, guild_id: GuildId) -> Result<(), JoinError> {
+  pub async fn kill(&self, core: &Core, guild_id: GuildId) -> Result<(), JoinError> {
     let songbird = core.get::<SongbirdKey>().await;
     songbird.remove(guild_id).await?;
     self.remove_guild_queue_bundle(guild_id).await;
     Ok(())
+  }
+
+  pub async fn stop(&self, core: &Core, guild_id: GuildId) {
+    let songbird = core.get::<SongbirdKey>().await;
+    if let Some(session) = self.current_session(&songbird, guild_id).await {
+      session.queue_bundle.lock().await.queue.clear();
+      session.stop_playing().await;
+    };
   }
 
   pub async fn skip(&self, core: &Core, guild_id: GuildId) {
@@ -92,8 +100,8 @@ impl MusicPlayer {
     };
   }
 
-  pub async fn queue_clear(&self, guild_id: GuildId) {
-    self.queue_manipulate(guild_id, |queue| queue.clear()).await
+  pub async fn queue_clear_keep_one(&self, guild_id: GuildId) {
+    self.queue_manipulate(guild_id, |queue| queue.clear_keep_one()).await
   }
 
   pub async fn queue_shuffle(&self, guild_id: GuildId) {
@@ -170,13 +178,20 @@ struct Session {
 }
 
 impl Session {
+  async fn stop_playing(&self) {
+    let mut queue_bundle = self.queue_bundle.lock().await;
+    let mut call = self.call.lock().await;
+    call.stop();
+    queue_bundle.track = None;
+  }
+
   /// Start playing the first item in the queue, stopping any other tracks that might be playing, internally.
   async fn start_playing(&self) {
     let mut queue_bundle = self.queue_bundle.lock().await;
     let mut call = self.call.lock().await;
     if let Some(current_item) = queue_bundle.queue.get_current() {
       let input = current_item.to_input(self.http_client.clone(), self.ytdlp_path.clone());
-      let track_handle = self.play(&mut call, input).await;
+      let track_handle = self.play(&mut call, input);
       queue_bundle.track = Some(track_handle);
     } else {
       queue_bundle.track = None;
@@ -190,12 +205,12 @@ impl Session {
     queue_bundle.queue.append(items);
     if let (None, Some(current_item)) = (&queue_bundle.track, queue_bundle.queue.get_current()) {
       let input = current_item.to_input(self.http_client.clone(), self.ytdlp_path.clone());
-      let track_handle = self.play(&mut call, input).await;
+      let track_handle = self.play(&mut call, input);
       queue_bundle.track = Some(track_handle);
     };
   }
 
-  async fn play(&self, call: &mut Call, input: Input) -> TrackHandle {
+  fn play(&self, call: &mut Call, input: Input) -> TrackHandle {
     let track_handle = call.play_only_input(input);
     track_handle.add_event(Event::Track(TrackEvent::End), OnTrackEnd(self.clone())).unwrap();
     track_handle.add_event(Event::Track(TrackEvent::Error), OnTrackError(self.clone())).unwrap();
@@ -254,6 +269,10 @@ struct Queue {
 
 impl Queue {
   fn clear(&mut self) {
+    self.contents.clear();
+  }
+
+  fn clear_keep_one(&mut self) {
     self.contents.truncate(1);
   }
 

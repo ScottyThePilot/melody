@@ -146,7 +146,7 @@ pub const MUSIC_PLAYER: BlueprintCommand = blueprint_command! {
     },
     blueprint_subcommand! {
       name: "leave",
-      description: "Makes the bot leave your voice channel",
+      description: "Makes the bot leave your voice channel (does not clear the queue)",
       arguments: [],
       function: music_player_leave
     },
@@ -186,6 +186,12 @@ pub const MUSIC_PLAYER: BlueprintCommand = blueprint_command! {
       arguments: [],
       function: music_player_stop
     },
+    blueprint_subcommand! {
+      name: "kill",
+      description: "Makes the bot leave your voice channel, stopping the music player and clearing the queue",
+      arguments: [],
+      function: music_player_kill
+    }
   ]
 };
 
@@ -334,9 +340,9 @@ async fn music_player_queue_clear(core: Core, args: BlueprintCommandArgs) -> Mel
     match ensure_in_same_channel(&core, guild_id, args.interaction.user.id).await {
       Err(response) => Err(response),
       Ok((music_player, ..)) => Ok({
-        music_player.queue_clear(guild_id).await;
+        music_player.queue_clear_keep_one(guild_id).await;
 
-        "Cleared queue".to_owned()
+        "Cleared the queue".to_owned()
       })
     }
   }).await
@@ -351,7 +357,7 @@ async fn music_player_queue_shuffle(core: Core, args: BlueprintCommandArgs) -> M
       Ok((music_player, ..)) => Ok({
         music_player.queue_shuffle(guild_id).await;
 
-        "Shuffled queue".to_owned()
+        "Shuffled the queue".to_owned()
       })
     }
   }).await
@@ -470,9 +476,25 @@ async fn music_player_stop(core: Core, args: BlueprintCommandArgs) -> MelodyResu
   send_response_result(&core, &args, {
     match ensure_in_same_channel(&core, guild_id, args.interaction.user.id).await {
       Err(response) => Err(response),
+      Ok((music_player, ..)) => Ok({
+        args.defer(&core).await?;
+        music_player.stop(&core, guild_id).await;
+
+        "Stopped the player and cleared the queue".to_owned()
+      })
+    }
+  }).await
+}
+
+async fn music_player_kill(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
+  let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+
+  send_response_result(&core, &args, {
+    match ensure_in_same_channel(&core, guild_id, args.interaction.user.id).await {
+      Err(response) => Err(response),
       Ok((music_player, channel_id)) => Ok({
         args.defer(&core).await?;
-        match music_player.stop(&core, guild_id).await {
+        match music_player.kill(&core, guild_id).await {
           Ok(()) => format!("Left channel {} and cleared the queue", channel_id.mention()),
           Err(err) => {
             error!("failed to leave channel: {err}");

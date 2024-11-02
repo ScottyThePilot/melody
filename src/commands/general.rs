@@ -124,6 +124,7 @@ async fn troll(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
       } else {
         if rand::thread_rng().gen_bool(0.01) {
           let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+          #[allow(deprecated)]
           let mut target_member = core.cache.member(guild_id, target)
             .ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?.clone();
           match log_result!(target_member.disable_communication_until_datetime(&core, time).await) {
