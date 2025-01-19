@@ -11,6 +11,10 @@ use std::collections::HashSet;
 
 const COMMANDS: &[Command<Target>] = &[
   Command::new_target("stop", Target::Stop),
+  // a few months ago, i was using tmux, and typing `stop` did not immediately kill the tmux session,
+  // now it does, and i can't find any resources on changing the magic words it uses, so i get to
+  // pull out the thesaurus to work around this...
+  Command::new_target("halt", Target::Stop),
   Command::new_group("plugin", &[
     Command::new_target("list", Target::PluginList),
     Command::new_target("enable", Target::PluginEnable),
