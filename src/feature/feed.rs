@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use crate::data::{Core, ConfigRssTwitter, ConfigRssYouTube};
 
 use chrono::{DateTime, Utc};
@@ -178,13 +179,13 @@ impl Hash for Feed {
 }
 
 async fn set_last_updated(core: &Core, feed: &Feed, last_update: DateTime<Utc>) {
-  log_result!(core.operate_persist_commit(|persist| {
+  core.operate_persist_commit(|persist| {
     if let Some(feed_state) = persist.feeds.get_mut(&feed) {
       feed_state.last_update = last_update;
     };
 
     Ok(())
-  }).await);
+  }).await.log_error();
 }
 
 const MAX_FAILURES: usize = 32;

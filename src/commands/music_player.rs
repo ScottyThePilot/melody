@@ -1,4 +1,4 @@
-use crate::{MelodyError, MelodyResult};
+use crate::prelude::*;
 use crate::blueprint::*;
 use crate::data::{Core, MusicPlayerKey};
 use crate::feature::music_player::{MusicPlayer, QueueItem, AttachmentItem, YouTubeItem};
@@ -43,7 +43,7 @@ pub const MUSIC_PLAYER: BlueprintCommand = blueprint_command! {
     "/music-player stop"
   ],
   plugin: "music-player",
-  allow_in_dms: false,
+  context: BlueprintCommandContext::OnlyInGuild,
   subcommands: [
     blueprint_subcommand! {
       name: "play",

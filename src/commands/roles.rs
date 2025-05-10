@@ -1,4 +1,4 @@
-use crate::{MelodyError, MelodyResult};
+use crate::prelude::*;
 use crate::blueprint::*;
 use crate::feature::roles::{Granter, JoinRoleFilter};
 use crate::data::{Core, PersistGuild};
@@ -31,7 +31,7 @@ pub const ROLE: BlueprintCommand = blueprint_command! {
     "/role grant @Helper @Nanachi",
     "/role revoke @Helper @Reg"
   ],
-  allow_in_dms: false,
+  context: BlueprintCommandContext::OnlyInGuild,
   subcommands: [
     blueprint_subcommand! {
       name: "grant",
@@ -82,7 +82,7 @@ async fn role_grant(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
 
   let response = if is_granter {
     let member2 = guild_id.member(&core, user_id).await.context("failed to find member")?;
-    if log_result!(member2.add_role(&core, role.id).await.context("failed to add role")).is_some() {
+    if member2.add_role(&core, role.id).await.context("failed to add role").log_error().is_some() {
       info!(
         "User {user1} ({user1_id}) granted role {role} ({role_id}) to user {user2} ({user2_id}) in guild {guild_id}",
         role = role.name, role_id = role.id, guild_id = guild_id,
@@ -114,7 +114,7 @@ async fn role_revoke(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
 
   let response = if is_granter {
     let member2 = guild_id.member(&core, user_id).await.context("failed to find member")?;
-    if log_result!(member2.remove_role(&core, role.id).await.context("failed to add role")).is_some() {
+    if member2.remove_role(&core, role.id).await.context("failed to add role").log_error().is_some() {
       info!(
         "User {user1} ({user1_id}) revoked role {role} ({role_id}) from user {user2} ({user2_id}) in guild {guild_id}",
         role = role.name, role_id = role.id, guild_id = guild_id,
@@ -159,7 +159,7 @@ pub const GRANT_ROLES: BlueprintCommand = blueprint_command! {
     "/grant-roles list",
     "/grant-roles list @Helper"
   ],
-  allow_in_dms: false,
+  context: BlueprintCommandContext::OnlyInGuild,
   default_permissions: Permissions::MANAGE_ROLES,
   subcommands: [
     blueprint_subcommand! {
@@ -370,7 +370,7 @@ pub const JOIN_ROLES: BlueprintCommand = blueprint_command! {
     "/join-roles remove @Members",
     "/join-roles list"
   ],
-  allow_in_dms: false,
+  context: BlueprintCommandContext::OnlyInGuild,
   default_permissions: Permissions::MANAGE_ROLES,
   subcommands: [
     blueprint_subcommand! {
@@ -412,7 +412,7 @@ async fn join_roles_add(core: Core, args: BlueprintCommandArgs) -> MelodyResult 
   roles_common(&core, args, |persist_guild, _guild_id, role, filter: Option<Parsed<JoinRoleFilter>>| {
     let Parsed(filter) = filter.unwrap_or(Parsed(JoinRoleFilter::All));
     Ok(match persist_guild.join_roles.insert(role.id, filter) {
-      Some(..) => format!("Replaced existing join role filter for `@{}` with filter `{}`", role.name, filter.to_str()),
+      Some(..) => format!("Replaced existing join role for `@{}` with filter `{}`", role.name, filter.to_str()),
       None => format!("Created new join role for `@{}` with filter `{}`", role.name, filter.to_str())
     })
   }).await

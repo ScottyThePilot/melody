@@ -1,7 +1,7 @@
 //! Items and functions associated with launching the bot and handling discord events
 mod input;
 
-use crate::{MelodyResult, MelodyError};
+use crate::prelude::*;
 use crate::commands::COMMANDS;
 use crate::data::*;
 use crate::feature::cleverbot::{CleverBotLoggerWrapper, CleverBotWrapper};
@@ -9,7 +9,7 @@ use crate::feature::feed::{Feed, FeedManager, FeedEventHandler};
 use crate::feature::message_chains::MessageChains;
 use crate::feature::music_player::MusicPlayer;
 use crate::utils::Contextualize;
-use self::input::InputAgent;
+pub use self::input::InputAgent;
 
 use melody_rss_feed::{TwitterPost, YouTubeVideo};
 use melody_rss_feed::url::Url;
@@ -133,7 +133,7 @@ impl EventHandler for Handler {
 
     if core.is_new_build().await {
       info!("New build detected, registering commands");
-      log_result!(crate::commands::register_commands(&core, &guilds).await);
+      crate::commands::register_commands(&core, &guilds).await.log_error();
     } else {
       info!("Old build detected, commands will not be re-registered");
     };
@@ -142,7 +142,7 @@ impl EventHandler for Handler {
   async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
     let core = Core::from(ctx);
     if let Interaction::Command(interaction) = interaction {
-      log_result!(crate::blueprint::dispatch(core, interaction, COMMANDS).await);
+      crate::blueprint::dispatch(core, interaction, COMMANDS).await.log_error();
     };
   }
 
@@ -154,18 +154,18 @@ impl EventHandler for Handler {
 
     if let Some(guild_id) = message.guild_id {
       let emojis = crate::utils::parse_emojis(&message.content);
-      log_result!(core.operate_persist_guild_commit(guild_id, |persist_guild| {
+      core.operate_persist_guild_commit(guild_id, |persist_guild| {
         // don't be greedy
         let mut rng = rand::thread_rng();
         if let Some(&emoji) = emojis.choose(&mut rng) {
           persist_guild.emoji_stats.increment_emoji_uses(emoji, message.author.id);
         };
         Ok(())
-      }).await);
+      }).await.log_error();
     };
 
     if should_contribute_message_chain(&core, &message).await {
-      log_result!(message.channel_id.say(&core, &message.content).await.context("failed to send message"));
+      message.channel_id.say(&core, &message.content).await.context("failed to send message").log_error();
     };
 
     if let Some(content) = get_message_replying_to(&message, me) {
@@ -177,14 +177,14 @@ impl EventHandler for Handler {
         Ok(reply) => {
           info!("Recieved reply from cleverbot: {reply:?}");
           let reply = content_safe(&core, reply, &options, &[]);
-          log_result!(crate::feature::cleverbot::send_reply(&core, &message, &reply).await);
-          log_result!(core.get::<CleverBotLoggerKey>().await.log(message.channel_id, content, reply).await);
+          crate::feature::cleverbot::send_reply(&core, &message, &reply).await.log_error();
+          core.get::<CleverBotLoggerKey>().await.log(message.channel_id, content, reply).await.log_error();
         },
         Err(error) => {
           error!("Unable to get reply from cleverbot: {error}");
-          let result = message.reply(&core, "There was an error getting a reply from cleverbot").await
-            .context("failed to send cleverbot failure message");
-          log_result!(result);
+          message.reply(&core, "There was an error getting a reply from cleverbot").await
+            .context("failed to send cleverbot failure message")
+            .log_error();
         }
       };
     };
@@ -192,17 +192,17 @@ impl EventHandler for Handler {
 
   async fn guild_member_addition(&self, ctx: Context, mut member: Member) {
     let core = Core::from(ctx);
-    log_result!(add_join_roles(&core, &mut member).await);
+    add_join_roles(&core, &mut member).await.log_error();
   }
 
   async fn reaction_add(&self, ctx: Context, reaction: Reaction) {
     let core = Core::from(ctx);
 
     if let (Some(guild_id), Some(user_id), ReactionType::Custom { id: emoji_id, .. }) = (reaction.guild_id, reaction.user_id, reaction.emoji) {
-      log_result!(core.operate_persist_guild_commit(guild_id, |persist_guild| {
+      core.operate_persist_guild_commit(guild_id, |persist_guild| {
         persist_guild.emoji_stats.increment_emoji_uses(emoji_id, user_id);
         Ok(())
-      }).await);
+      }).await.log_error();
     };
   }
 
@@ -210,10 +210,10 @@ impl EventHandler for Handler {
     let core = Core::from(ctx);
 
     if let (Some(guild_id), Some(user_id), ReactionType::Custom { id: emoji_id, .. }) = (reaction.guild_id, reaction.user_id, reaction.emoji) {
-      log_result!(core.operate_persist_guild_commit(guild_id, |persist_guild| {
+      core.operate_persist_guild_commit(guild_id, |persist_guild| {
         persist_guild.emoji_stats.decrement_emoji_uses(emoji_id, user_id);
         Ok(())
-      }).await);
+      }).await.log_error();
     };
   }
 }
@@ -239,7 +239,7 @@ impl FeedEventHandler for FeedHandler {
     }).await;
 
     for channel in delivery_channels {
-      log_result!(channel.say(&core, link.as_str()).await.context("failed to send youtube video message"));
+      channel.say(&core, link.as_str()).await.context("failed to send youtube video message").log_error();
       tokio::time::sleep(FEED_POST_DELAY).await;
     };
   }
@@ -258,7 +258,7 @@ impl FeedEventHandler for FeedHandler {
     }).await;
 
     for channel in delivery_channels {
-      log_result!(channel.say(&core, link.as_str()).await.context("failed to send twitter post message"));
+      channel.say(&core, link.as_str()).await.context("failed to send twitter post message").log_error();
       tokio::time::sleep(FEED_POST_DELAY).await;
     };
   }
@@ -319,14 +319,14 @@ async fn events_task(
   shard_manager: Arc<ShardManager>,
   mut event_receiver: MpscReceiver<StratumEvent>
 ) {
-  let input_agent = InputAgent::new(core);
+  let mut input_agent = InputAgent::new(core);
   while let Some(event) = event_receiver.recv().await {
     match event {
       StratumEvent::Input(line) => {
-        match input_agent.line(line).await {
-          Ok(()) => (),
-          Err(err) => error!("{err}")
-        }
+        let result = input_agent.line(line).await;
+        if let Err(err) = result {
+          input_agent.error(err.to_string());
+        };
       },
       StratumEvent::Terminate => {
         shard_manager.shutdown_all().await;

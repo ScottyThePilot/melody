@@ -1,7 +1,8 @@
-use crate::MelodyResult;
+use crate::prelude::*;
 use crate::data::Core;
 
 use itertools::Itertools;
+use log::Level;
 use melody_commander::{Command, CommandError, CommandOutput, Parsed, resolve_args};
 use serenity::model::id::GuildId;
 
@@ -24,7 +25,8 @@ const COMMANDS: &[Command<Target>] = &[
     Command::new_target("respawn-all", Target::FeedsRespawnAll),
     Command::new_target("abort-all", Target::FeedsAbortAll),
     Command::new_target("list-tasks", Target::FeedsListTasks),
-  ])
+  ]),
+  Command::new_target("update-yt-dlp", Target::UpdateYtDlp)
 ];
 
 #[derive(Debug, Clone, Copy)]
@@ -35,7 +37,8 @@ enum Target {
   PluginDisable,
   FeedsRespawnAll,
   FeedsAbortAll,
-  FeedsListTasks
+  FeedsListTasks,
+  UpdateYtDlp
 }
 
 #[derive(Debug, Clone)]
@@ -46,7 +49,8 @@ enum TargetArgs {
   PluginDisable(String, GuildId),
   FeedsRespawnAll,
   FeedsAbortAll,
-  FeedsListTasks
+  FeedsListTasks,
+  UpdateYtDlp(Option<String>)
 }
 
 impl TryFrom<CommandOutput<Target>> for TargetArgs {
@@ -70,28 +74,32 @@ impl TryFrom<CommandOutput<Target>> for TargetArgs {
       Target::FeedsRespawnAll => Ok(TargetArgs::FeedsRespawnAll),
       Target::FeedsAbortAll => Ok(TargetArgs::FeedsAbortAll),
       Target::FeedsListTasks => Ok(TargetArgs::FeedsListTasks),
+      Target::UpdateYtDlp => {
+        let update_to = resolve_args::<Option<String>>(&output.remaining_args)?;
+        Ok(TargetArgs::UpdateYtDlp(update_to))
+      }
     }
   }
 }
 
 impl TargetArgs {
-  async fn execute(self, agent: &InputAgent) -> MelodyResult {
+  async fn execute(self, agent: &mut InputAgent) -> MelodyResult {
     match self {
       TargetArgs::Stop => {
-        info!("Shutdown triggered");
+        agent.info("Shutdown triggered");
         agent.core.trigger_shutdown().await;
       },
       TargetArgs::PluginList(guild_id) => {
         let plugins = agent.plugin_list(guild_id).await;
-        info!("Plugins for guild ({guild_id}): {}", plugins.iter().join(", "));
+        agent.info(format!("Plugins for guild ({guild_id}): {}", plugins.iter().join(", ")));
       },
       TargetArgs::PluginEnable(plugin, guild_id) => {
         agent.plugin_enable(&plugin, guild_id).await?;
-        info!("Enabled plugin {plugin} for guild ({guild_id})");
+        agent.info(format!("Enabled plugin {plugin} for guild ({guild_id})"));
       },
       TargetArgs::PluginDisable(plugin, guild_id) => {
         agent.plugin_disable(&plugin, guild_id).await?;
-        info!("Disabled plugin {plugin} for guild ({guild_id})");
+        agent.info(format!("Disabled plugin {plugin} for guild ({guild_id})"));
       },
       TargetArgs::FeedsRespawnAll => {
         let feed_wrapper = agent.core.get::<crate::data::FeedKey>().await;
@@ -104,7 +112,23 @@ impl TargetArgs {
       TargetArgs::FeedsListTasks => {
         let feed_wrapper = agent.core.get::<crate::data::FeedKey>().await;
         for (feed, running) in feed_wrapper.lock().await.tasks() {
-          debug!("Feed task: {feed} ({})", if running { "running" } else { "stopped" });
+          agent.debug(format!("Feed task: {feed} ({})", if running { "running" } else { "stopped" }));
+        };
+      },
+      TargetArgs::UpdateYtDlp(update_to) => {
+        let yt_dlp_path = agent.core.operate_config(|config| {
+          config.music_player.as_ref().map(|music_player| music_player.ytdlp_path.clone())
+        }).await;
+
+        if let Some(yt_dlp_path) = yt_dlp_path {
+          let update_to = update_to.as_deref().unwrap_or("latest");
+          agent.info(format!("Updating yt-dlp..."));
+          let yt_dlp_output = crate::utils::youtube::update_yt_dlp(yt_dlp_path, update_to).await?;
+          for yt_dlp_output_line in yt_dlp_output.lines() {
+            agent.trace(format!("(yt-dlp): {yt_dlp_output_line:?}"));
+          };
+        } else {
+          agent.error(format!("Cannot update yt-dlp, no yt-dlp path in config"));
         };
       }
     };
@@ -115,21 +139,33 @@ impl TargetArgs {
 
 #[derive(Debug, Clone)]
 pub struct InputAgent {
-  core: Core
+  core: Core,
+  output: Vec<(Level, String)>
 }
 
 impl InputAgent {
   pub fn new(core: impl Into<Core>) -> Self {
-    InputAgent { core: core.into() }
+    InputAgent {
+      core: core.into(),
+      output: Vec::new()
+    }
   }
 
-  pub async fn line(&self, line: String) -> MelodyResult {
-    match melody_commander::apply(&line, COMMANDS).and_then(TargetArgs::try_from) {
-      Ok(target_args) => target_args.execute(self).await?,
-      Err(err) => error!("{err}")
-    };
-
+  pub async fn line(&mut self, line: String) -> MelodyResult {
+    melody_commander::apply(&line, COMMANDS)
+      .and_then(TargetArgs::try_from)?
+      .execute(self).await?;
     Ok(())
+  }
+
+  #[inline]
+  pub fn output(&self) -> &[(Level, String)] {
+    &self.output
+  }
+
+  #[inline]
+  pub fn into_output(self) -> Vec<(Level, String)> {
+    self.output
   }
 
   async fn plugin_list(&self, guild_id: GuildId) -> HashSet<String> {
@@ -156,5 +192,37 @@ impl InputAgent {
         Ok(guild_plugins.clone())
       }).await?
     }).await
+  }
+
+  #[allow(unused)]
+  pub fn log(&mut self, level: Level, message: impl Into<String>) {
+    let message = message.into();
+    log!(level, "{message}");
+    self.output.push((level, message));
+  }
+
+  #[allow(unused)]
+  pub fn error(&mut self, message: impl Into<String>) {
+    self.log(Level::Error, message);
+  }
+
+  #[allow(unused)]
+  pub fn warn(&mut self, message: impl Into<String>) {
+    self.log(Level::Warn, message);
+  }
+
+  #[allow(unused)]
+  pub fn info(&mut self, message: impl Into<String>) {
+    self.log(Level::Info, message);
+  }
+
+  #[allow(unused)]
+  pub fn debug(&mut self, message: impl Into<String>) {
+    self.log(Level::Debug, message);
+  }
+
+  #[allow(unused)]
+  pub fn trace(&mut self, message: impl Into<String>) {
+    self.log(Level::Trace, message);
   }
 }

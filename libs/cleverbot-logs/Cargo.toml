@@ -7,5 +7,6 @@ edition = "2021"
 base64 = { version = "0.21.3" }
 chrono = { version = "0.4", features = ["serde"] }
 ciborium = { version = "0.2.1" }
+fs-err = { version = "3" }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = { version = "1.0" }

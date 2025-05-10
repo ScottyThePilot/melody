@@ -11,10 +11,10 @@ use chrono::{DateTime, Utc};
 
 use std::io::{self, BufRead, BufReader, BufWriter, Read, Write};
 use std::path::Path;
-use std::fs::File;
 
 use base64::read::DecoderReader;
 use base64::write::EncoderWriter;
+use fs_err::File;
 
 #[derive(Debug)]
 pub struct CleverBotLogger {

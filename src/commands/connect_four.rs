@@ -1,4 +1,4 @@
-use crate::{MelodyError, MelodyResult};
+use crate::prelude::*;
 use crate::blueprint::*;
 use crate::data::*;
 use crate::feature::connect_four::*;
@@ -38,7 +38,7 @@ pub const CONNECT_FOUR: BlueprintCommand = blueprint_command! {
     "/connect-four decline @Riko",
     "/connect-four play 4"
   ],
-  allow_in_dms: false,
+  context: BlueprintCommandContext::OnlyInGuild,
   subcommands: [
     blueprint_subcommand! {
       name: "challenge",

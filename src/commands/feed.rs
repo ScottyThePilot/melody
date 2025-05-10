@@ -1,4 +1,4 @@
-use crate::{MelodyError, MelodyResult};
+use crate::prelude::*;
 use crate::blueprint::*;
 use crate::feature::feed::{Feed, FeedState};
 use crate::data::Core;
@@ -31,7 +31,7 @@ pub const FEEDS: BlueprintCommand = blueprint_command! {
     "/feeds list"
   ],
   plugin: "feed",
-  allow_in_dms: false,
+  context: BlueprintCommandContext::OnlyInGuild,
   default_permissions: Permissions::MANAGE_WEBHOOKS,
   subcommands: [
     blueprint_subcommand! {

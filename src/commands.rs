@@ -5,7 +5,7 @@ mod music_player;
 mod role_playing;
 mod roles;
 
-use crate::MelodyResult;
+use crate::prelude::*;
 use crate::blueprint::*;
 use crate::data::*;
 use crate::utils::Contextualize;
@@ -29,6 +29,7 @@ pub const COMMANDS: &[BlueprintCommand] = &[
   self::general::AVATAR,
   self::general::BANNER,
   self::general::EMOJI_STATS,
+  self::general::CONSOLE,
   self::music_player::MUSIC_PLAYER,
   self::connect_four::CONNECT_FOUR,
   self::role_playing::ROLL,

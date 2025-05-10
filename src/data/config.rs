@@ -1,4 +1,4 @@
-use crate::MelodyResult;
+use crate::prelude::*;
 use crate::utils::Contextualize;
 
 use rand::seq::SliceRandom;
@@ -7,7 +7,7 @@ use serenity::model::id::UserId;
 use serenity::model::gateway::GatewayIntents;
 use serenity::model::colour::Color;
 use singlefile::container_shared_async::ContainerSharedAsyncReadonly;
-use singlefile_formats::toml_serde::Toml;
+use singlefile_formats::data::toml_serde::Toml;
 
 use std::path::PathBuf;
 use std::sync::Arc;

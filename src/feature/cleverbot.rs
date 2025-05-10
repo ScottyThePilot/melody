@@ -1,4 +1,4 @@
-use crate::MelodyResult;
+use crate::prelude::*;
 use crate::data::Core;
 use crate::ratelimiter::RateLimiter;
 use crate::utils::Contextualize;

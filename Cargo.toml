@@ -14,6 +14,7 @@ const-random = { version = "0.1.15" }
 dunce = { version = "1.0.4" }
 fern = { version = "0.6" }
 float-ord = { version = "0.3.2" }
+fs-err = { version = "3", features = ["tokio"] }
 itertools = { version = "0.10" }
 log = { version = "0.4" }
 melody-commander = { path = "./libs/melody-commander" }
@@ -25,8 +26,8 @@ regex = { version = "1.8.4" }
 reqwest = { version = "0.11" }
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = { version = "1.0" }
-singlefile = { version = "0.2.2", features = ["shared-async"] }
-singlefile-formats = { version = "0.2.2", features = ["cbor-serde", "json-serde", "toml-serde"] }
+singlefile = { version = "0.3.1", features = ["shared-async", "fs-err"] }
+singlefile-formats = { version = "0.3.1", features = ["cbor-serde", "json-serde", "toml-serde"] }
 songbird = { version = "0.4" }
 symphonia = { version = "0.5.2", features = ["aac", "alac", "mp3"] }
 term-stratum = { path = "./libs/term-stratum" }
@@ -43,6 +44,10 @@ features = [
   "gateway", "model", "http",
   "unstable_discord_api"
 ]
+
+[dependencies.defy]
+git = "https://github.com/ScottyThePilot/misc-crates"
+features = ["log"]
 
 [dependencies.ids]
 git = "https://github.com/ScottyThePilot/misc-crates"

@@ -3,7 +3,7 @@ mod activities;
 mod config;
 mod persist;
 
-use crate::MelodyResult;
+use crate::prelude::*;
 use crate::ratelimiter::RateLimiter;
 use crate::utils::Contextualize;
 pub use self::activities::{ActivitiesContainer, Activities};
@@ -155,7 +155,7 @@ impl Core {
     let shard_runners_lock = shard_runners.lock().await;
     self.operate_activities(|activities| {
       for (_, shard_runner) in shard_runners_lock.iter() {
-        let activitiy = log_result!(activities.select(self));
+        let activitiy = activities.select(self).log_error();
         shard_runner.runner_tx.set_activity(activitiy);
       };
     }).await;

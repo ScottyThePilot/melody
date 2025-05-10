@@ -1,6 +1,6 @@
 pub mod youtube;
 
-use crate::{MelodyError, MelodyFileError, MelodyResult};
+use crate::prelude::*;
 
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
@@ -213,21 +213,6 @@ impl<T> Contextualize for Result<T, serenity::Error> {
   fn context(self, context: impl Into<String>) -> Self::Output {
     self.map_err(|error| MelodyError::SerenityError(error, context.into()))
   }
-}
-
-#[macro_export]
-macro_rules! log_result {
-  ($result:expr) => {
-    match $result {
-      Result::Ok(_value) => {
-        Option::Some(_value)
-      },
-      Result::Err(_value) => {
-        error!("{}", _value);
-        Option::None
-      }
-    }
-  };
 }
 
 #[macro_export]

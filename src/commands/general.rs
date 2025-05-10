@@ -1,8 +1,9 @@
-use crate::{MelodyError, MelodyResult};
+use crate::prelude::*;
 use crate::blueprint::*;
 use crate::data::Core;
 
 use chrono::{Utc, Duration};
+use log::Level;
 use rand::Rng;
 use serenity::model::id::UserId;
 use serenity::model::mention::Mentionable;
@@ -17,7 +18,7 @@ pub const PING: BlueprintCommand = blueprint_command! {
   description: "Gets a basic response from the bot",
   usage: ["/ping"],
   examples: ["/ping"],
-  allow_in_dms: true,
+  context: BlueprintCommandContext::Anywhere,
   arguments: [],
   function: ping
 };
@@ -33,7 +34,7 @@ pub const HELP: BlueprintCommand = blueprint_command! {
   description: "Gets command help",
   usage: ["/help [command]"],
   examples: ["/help", "/help connect-four"],
-  allow_in_dms: true,
+  context: BlueprintCommandContext::Anywhere,
   arguments: [
     blueprint_argument!(String {
       name: "command",
@@ -71,7 +72,7 @@ pub const ECHO: BlueprintCommand = blueprint_command! {
   description: "Makes the bot repeat something",
   usage: ["/echo <text>"],
   examples: ["/echo 'hello world'"],
-  allow_in_dms: true,
+  context: BlueprintCommandContext::Anywhere,
   arguments: [
     blueprint_argument!(String {
       name: "text",
@@ -86,7 +87,7 @@ pub const ECHO: BlueprintCommand = blueprint_command! {
 async fn echo(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   let text = args.resolve_values::<String>()?;
   let text_filtered = content_safe(&core.cache, &text, &ContentSafeOptions::default().clean_user(false), &[]);
-  info!("Echoing message: {text:?}");
+  info!("Echoing message (original): {text:?}");
   info!("Echoing message (filtered): {text_filtered:?}");
   BlueprintCommandResponse::new(text_filtered)
     .send(&core, &args).await
@@ -97,7 +98,7 @@ pub const TROLL: BlueprintCommand = blueprint_command! {
   description: "Conducts epic trollage",
   usage: ["/troll"],
   examples: ["/troll"],
-  allow_in_dms: false,
+  context: BlueprintCommandContext::OnlyInGuild,
   arguments: [
     blueprint_argument!(User {
       name: "victim",
@@ -117,9 +118,14 @@ async fn troll(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
       if target == core.current_user_id() {
         // Shadows `time`, changing it to be 30 seconds instead of 10.
         let time = Timestamp::from(Utc::now() + Duration::seconds(30));
-        match log_result!(member.disable_communication_until_datetime(&core, time).await) {
+        match member.disable_communication_until_datetime(&core, time).await.log_error() {
           Some(()) => "Impossible. Heresy. Unspeakable. Heresy. Heresy. Silence.".to_owned(),
           None => "Not happening, buddy.".to_owned()
+        }
+      } else if target == member.user.id {
+        match member.disable_communication_until_datetime(&core, time).await.log_error() {
+          Some(()) => format!("{} has successfully trolled themselves.", member.user.id.mention()),
+          None => "Sorry, I don't have permission to do that.".to_owned()
         }
       } else {
         if rand::thread_rng().gen_bool(0.01) {
@@ -127,20 +133,20 @@ async fn troll(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
           #[allow(deprecated)]
           let mut target_member = core.cache.member(guild_id, target)
             .ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?.clone();
-          match log_result!(target_member.disable_communication_until_datetime(&core, time).await) {
+          match target_member.disable_communication_until_datetime(&core, time).await.log_error() {
             Some(()) => format!("{} has successfully trolled {}.", member.user.id.mention(), target.mention()),
             None => "Sorry, even though you succeeded, I don't have permission to do that.".to_owned()
           }
         } else {
-          match log_result!(member.disable_communication_until_datetime(&core, time).await) {
+          match member.disable_communication_until_datetime(&core, time).await.log_error() {
             Some(()) => format!("{}'s attempt at trollage was a royal failure.", member.user.id.mention()),
-            None => "Sorry, I cannot do that.".to_owned()
+            None => "Sorry, I don't have permission to do that.".to_owned()
           }
         }
       }
     },
     None => {
-      match log_result!(member.disable_communication_until_datetime(&core, time).await) {
+      match member.disable_communication_until_datetime(&core, time).await.log_error() {
         Some(()) => format!("{} has been trolled.", member.user.id.mention()),
         None => "Sorry, I cannot do that.".to_owned()
       }
@@ -156,7 +162,7 @@ pub const AVATAR: BlueprintCommand = blueprint_command! {
   description: "Gets another user's avatar",
   usage: ["/avatar [user]"],
   examples: ["/avatar", "/avatar @Nanachi"],
-  allow_in_dms: true,
+  context: BlueprintCommandContext::Anywhere,
   arguments: [
     blueprint_argument!(User {
       name: "user",
@@ -187,7 +193,7 @@ pub const BANNER: BlueprintCommand = blueprint_command! {
   description: "Gets another user's banner",
   usage: ["/banner [user]"],
   examples: ["/banner", "/banner @Nanachi"],
-  allow_in_dms: true,
+  context: BlueprintCommandContext::Anywhere,
   arguments: [
     blueprint_argument!(User {
       name: "user",
@@ -218,7 +224,7 @@ pub const EMOJI_STATS: BlueprintCommand = blueprint_command! {
   description: "Gets usage statistics of emojis for this server",
   usage: ["/emoji-stats [page]"],
   examples: ["/emoji-stats", "/emoji-stats 3"],
-  allow_in_dms: false,
+  context: BlueprintCommandContext::OnlyInGuild,
   arguments: [
     blueprint_argument!(Integer {
       name: "page",
@@ -253,5 +259,65 @@ async fn emoji_stats(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
   };
 
   BlueprintCommandResponse::new(response)
+    .send(&core, &args).await
+}
+
+pub const CONSOLE: BlueprintCommand = blueprint_command! {
+  name: "console",
+  description: "Execute an internal command",
+  info: [
+    "This command is only usable by the bot owner."
+  ],
+  context: BlueprintCommandContext::Anywhere,
+  arguments: [
+    blueprint_argument!(String {
+      name: "internal-command",
+      description: "The internal command to be submitted",
+      required: true,
+      max_length: 1000
+    })
+  ],
+  function: console
+};
+
+async fn console(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
+  let internal_command = args.resolve_values::<String>()?;
+  let is_owner = core.operate_config(|config| config.owner_id == args.interaction.user.id).await;
+
+  let response = if is_owner {
+    info!("External console input: {internal_command:?}");
+    args.defer(&core).await?;
+    let mut input_agent = crate::handler::InputAgent::new(&core);
+    let result = input_agent.line(internal_command).await;
+    if let Err(err) = result {
+      input_agent.error(err.to_string());
+    };
+
+    if input_agent.output().is_empty() {
+      input_agent.trace("(no output)");
+    };
+
+    let mut output = String::new();
+    output.push_str("```\n");
+    for (level, line) in input_agent.into_output() {
+      output.push_str(match level {
+        Level::Error => "[ERROR]: ",
+        Level::Warn => "[WARN]: ",
+        Level::Info => "[INFO]: ",
+        Level::Debug => "[DEBUG]: ",
+        Level::Trace => "[TRACE]: ",
+      });
+
+      output.push_str(&line);
+      output.push('\n');
+    };
+    output.push_str("```\n");
+
+    output
+  } else {
+    "You cannot use this command.".to_owned()
+  };
+
+  BlueprintCommandResponse::new_ephemeral(response)
     .send(&core, &args).await
 }

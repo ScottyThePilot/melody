@@ -1,4 +1,4 @@
-use crate::MelodyResult;
+use crate::prelude::*;
 use crate::data::Core;
 use crate::utils::Contextualize;
 
@@ -9,11 +9,12 @@ use serenity::model::id::GuildId;
 use serenity::model::gateway::ActivityType;
 use serenity::gateway::ActivityData;
 use singlefile::container_shared_async::ContainerSharedAsyncReadonly;
-use singlefile_formats::json_serde::Json;
+use singlefile_formats::data::json_serde::Json;
 
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use std::path::PathBuf;
 use std::fmt::{self, Write};
+use std::num::NonZeroU32 as zu32;
 
 pub type ActivitiesContainer = ContainerSharedAsyncReadonly<Activities, Json>;
 
@@ -35,7 +36,7 @@ impl Activities {
 
   pub fn select(&self, core: &Core) -> Result<ActivityData, ActivityError> {
     let mut rng = rand::thread_rng();
-    let activity_data = self.activities.choose_weighted(&mut rng, |v| v.weight)
+    let activity_data = self.activities.choose_weighted(&mut rng, |v| v.variant.weight.get())
       .map_err(ActivityError::CannotSelectRandomActivity)?
       .to_activity_data(&mut rng, core)?;
     Ok(activity_data)
@@ -44,25 +45,31 @@ impl Activities {
 
 impl Default for Activities {
   fn default() -> Self {
+    let mut watching_users_args = HashMap::new();
+    watching_users_args.insert("users".to_owned(), ActivityVariant::GlobalUserCount);
+
     let watching_users = Activity {
       mode: ActivityMode::Watching,
-      weight: 1,
-      variant: ActivityVariant::Concatenate {
-        values: vec![
-          ActivityVariant::GlobalUserCount,
-          ActivityVariant::Text { text: " users".to_owned() }
-        ]
+      variant: ActivityVariantWeighted {
+        weight: zu32::MIN,
+        variant: ActivityVariant::Format {
+          template: "{users} users".to_owned(),
+          arguments: watching_users_args
+        }
       }
     };
 
+    let mut watching_guilds_args = HashMap::new();
+    watching_guilds_args.insert("guilds".to_owned(), ActivityVariant::GlobalGuildCount);
+
     let watching_guilds = Activity {
       mode: ActivityMode::Watching,
-      weight: 1,
-      variant: ActivityVariant::Concatenate {
-        values: vec![
-          ActivityVariant::GlobalGuildCount,
-          ActivityVariant::Text { text: " guilds".to_owned() }
-        ]
+      variant: ActivityVariantWeighted {
+        weight: zu32::MIN,
+        variant: ActivityVariant::Format {
+          template: "{guilds} guilds".to_owned(),
+          arguments: watching_guilds_args
+        }
       }
     };
 
@@ -77,15 +84,14 @@ impl Default for Activities {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Activity {
-  pub weight: u32,
   pub mode: ActivityMode,
   #[serde(flatten)]
-  pub variant: ActivityVariant
+  pub variant: ActivityVariantWeighted
 }
 
 impl Activity {
   pub fn to_activity_data(&self, rng: &mut impl Rng, core: &Core) -> Result<ActivityData, ActivityError> {
-    let text = self.variant.print(rng, core)?;
+    let text = self.variant.variant.print(rng, core)?;
     Ok(match self.mode {
       ActivityMode::Playing => ActivityData::playing(text),
       ActivityMode::Listening => ActivityData::listening(text),
@@ -94,6 +100,19 @@ impl Activity {
       ActivityMode::Competing => ActivityData::competing(text)
     })
   }
+}
+
+#[inline]
+const fn default_weight() -> zu32 {
+  zu32::MIN
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActivityVariantWeighted {
+  #[serde(flatten)]
+  pub variant: ActivityVariant,
+  #[serde(default = "default_weight")]
+  pub weight: zu32
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -107,13 +126,18 @@ pub enum ActivityVariant {
   Text {
     text: String
   },
+  #[serde(rename = "template")]
+  Format {
+    template: String,
+    arguments: HashMap<String, Self>
+  },
   #[serde(rename = "concatenate")]
   Concatenate {
     values: Vec<Self>
   },
   #[serde(rename = "select_random")]
   SelectRandom {
-    values: Vec<Self>
+    values: Vec<ActivityVariantWeighted>
   },
   #[serde(rename = "select_random_game")]
   SelectRandomGame,
@@ -154,10 +178,13 @@ impl ActivityVariant {
           value.print_append(buf, rng, core)?;
         };
       },
+      Self::Format { ref template, ref arguments } => {
+        assemble_template(buf, rng, core, template, arguments)?;
+      },
       Self::SelectRandom { ref values } => {
-        values.choose(rng)
-          .ok_or(ActivityError::CannotSelectRandomValue)?
-          .print_append(buf, rng, core)?;
+        values.choose_weighted(rng, |i| i.weight.get())
+          .map_err(ActivityError::CannotSelectRandomValue)?
+          .variant.print_append(buf, rng, core)?;
       },
       Self::SelectRandomGame => {
         let game = random_game(core)
@@ -192,10 +219,12 @@ pub enum ActivityMode {
 pub enum ActivityError {
   #[error("format error")]
   FormatError(#[from] fmt::Error),
+  #[error("failed to assemble template")]
+  CannotAssembleTemplate,
   #[error("failed to select random activity: {0}")]
   CannotSelectRandomActivity(WeightedError),
   #[error("failed to select random value")]
-  CannotSelectRandomValue,
+  CannotSelectRandomValue(rand::distributions::weighted::WeightedError),
   #[error("failed to select random game")]
   CannotSelectRandomGame
 }
@@ -218,4 +247,59 @@ fn random_game(core: &Core) -> Option<String> {
     .flat_map(|guild_id| list_games(core, guild_id))
     .collect::<Vec<String>>();
   games.choose(&mut rng).cloned()
+}
+
+fn assemble_template(
+  buf: &mut String, rng: &mut impl Rng, core: &Core,
+  template: &str, arguments: &HashMap<String, ActivityVariant>
+) -> Result<(), ActivityError> {
+  let mut iter = template.chars().peekable();
+
+  let mut current_template_argument = String::new();
+  let mut inside_template_argument = false;
+  while let Some(ch) = iter.next() {
+    match ch {
+      '{' => {
+        if inside_template_argument {
+          return Err(ActivityError::CannotAssembleTemplate);
+        };
+
+        if let Some('{') = iter.peek() {
+          iter.next();
+          buf.push('{');
+        } else {
+          inside_template_argument = true;
+        };
+      },
+      '}' => {
+        if !inside_template_argument {
+          return Err(ActivityError::CannotAssembleTemplate);
+        };
+
+        if let Some('}') = iter.peek() {
+          iter.next();
+          buf.push('}');
+        } else {
+          inside_template_argument = false;
+
+          let argument_value = arguments.get(current_template_argument.as_str())
+            .ok_or(ActivityError::CannotAssembleTemplate)?;
+          argument_value.print_append(buf, rng, core)?;
+
+          current_template_argument.clear();
+        };
+      },
+      ch => if inside_template_argument {
+        current_template_argument.push(ch);
+      } else {
+        buf.push(ch);
+      }
+    };
+  };
+
+  if inside_template_argument {
+    return Err(ActivityError::CannotAssembleTemplate);
+  };
+
+  Ok(())
 }

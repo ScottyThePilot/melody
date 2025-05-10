@@ -79,9 +79,19 @@ impl VideoInfo {
   }
 }
 
-pub async fn get_video_info(yt_dlp: impl AsRef<Path>, video_id: &str) -> Result<VideoInfo, YtDlpError> {
+pub async fn update_yt_dlp(yt_dlp: impl AsRef<Path>, update_to: &str) -> Result<String, YtDlpError> {
   let yt_dlp = yt_dlp.as_ref();
+  let args = ["--update-to", update_to];
+  let output = Command::new(yt_dlp).args(args).output().await
+    .map_err(|err| YtDlpError::Io(err, yt_dlp.to_owned()))?;
+  let info = String::from_utf8_lossy(&output.stdout).into_owned();
+
+  Ok(info)
+}
+
+pub async fn get_video_info(yt_dlp: impl AsRef<Path>, video_id: &str) -> Result<VideoInfo, YtDlpError> {
   assert!(is_id_str(video_id, 16), "video id {video_id:?} was invalid");
+  let yt_dlp = yt_dlp.as_ref();
   let url = display_video_url(video_id).to_string();
   let args = ["-j", url.as_str(), "-f", "ba[abr>0][vcodec=none]/best", "--no-playlist"];
   let output = Command::new(yt_dlp).args(args).output().await
@@ -93,8 +103,8 @@ pub async fn get_video_info(yt_dlp: impl AsRef<Path>, video_id: &str) -> Result<
 }
 
 pub async fn get_playlist_info(yt_dlp: impl AsRef<Path>, playlist_id: &str) -> Result<PlaylistInfo, YtDlpError> {
-  let yt_dlp = yt_dlp.as_ref();
   assert!(is_id_str(playlist_id, 40), "playlist id {playlist_id:?} was invalid");
+  let yt_dlp = yt_dlp.as_ref();
   let url = display_playlist_url(playlist_id).to_string();
   let args = ["-J", url.as_str(), "--compat-options", "no-youtube-unavailable-videos", "--yes-playlist"];
   let output = Command::new(yt_dlp).args(args).output().await

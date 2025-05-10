@@ -1,4 +1,4 @@
-use crate::MelodyResult;
+use crate::prelude::*;
 use crate::blueprint::*;
 use crate::data::Core;
 use crate::feature::dice_roll::Roll;
@@ -19,7 +19,7 @@ pub const ROLL: BlueprintCommand = blueprint_command! {
     "/roll '2d8 + 3'",
     "/roll 'coin'"
   ],
-  allow_in_dms: true,
+  context: BlueprintCommandContext::Anywhere,
   arguments: [
     blueprint_argument!(String {
       name: "dice",

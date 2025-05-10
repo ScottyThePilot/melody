@@ -1,4 +1,4 @@
-use crate::{MelodyError, MelodyParseCommandError, MelodyResult};
+use crate::prelude::*;
 use crate::data::Core;
 use crate::utils::{Blockify, Contextualize};
 
@@ -21,7 +21,8 @@ use serenity::model::application::{
   CommandDataResolved,
   CommandInteraction,
   CommandOptionType,
-  CommandType
+  CommandType,
+  InteractionContext
 };
 use serenity::model::user::User;
 use serenity::model::channel::{Attachment, ChannelType, PartialChannel};
@@ -63,7 +64,7 @@ pub fn command_embed(command: &'static BlueprintCommand, color: Color) -> Create
     .field("Usage", command.stringify_usage(), false)
     .field("Examples", command.stringify_examples(), false)
     .field("Required Permissions", command.stringify_permissions(), false)
-    .field("Allowed in DM", if command.allow_in_dms { "Yes" } else { "No" }, false)
+    .field("Allowable Where?", command.context.to_string(), false)
     .footer(CreateEmbedFooter::new(format!("Melody v{}", env!("CARGO_PKG_VERSION"))))
 }
 
@@ -87,6 +88,43 @@ pub fn build_commands(commands: impl IntoIterator<Item = BlueprintCommand>) -> V
   commands.into_iter().map(BlueprintCommand::into_command_builder).collect()
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub enum BlueprintCommandContext {
+  #[default]
+  Anywhere,
+  OnlyInGuild,
+  OnlyInDm
+}
+
+impl BlueprintCommandContext {
+  const fn contexts(self) -> &'static [InteractionContext] {
+    match self {
+      Self::Anywhere => &[
+        InteractionContext::Guild,
+        InteractionContext::BotDm,
+        InteractionContext::PrivateChannel
+      ],
+      Self::OnlyInGuild => &[
+        InteractionContext::Guild
+      ],
+      Self::OnlyInDm => &[
+        InteractionContext::BotDm,
+        InteractionContext::PrivateChannel
+      ]
+    }
+  }
+}
+
+impl fmt::Display for BlueprintCommandContext {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.write_str(match self {
+      Self::Anywhere => "Anywhere",
+      Self::OnlyInGuild => "Only in Guilds",
+      Self::OnlyInDm => "Only in DMs"
+    })
+  }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct BlueprintCommand {
   pub name: &'static str,
@@ -96,7 +134,7 @@ pub struct BlueprintCommand {
   pub examples: Option<&'static [&'static str]>,
   pub plugin: Option<&'static str>,
   pub command_type: CommandType,
-  pub allow_in_dms: bool,
+  pub context: BlueprintCommandContext,
   pub default_permissions: Option<Permissions>,
   pub root: BlueprintRoot
 }
@@ -106,7 +144,7 @@ impl BlueprintCommand {
     let builder = CreateCommand::new(self.name)
       .description(self.description)
       .kind(self.command_type)
-      .dm_permission(self.allow_in_dms)
+      .contexts(self.context.contexts().to_owned())
       .set_options(self.root.into_options_builders().1);
     if let Some(permissions) = self.default_permissions {
       builder.default_member_permissions(permissions)
@@ -638,6 +676,7 @@ impl<'a, T: ResolveArgumentValue<'a>> ResolveArgumentsValues<'a> for T {
 // Avert your eyes
 
 pub const DEFAULT_COMMAND_TYPE: CommandType = CommandType::ChatInput;
+pub const DEFAULT_COMMAND_CONTEXT: BlueprintCommandContext = BlueprintCommandContext::OnlyInGuild;
 
 #[macro_export]
 macro_rules! make_concrete_asyncfn {
@@ -662,7 +701,7 @@ macro_rules! blueprint_command {
     $(examples: [$($examples:expr),+ $(,)?],)?
     $(plugin: $plugin:expr,)?
     $(command_type: $command_type:expr,)?
-    $(allow_in_dms: $allow_in_dms:expr,)?
+    $(context: $context:expr,)?
     $(default_permissions: $default_permissions:expr,)?
     subcommands: [$($subcommand:expr),+ $(,)?]
   } => ($crate::blueprint::BlueprintCommand {
@@ -673,7 +712,7 @@ macro_rules! blueprint_command {
     examples: $crate::default_expr!(None, $(Some(&[$($examples),*]))?),
     plugin: $crate::default_expr!(None, $(Some($plugin))?),
     command_type: $crate::default_expr!($crate::blueprint::DEFAULT_COMMAND_TYPE, $($command_type)?),
-    allow_in_dms: $crate::default_expr!(false, $($allow_in_dms)?),
+    context: $crate::default_expr!($crate::blueprint::DEFAULT_COMMAND_CONTEXT, $($context)?),
     default_permissions: $crate::default_expr!(None, $(Some($default_permissions))?),
     root: $crate::blueprint::BlueprintRoot::CommandContainer {
       subcommands: &[$($subcommand,)+]
@@ -687,7 +726,7 @@ macro_rules! blueprint_command {
     $(examples: [$($examples:expr),+ $(,)?],)?
     $(plugin: $plugin:expr,)?
     $(command_type: $command_type:expr,)?
-    $(allow_in_dms: $allow_in_dms:expr,)?
+    $(context: $context:expr,)?
     $(default_permissions: $default_permissions:expr,)?
     arguments: [$($option:expr),* $(,)?],
     function: $function:expr
@@ -699,7 +738,7 @@ macro_rules! blueprint_command {
     examples: $crate::default_expr!(None, $(Some(&[$($examples),*]))?),
     plugin: $crate::default_expr!(None, $(Some($plugin))?),
     command_type: $crate::default_expr!($crate::blueprint::DEFAULT_COMMAND_TYPE, $($command_type)?),
-    allow_in_dms: $crate::default_expr!(false, $($allow_in_dms)?),
+    context: $crate::default_expr!($crate::blueprint::DEFAULT_COMMAND_CONTEXT, $($context)?),
     default_permissions: $crate::default_expr!(None, $(Some($default_permissions))?),
     root: $crate::blueprint::BlueprintRoot::Command {
       function: crate::utils::NoDebug(

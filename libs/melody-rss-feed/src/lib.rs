@@ -12,7 +12,7 @@ pub extern crate url;
 use chrono::{DateTime, Utc};
 use mime::Mime;
 use feed::model::{Feed, Entry, MediaObject};
-use feed::parser::ParseFeedError;
+use feed::parser::{Builder as ParserBuilder, ParseFeedError};
 use reqwest::{Client, Error as ReqwestError};
 use url::Url;
 
@@ -42,7 +42,7 @@ pub async fn get_twitter_feed(client: &Client, url: &str) -> Result<Vec<TwitterP
 
 async fn get_feed_inner<E: FromFeedEntry>(client: &Client, url: &str) -> Result<Vec<E>, FeedError> {
   let payload = client.get(url).send().await?.bytes().await?;
-  let feed = feed::parser::parse_with_uri(payload.as_ref(), Some(url))?;
+  let feed = ParserBuilder::new().base_uri(Some(url)).build().parse(payload.as_ref())?;
   let feed_entries = decompose_feed(feed).map_err(FeedError::InvalidFeedEntry)?;
   Ok(feed_entries)
 }

@@ -32,6 +32,7 @@ extern crate yggdrasil;
 
 #[macro_use] pub(crate) mod utils;
 #[macro_use] pub(crate) mod blueprint;
+pub(crate) mod prelude;
 pub(crate) mod commands;
 pub(crate) mod data;
 pub(crate) mod feature;
@@ -85,7 +86,7 @@ fn setup_logger(sender: SyncSender<String>) -> Result<(), fern::InitError> {
     .level_for(me, log::LevelFilter::Trace)
     .chain(sender)
     .chain({
-      std::fs::create_dir_all("./data/")?;
+      fs_err::create_dir_all("./data/")?;
       fern::log_file("./data/latest.log")?
     })
     .apply()?;
@@ -102,7 +103,11 @@ pub enum MelodyError {
   #[error("Serenity Error: {1} ({0})")]
   SerenityError(SerenityError, String),
   #[error("Command Error: {0}")]
-  CommandError(MelodyCommandError)
+  CommandError(MelodyCommandError),
+  #[error("Input Error: {0}")]
+  InputError(#[from] crate::melody_commander::CommandError),
+  #[error("YT-DLP Error: {0}")]
+  YtDlpError(#[from] crate::utils::youtube::YtDlpError)
 }
 
 impl MelodyError {
@@ -126,11 +131,11 @@ pub enum MelodyFileError {
   #[error(transparent)]
   Io(#[from] std::io::Error),
   #[error(transparent)]
-  Toml(#[from] singlefile::Error<singlefile_formats::toml_serde::TomlError>),
+  Toml(#[from] singlefile::Error<singlefile_formats::data::toml_serde::TomlError>),
   #[error(transparent)]
-  Json(#[from] singlefile::Error<singlefile_formats::json_serde::JsonError>),
+  Json(#[from] singlefile::Error<singlefile_formats::data::json_serde::JsonError>),
   #[error(transparent)]
-  Cbor(#[from] singlefile::Error<singlefile_formats::cbor_serde::CborError>),
+  Cbor(#[from] singlefile::Error<singlefile_formats::data::cbor_serde::CborError>),
   #[error(transparent)]
   CleverBotLog(#[from] cleverbot_logs::Error)
 }

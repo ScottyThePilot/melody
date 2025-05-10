@@ -1,11 +1,11 @@
-use crate::MelodyResult;
+use crate::prelude::*;
 use crate::feature::roles::{Granter, JoinRoleFilter};
 use crate::feature::feed::{Feed, FeedState};
 use crate::utils::Contextualize;
 
 use serenity::model::id::{GuildId, UserId, RoleId};
 use singlefile::container_shared_async::ContainerSharedAsyncWritableLocked;
-use singlefile_formats::cbor_serde::Cbor;
+use singlefile_formats::data::cbor_serde::Cbor;
 use tokio::sync::RwLock;
 
 use std::collections::{HashMap, HashSet};
@@ -27,7 +27,7 @@ pub struct Persist {
 
 impl Persist {
   pub async fn create() -> MelodyResult<PersistContainer> {
-    tokio::fs::create_dir_all("./data/")
+    fs_err::tokio::create_dir_all("./data/")
       .await.context("failed to create data/guilds/")?;
     let path = PathBuf::from(format!("./data/persist.bin"));
     let container = PersistContainer::create_or_default(path, Cbor)
@@ -74,10 +74,10 @@ pub struct PersistGuilds {
 impl PersistGuilds {
   #[inline]
   pub async fn create() -> MelodyResult<PersistGuilds> {
-    tokio::fs::create_dir_all("./data/guilds/")
+    fs_err::tokio::create_dir_all("./data/guilds/")
       .await.context("failed to create data/guilds/")?;
     let mut guilds = HashMap::new();
-    let mut read_dir = tokio::fs::read_dir("./data/guilds/")
+    let mut read_dir = fs_err::tokio::read_dir("./data/guilds/")
       .await.context("failed to read data/guilds/")?;
     while let Some(entry) = read_dir.next_entry().await.context("failed to read entry in data/guilds/")? {
       let file_type = entry.file_type().await.context("failed to read entry in data/guilds/")?;
