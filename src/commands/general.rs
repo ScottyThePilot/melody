@@ -55,7 +55,9 @@ async fn help(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
     },
     // User provided no command, return command list
     None => {
+      #[allow(deprecated)]
       let permissions = args.interaction.member.as_ref()
+        // "Use Guild::member_permissions_in instead"? What? That function doesn't exist.
         .and_then(|member| member.permissions(&core).ok())
         .unwrap_or(Permissions::all());
       BlueprintCommandResponse::with_ephemeral_embeds(vec![

@@ -502,7 +502,9 @@ where for<'a> A: ResolveArgumentValue<'a>, F: FnOnce(&mut crate::data::PersistGu
     let me = core.current_member(guild_id).await?;
     let my_role_position = member_role_position(&me, &core)
       .ok_or(MelodyError::command_cache_failure("guild"))?;
-    let permissions = me.permissions(&core).context("failed to get permissions for member")?;
+    #[allow(deprecated)]
+    let permissions = me.permissions(&core)
+      .context("failed to get permissions for member")?;
 
     let response = core.operate_persist_guild_commit(guild_id, |persist_guild| {
       operation(persist_guild, guild_id, &role, args_remaining).map(|content| {

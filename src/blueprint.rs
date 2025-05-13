@@ -626,8 +626,8 @@ impl<'a, T: ResolveArgumentValue<'a>> ResolveArgumentValue<'a> for Option<T> {
 }
 
 impl<'a> ResolveArgumentValue<'a> for () {
-  fn resolve_value(option_value: Option<&'a BlueprintOptionValue>, _: &'a CommandDataResolved) -> Option<Self> where Self: Sized {
-    option_value.map(|_| ())
+  fn resolve_value(_: Option<&'a BlueprintOptionValue>, _: &'a CommandDataResolved) -> Option<Self> where Self: Sized {
+    Some(())
   }
 }
 

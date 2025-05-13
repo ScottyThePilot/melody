@@ -15,7 +15,7 @@ dunce = { version = "1.0.4" }
 fern = { version = "0.6" }
 float-ord = { version = "0.3.2" }
 fs-err = { version = "3", features = ["tokio"] }
-itertools = { version = "0.10" }
+itertools = { version = "0.14" }
 log = { version = "0.4" }
 melody-commander = { path = "./libs/melody-commander" }
 melody-flag = { path = "./libs/melody-flag" }
