@@ -64,6 +64,7 @@ git = "https://github.com/ScottyThePilot/misc-crates"
 resolver = "2"
 members = [
   "libs/cacheable",
+  "libs/chessboard-render",
   "libs/cleverbot",
   "libs/cleverbot-logs",
   "libs/melody-commander",
