@@ -5,6 +5,9 @@ use crate::data::Core;
 use chrono::{Utc, Duration};
 use log::Level;
 use rand::Rng;
+use serenity::cache::Cache;
+use serenity::model::user::User;
+use serenity::model::guild::Member;
 use serenity::model::id::UserId;
 use serenity::model::mention::Mentionable;
 use serenity::model::permissions::Permissions;
@@ -170,16 +173,23 @@ pub const AVATAR: BlueprintCommand = blueprint_command! {
       name: "user",
       description: "The user whose avatar should be retrieved, defaults to the caller if not set",
       required: false
+    }),
+    blueprint_argument!(Boolean {
+      name: "get-global-avatar",
+      description: "Whether to get this user's global avatar instead of their server avatar",
+      required: false
     })
   ],
   function: avatar
 };
 
 async fn avatar(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let avatar_url = match args.resolve_values::<Option<UserId>>()? {
-    Some(user_id) => core.cache.user(user_id).and_then(|user| user.avatar_url()),
-    None => args.interaction.user.avatar_url()
-  };
+  let (user_id, get_globally) = args.resolve_values::<(Option<UserId>, Option<bool>)>()?;
+  let avatar_url = get_user_or_member_thing(
+    &core, &args.interaction, user_id, get_globally.unwrap_or(false),
+    |user| Some(user.face()),
+    |member| Some(member.face()),
+  );
 
   let response = match avatar_url {
     Some(avatar_url) => avatar_url,
@@ -219,6 +229,40 @@ async fn banner(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
 
   BlueprintCommandResponse::new_ephemeral(response)
     .send(&core, &args).await
+}
+
+fn get_user_or_member_thing<T>(
+  cache: impl AsRef<Cache>,
+  interaction: &serenity::model::application::CommandInteraction,
+  target_user_id: Option<UserId>,
+  get_globally: bool,
+  get_from_user: impl FnOnce(&User) -> Option<T>,
+  get_from_member: impl FnOnce(&Member) -> Option<T>
+) -> Option<T> {
+  let cache = cache.as_ref();
+
+  let member_thing = if !get_globally {
+    match target_user_id {
+      None => interaction.member.as_deref().and_then(get_from_member),
+      Some(user_id) => interaction.guild_id.and_then(|guild_id| {
+        cache.guild(guild_id).and_then(|guild| {
+          guild.members.get(&user_id).and_then(get_from_member)
+        })
+      })
+    }
+  } else {
+    None
+  };
+
+  let user_thing = member_thing.or_else(|| {
+    if let Some(user_id) = target_user_id {
+      cache.user(user_id).and_then(|user| get_from_user(&user))
+    } else {
+      get_from_user(&interaction.user)
+    }
+  });
+
+  user_thing
 }
 
 pub const EMOJI_STATS: BlueprintCommand = blueprint_command! {

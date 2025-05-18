@@ -23,20 +23,20 @@ melody-rss-feed = { path = "./libs/melody-rss-feed" }
 once_cell = { version = "1.18" }
 rand = { version = "0.8", features = ["small_rng"] }
 regex = { version = "1.8.4" }
-reqwest = { version = "0.11" }
+reqwest = { version = "0.12" }
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = { version = "1.0" }
 singlefile = { version = "0.3.1", features = ["shared-async", "fs-err"] }
 singlefile-formats = { version = "0.3.1", features = ["cbor-serde", "json-serde", "toml-serde"] }
-songbird = { version = "0.4" }
-symphonia = { version = "0.5.2", features = ["aac", "alac", "mp3"] }
+songbird = { version = "0.5" }
+symphonia = { version = "0.5.4", features = ["aac", "alac", "mp3"] }
 term-stratum = { path = "./libs/term-stratum" }
 thiserror = { version = "1.0" }
 tokio = { version = "1.35", features = ["full", "parking_lot"] }
 url = { version = "2.4", features = ["serde"] }
 
 [dependencies.serenity]
-version = "0.12"
+version = "0.12.4"
 default-features = false
 features = [
   "rustls_backend",
