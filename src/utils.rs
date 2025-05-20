@@ -237,12 +237,14 @@ macro_rules! impl_chain_tuple {
   );
 }
 
+#[allow(unused)]
 pub trait ChainTuple<Rhs> {
   type Output;
 
   fn chain_tuple(self, rhs: Rhs) -> Self::Output;
 }
 
+#[allow(unused)]
 pub type Chained<Lhs, Rhs> = <Lhs as ChainTuple<Rhs>>::Output;
 
 impl_chain_tuple!([], []);
