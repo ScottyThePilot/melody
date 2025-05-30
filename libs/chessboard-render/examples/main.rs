@@ -44,5 +44,5 @@ fn main() {
 
   let img = chessboard_render::render_board(&game, color, &[Square::D8, Square::H4]);
   let writer = BufWriter::new(File::create("board.png").unwrap());
-  chessboard_render::encode_image(&img, writer).unwrap();
+  chessboard_render::encode_image_rgb(&img, writer).unwrap();
 }

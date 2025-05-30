@@ -1,6 +1,7 @@
 pub extern crate shakmaty;
 pub extern crate image;
 
+use glam::{Vec2, UVec2};
 use shakmaty::{Color, Piece, Role, Square, File, Rank, Position};
 use image::{DynamicImage, GenericImageView, GrayAlphaImage, ImageResult, Pixel, Rgb, Rgba, RgbImage, RgbaImage};
 use once_cell::sync::OnceCell;
@@ -133,9 +134,19 @@ impl Assets {
       files: decode_static_image(include_bytes!("../assets/files.png")).into_luma_alpha8(),
       ranks: decode_static_image(include_bytes!("../assets/ranks.png")).into_luma_alpha8(),
       pieces: decode_static_image(include_bytes!("../assets/pieces.png")).into_luma_alpha8(),
-      check: decode_static_image(include_bytes!("../assets/check.png")).into_rgba8()
+      check: generate_image_check()
     }
   }
+}
+
+fn generate_image_check() -> RgbaImage {
+  const CENTER: Vec2 = Vec2::splat((64.0 - 1.0) / 2.0);
+  RgbaImage::from_fn(64, 64, |x, y| {
+    let pos = UVec2::new(x, y);
+    let dist = pos.as_vec2().distance(CENTER);
+    let alpha = (1.0 - (dist / 32.0).powi(2)).clamp(0.0, 1.0);
+    Rgba([0xff, 0x00, 0x00, (alpha * 255.0) as u8])
+  })
 }
 
 fn fill_square(destination: &mut RgbImage, pixel: Rgb<u8>, (x, y): Pos, size: u32) {
@@ -168,11 +179,18 @@ fn blend(p1: Rgb<u8>, p2: Rgba<u8>) -> Rgb<u8> {
   p1.to_rgb()
 }
 
-pub fn encode_image<W: Write>(img: &RgbImage, writer: W) -> ImageResult<()> {
+pub fn encode_image_rgb<W: Write>(img: &RgbImage, writer: W) -> ImageResult<()> {
   use image::{ColorType, ImageEncoder};
   use image::codecs::png::{CompressionType, FilterType, PngEncoder};
   PngEncoder::new_with_quality(writer, CompressionType::Best, FilterType::Adaptive)
     .write_image(img.as_raw(), img.width(), img.height(), ColorType::Rgb8)
+}
+
+pub fn encode_image_rgba<W: Write>(img: &RgbaImage, writer: W) -> ImageResult<()> {
+  use image::{ColorType, ImageEncoder};
+  use image::codecs::png::{CompressionType, FilterType, PngEncoder};
+  PngEncoder::new_with_quality(writer, CompressionType::Best, FilterType::Adaptive)
+    .write_image(img.as_raw(), img.width(), img.height(), ColorType::Rgba8)
 }
 
 pub fn decode_image<R: Read>(reader: R) -> ImageResult<DynamicImage> {
