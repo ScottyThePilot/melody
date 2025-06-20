@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use tokio::sync::{Mutex, MutexGuard};
 use tokio::time::Instant;
 

@@ -1814,6 +1814,7 @@ dependencies = [
  "log",
  "melody-commander",
  "melody-flag",
+ "melody-ratelimiter",
  "melody-rss-feed",
  "poise",
  "rand 0.8.5",
@@ -1844,6 +1845,13 @@ dependencies = [
 [[package]]
 name = "melody-flag"
 version = "0.1.0"
+
+[[package]]
+name = "melody-ratelimiter"
+version = "0.1.0"
+dependencies = [
+ "tokio",
+]
 
 [[package]]
 name = "melody-rss-feed"

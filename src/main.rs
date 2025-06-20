@@ -35,7 +35,6 @@ pub(crate) mod commands;
 pub(crate) mod data;
 pub(crate) mod feature;
 pub(crate) mod handler;
-pub(crate) mod ratelimiter;
 
 use serenity::prelude::SerenityError;
 use term_stratum::StratumEvent;

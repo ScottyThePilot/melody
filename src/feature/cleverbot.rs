@@ -1,12 +1,12 @@
 use crate::prelude::*;
 use crate::data::Core;
-use crate::ratelimiter::RateLimiter;
 
 pub use cleverbot::Error as CleverBotError;
 pub use cleverbot_logs::Error as CleverBotLogError;
 use cleverbot::{CleverBotAgent, CleverBotContext};
 use cleverbot_logs::{CleverBotLogger, CleverBotLogEntry};
 use chrono::Utc;
+use melody_ratelimiter::RateLimiter;
 use serenity::builder::{CreateEmbed, CreateEmbedFooter, CreateMessage};
 use serenity::model::channel::Message;
 use serenity::model::id::ChannelId;

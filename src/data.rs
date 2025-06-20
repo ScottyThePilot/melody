@@ -8,11 +8,11 @@ use crate::feature::cleverbot::{CleverBotLoggerWrapper, CleverBotWrapper};
 use crate::feature::feed::{FeedManager, FeedWrapper, FeedEventHandler};
 use crate::feature::message_chains::{MessageChains, MessageChainsWrapper};
 use crate::feature::music_player::MusicPlayer;
-use crate::ratelimiter::RateLimiter;
 pub use self::activities::{ActivitiesContainer, Activities};
 pub use self::config::*;
 pub use self::persist::*;
 
+use melody_ratelimiter::RateLimiter;
 use reqwest::Client as HttpClient;
 use serenity::cache::Cache;
 use serenity::client::{Client, Context};
