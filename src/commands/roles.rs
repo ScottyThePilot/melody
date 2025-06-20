@@ -1,12 +1,9 @@
 use crate::prelude::*;
-use crate::blueprint::*;
 use crate::feature::roles::{Granter, JoinRoleFilter};
 use crate::data::{Core, PersistGuild};
-use crate::utils::Contextualize;
+use crate::utils::RoleOrUser;
+use super::{MelodyContext, CommandState};
 
-use itertools::Itertools;
-use serenity::cache::Cache;
-use serenity::model::permissions::Permissions;
 use serenity::model::id::{UserId, GuildId, RoleId};
 use serenity::model::guild::{Member, Role};
 use serenity::utils::{content_safe, ContentSafeOptions};
@@ -15,66 +12,55 @@ use std::collections::{HashMap, HashSet};
 
 
 
-const BOT_MISSING_PERMS: &str = "I am missing 'Manage Roles' permissions";
 const BOT_ROLE_TOO_LOW: &str = "The role you have specified is above my highest role and inaccessible to me";
 const USER_ROLE_TOO_LOW: &str = "The role you have specified is above your highest role and not modifiable by you";
 const MANAGED_ROLE: &str = "The role you have specified is a managed role and may not be used";
 
-pub const ROLE: BlueprintCommand = blueprint_command! {
-  name: "role",
-  description: "Allows a grantable role to be granted or revoked",
-  usage: [
-    "/role grant <role> <user>",
-    "/role revoke <role> <user>"
-  ],
-  examples: [
-    "/role grant @Helper @Nanachi",
-    "/role revoke @Helper @Reg"
-  ],
-  context: BlueprintCommandContext::OnlyInGuild,
-  subcommands: [
-    blueprint_subcommand! {
-      name: "grant",
-      description: "Grants a grantable role to a user, as long as you are a valid granter",
-      arguments: [
-        blueprint_argument!(Role {
-          name: "role",
-          description: "The role to be granted",
-          required: true
-        }),
-        blueprint_argument!(User {
-          name: "user",
-          description: "The user to grant the role to",
-          required: false
-        })
-      ],
-      function: role_grant
-    },
-    blueprint_subcommand! {
-      name: "revoke",
-      description: "Revokes a grantable role from a user, as long as you are a valid granter",
-      arguments: [
-        blueprint_argument!(Role {
-          name: "role",
-          description: "The role to be revoked",
-          required: true
-        }),
-        blueprint_argument!(User {
-          name: "user",
-          description: "The user to revoke the role from",
-          required: false
-        })
-      ],
-      function: role_revoke
-    }
-  ]
-};
+#[poise::command(
+  slash_command,
+  guild_only,
+  subcommands(
+    "role_grant",
+    "role_revoke"
+  ),
+  name_localized("en-US", "role"),
+  description_localized("en-US", "Allows a grantable role to be granted or revoked"),
+  custom_data = CommandState::new()
+    .usage_localized("en-US", [
+      "/role grant <role> <user>",
+      "/role revoke <role> <user>"
+    ])
+    .examples_localized("en-US", [
+      "/role grant @Helper @Nanachi",
+      "/role revoke @Helper @Reg"
+    ])
+)]
+pub async fn role(_ctx: MelodyContext<'_>) -> MelodyResult {
+  Err(MelodyError::command_precondition_violation("root command"))
+}
 
-async fn role_grant(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let member1 = args.interaction.member.clone().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let (role_id, user_id) = args.resolve_values::<(RoleId, UserId)>()?;
-  let role = get_role(core.as_ref(), guild_id, role_id)?;
+#[poise::command(
+  slash_command,
+  guild_only,
+  rename = "grant",
+  name_localized("en-US", "grant"),
+  description_localized("en-US", "Grants a grantable role to a user, as long as you are a valid granter"),
+  custom_data = CommandState::new()
+    .usage_localized("en-US", ["/role grant <role> <user>"])
+    .examples_localized("en-US", ["/role grant @Helper @Nanachi"])
+)]
+async fn role_grant(
+  ctx: MelodyContext<'_>,
+  #[rename = "role"]
+  #[description_localized("en-US", "The role to be granted")]
+  role: Role,
+  #[rename = "user"]
+  #[description_localized("en-US", "The user to grant the role to")]
+  user_id: UserId
+) -> MelodyResult {
+  let core = Core::from(ctx);
+  let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+  let member1 = ctx.author_member().await.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
 
   let is_granter = core.operate_persist_guild(guild_id, |persist_guild| {
     Ok(is_granter(persist_guild, &member1, role.id))
@@ -98,15 +84,32 @@ async fn role_grant(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
     "You cannot grant this role".to_owned()
   };
 
-  BlueprintCommandResponse::new(response)
-    .send(&core, &args).await
+  ctx.reply(response).await.context("failed to send reply")?;
+  Ok(())
 }
 
-async fn role_revoke(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let member1 = args.interaction.member.clone().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let (role_id, user_id) = args.resolve_values::<(RoleId, UserId)>()?;
-  let role = get_role(core.as_ref(), guild_id, role_id)?;
+#[poise::command(
+  slash_command,
+  guild_only,
+  rename = "revoke",
+  name_localized("en-US", "revoke"),
+  description_localized("en-US", "Revokes a grantable role from a user, as long as you are a valid granter"),
+  custom_data = CommandState::new()
+    .usage_localized("en-US", ["/role revoke <role> <user>"])
+    .examples_localized("en-US", ["/role revoke @Helper @Reg"])
+)]
+async fn role_revoke(
+  ctx: MelodyContext<'_>,
+  #[rename = "role"]
+  #[description_localized("en-US", "The role to be revoked")]
+  role: Role,
+  #[rename = "user"]
+  #[description_localized("en-US", "The user to revoke the role from")]
+  user_id: UserId
+) -> MelodyResult {
+  let core = Core::from(ctx);
+  let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+  let member1 = ctx.author_member().await.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
 
   let is_granter = core.operate_persist_guild(guild_id, |persist_guild| {
     Ok(is_granter(persist_guild, &member1, role.id))
@@ -130,113 +133,88 @@ async fn role_revoke(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
     "You cannot revoke this role".to_owned()
   };
 
-  BlueprintCommandResponse::new(response)
-    .send(&core, &args).await
+  ctx.reply(response).await.context("failed to send reply")?;
+  Ok(())
 }
 
-pub const GRANT_ROLES: BlueprintCommand = blueprint_command! {
-  name: "grant-roles",
-  description: "Allows specific roles to be made grantable by specific users or other roles",
-  info: [
-    "To create a grantable role, you must first register it with the `/grant-roles add` subcommand,",
-    "and then add granters to it with the `/grant-roles add-granter` subcommand.",
-    "Users will not be able to modify a grantable role if that role is above their highest role.",
-    "The `/role grant` and `/role revoke` commands are used to grant and revoke grantable roles."
-  ],
-  usage: [
-    "/grant-roles add <role>",
-    "/grant-roles add-granter <role> <role|user>",
-    "/grant-roles remove <role>",
-    "/grant-roles remove-granter <role> <role|user>",
-    "/grant-roles list [role]"
-  ],
-  examples: [
-    "/grant-roles add @Helper",
-    "/grant-roles add-granter @Helper @Mod",
-    "/grant-roles add-granter @Helper @Admin",
-    "/grant-roles add-granter @Helper @Nanachi",
-    "/grant-roles remove @SuperAdmin",
-    "/grant-roles list",
-    "/grant-roles list @Helper"
-  ],
-  context: BlueprintCommandContext::OnlyInGuild,
-  default_permissions: Permissions::MANAGE_ROLES,
-  subcommands: [
-    blueprint_subcommand! {
-      name: "add",
-      description: "Adds a role that may be granted by a user group",
-      arguments: [
-        blueprint_argument!(Role {
-          name: "role",
-          description: "The role to be added",
-          required: true
-        })
-      ],
-      function: grant_roles_add
-    },
-    blueprint_subcommand! {
-      name: "remove",
-      description: "Removes a role from those that can be granted",
-      arguments: [
-        blueprint_argument!(Role {
-          name: "role",
-          description: "The role to be removed",
-          required: true
-        })
-      ],
-      function: grant_roles_remove
-    },
-    blueprint_subcommand! {
-      name: "add-granter",
-      description: "Adds a role or user to those allowed to grant a role",
-      arguments: [
-        blueprint_argument!(Role {
-          name: "role",
-          description: "The role to be added",
-          required: true
-        }),
-        blueprint_argument!(Mentionable {
-          name: "granter",
-          description: "The role or user who should be able to grant this role",
-          required: true
-        })
-      ],
-      function: grant_roles_add_granter
-    },
-    blueprint_subcommand! {
-      name: "remove-granter",
-      description: "Removes a role or user from those allowed to grant a role",
-      arguments: [
-        blueprint_argument!(Role {
-          name: "role",
-          description: "The role to be removed",
-          required: true
-        }),
-        blueprint_argument!(Mentionable {
-          name: "granter",
-          description: "The role or user who should no longer be able to grant this role",
-          required: true
-        })
-      ],
-      function: grant_roles_remove_granter
-    },
-    blueprint_subcommand! {
-      name: "list",
-      description: "Lists all grantable roles and their granters",
-      arguments: [
-        blueprint_argument!(Role {
-          name: "role",
-          description: "The role who's granters should be listed",
-          required: false
-        })
-      ],
-      function: grant_roles_list
-    }
-  ]
-};
+fn is_granter(persist_guild: &PersistGuild, member: &Member, role_id: RoleId) -> bool {
+  persist_guild.grant_roles.get(&role_id).map_or(false, |granters| {
+    granters.iter().any(|&granter| match granter {
+      Granter::User(user_id) => member.user.id == user_id,
+      Granter::Role(role_id) => member.roles.contains(&role_id)
+    })
+  })
+}
 
-async fn grant_roles_add(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  roles_common(&core, args, |persist_guild, _guild_id, role, ()| {
+
+
+#[poise::command(
+  slash_command,
+  guild_only,
+  subcommands(
+    "grant_roles_add",
+    "grant_roles_remove",
+    "grant_roles_add_granter",
+    "grant_roles_remove_granter",
+    "grant_roles_list"
+  ),
+  rename = "grant-roles",
+  name_localized("en-US", "grant-roles"),
+  description_localized("en-US", "Allows specific roles to be made grantable by specific users or other roles"),
+  default_member_permissions = "MANAGE_ROLES",
+  required_bot_permissions = "MANAGE_ROLES",
+  required_permissions = "MANAGE_ROLES",
+  custom_data = CommandState::new()
+    .info_localized_concat("en-US", [
+      "To create a grantable role, you must first register it with the `/grant-roles add` subcommand,",
+      "and then add granters to it with the `/grant-roles add-granter` subcommand.",
+      "Users will not be able to modify a grantable role if that role is above their highest role.",
+      "The `/role grant` and `/role revoke` commands are used to grant and revoke grantable roles."
+    ])
+    .usage_localized("en-US", [
+      "/grant-roles add <role>",
+      "/grant-roles add-granter <role> <role|user>",
+      "/grant-roles remove <role>",
+      "/grant-roles remove-granter <role> <role|user>",
+      "/grant-roles list [role]"
+    ])
+    .examples_localized("en-US", [
+      "/grant-roles add @Helper",
+      "/grant-roles add-granter @Helper @Mod",
+      "/grant-roles add-granter @Helper @Admin",
+      "/grant-roles add-granter @Helper @Nanachi",
+      "/grant-roles remove @SuperAdmin",
+      "/grant-roles remove-granter @Helper @Mod",
+      "/grant-roles remove-granter @Helper @Admin",
+      "/grant-roles remove-granter @Helper @Riko",
+      "/grant-roles list",
+      "/grant-roles list @Helper"
+    ])
+)]
+pub async fn grant_roles(_ctx: MelodyContext<'_>) -> MelodyResult {
+  Err(MelodyError::command_precondition_violation("root command"))
+}
+
+#[poise::command(
+  slash_command,
+  guild_only,
+  rename = "add",
+  name_localized("en-US", "add"),
+  description_localized("en-US", "Adds a role that may be granted by a user group"),
+  default_member_permissions = "MANAGE_ROLES",
+  required_bot_permissions = "MANAGE_ROLES",
+  required_permissions = "MANAGE_ROLES",
+  custom_data = CommandState::new()
+    .usage_localized("en-US", ["/grant-roles add <role>"])
+    .examples_localized("en-US", ["/grant-roles add @Helper"])
+)]
+async fn grant_roles_add(
+  ctx: MelodyContext<'_>,
+  #[name_localized("en-US", "role")]
+  #[description_localized("en-US", "The role to be added")]
+  role: Role
+) -> MelodyResult {
+  roles_common(ctx, role, |persist_guild, _guild_id, role| {
     Ok(match persist_guild.grant_roles.insert(role.id, HashSet::new()) {
       Some(..) => format!("Reset granters for existing grant role `@{}`", role.name),
       None => format!("Created new grant role for `@{}` (Add granters with the `/grant-roles add-granter`)", role.name)
@@ -244,8 +222,26 @@ async fn grant_roles_add(core: Core, args: BlueprintCommandArgs) -> MelodyResult
   }).await
 }
 
-async fn grant_roles_remove(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  roles_common(&core, args, |persist_guild, _guild_id, role, ()| {
+#[poise::command(
+  slash_command,
+  guild_only,
+  rename = "remove",
+  name_localized("en-US", "remove"),
+  description_localized("en-US", "Removes a role from those that can be granted"),
+  default_member_permissions = "MANAGE_ROLES",
+  required_bot_permissions = "MANAGE_ROLES",
+  required_permissions = "MANAGE_ROLES",
+  custom_data = CommandState::new()
+    .usage_localized("en-US", ["/grant-roles remove <role>"])
+    .examples_localized("en-US", ["/grant-roles remove @SuperAdmin"])
+)]
+async fn grant_roles_remove(
+  ctx: MelodyContext<'_>,
+  #[name_localized("en-US", "role")]
+  #[description_localized("en-US", "The role to be removed")]
+  role: Role
+) -> MelodyResult {
+  roles_common(ctx, role, |persist_guild, _guild_id, role| {
     Ok(match persist_guild.grant_roles.remove(&role.id) {
       Some(..) => format!("Removed existing grant role `@{}`", role.name),
       None => format!("No grant role for `@{}` was found", role.name)
@@ -253,12 +249,39 @@ async fn grant_roles_remove(core: Core, args: BlueprintCommandArgs) -> MelodyRes
   }).await
 }
 
-async fn grant_roles_add_granter(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  roles_common(&core, args, |persist_guild, guild_id, role, granter: RoleOrUser| {
+#[poise::command(
+  slash_command,
+  guild_only,
+  rename = "add-granter",
+  name_localized("en-US", "add-granter"),
+  description_localized("en-US", "Adds a role or user to those allowed to grant a role"),
+  default_member_permissions = "MANAGE_ROLES",
+  required_bot_permissions = "MANAGE_ROLES",
+  required_permissions = "MANAGE_ROLES",
+  custom_data = CommandState::new()
+    .usage_localized("en-US", [
+      "/grant-roles add-granter <role> <role|user>"
+    ])
+    .examples_localized("en-US", [
+      "/grant-roles add-granter @Helper @Mod",
+      "/grant-roles add-granter @Helper @Admin",
+      "/grant-roles add-granter @Helper @Nanachi",
+    ])
+)]
+async fn grant_roles_add_granter(
+  ctx: MelodyContext<'_>,
+  #[name_localized("en-US", "role")]
+  #[description_localized("en-US", "The role to be added")]
+  role: Role,
+  #[name_localized("en-US", "granter")]
+  #[description_localized("en-US", "The role or user who should be able to grant this role")]
+  granter: RoleOrUser
+) -> MelodyResult {
+  roles_common(ctx, role, |persist_guild, guild_id, role| {
     Ok(match persist_guild.grant_roles.get_mut(&role.id) {
       Some(granters) => {
         let granter = Granter::from(granter);
-        let granter_description = granter.display(guild_id, core.as_ref());
+        let granter_description = granter.display(guild_id, ctx.cache());
         let granter_type = granter.type_str();
 
         match granters.insert(granter) {
@@ -271,12 +294,39 @@ async fn grant_roles_add_granter(core: Core, args: BlueprintCommandArgs) -> Melo
   }).await
 }
 
-async fn grant_roles_remove_granter(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  roles_common(&core, args, |persist_guild, guild_id, role, granter: RoleOrUser| {
+#[poise::command(
+  slash_command,
+  guild_only,
+  rename = "remove-granter",
+  name_localized("en-US", "remove-granter"),
+  description_localized("en-US", "Removes a role or user from those allowed to grant a role"),
+  default_member_permissions = "MANAGE_ROLES",
+  required_bot_permissions = "MANAGE_ROLES",
+  required_permissions = "MANAGE_ROLES",
+  custom_data = CommandState::new()
+    .usage_localized("en-US", [
+      "/grant-roles remove-granter <role> <role|user>"
+    ])
+    .examples_localized("en-US", [
+      "/grant-roles remove-granter @Helper @Mod",
+      "/grant-roles remove-granter @Helper @Admin",
+      "/grant-roles remove-granter @Helper @Riko"
+    ])
+)]
+async fn grant_roles_remove_granter(
+  ctx: MelodyContext<'_>,
+  #[name_localized("en-US", "role")]
+  #[description_localized("en-US", "The role to be removed")]
+  role: Role,
+  #[name_localized("en-US", "granter")]
+  #[description_localized("en-US", "The role or user who should no longer be able to grant this role")]
+  granter: RoleOrUser
+) -> MelodyResult {
+  roles_common(ctx, role, |persist_guild, guild_id, role| {
     Ok(match persist_guild.grant_roles.get_mut(&role.id) {
       Some(granters) => {
         let granter = Granter::from(granter);
-        let granter_description = granter.display(guild_id, core.as_ref());
+        let granter_description = granter.display(guild_id, ctx.cache());
         let granter_type = granter.type_str();
 
         match granters.remove(&granter) {
@@ -289,10 +339,32 @@ async fn grant_roles_remove_granter(core: Core, args: BlueprintCommandArgs) -> M
   }).await
 }
 
-async fn grant_roles_list(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let role_id = args.resolve_values::<Option<RoleId>>()?;
-  let role = role_id.map(|role_id| get_role(core.as_ref(), guild_id, role_id)).transpose()?;
+#[poise::command(
+  slash_command,
+  guild_only,
+  rename = "list",
+  name_localized("en-US", "list"),
+  description_localized("en-US", "Lists all grantable roles and their granters"),
+  default_member_permissions = "MANAGE_ROLES",
+  required_bot_permissions = "MANAGE_ROLES",
+  required_permissions = "MANAGE_ROLES",
+  custom_data = CommandState::new()
+    .usage_localized("en-US", [
+      "/grant-roles list [role]"
+    ])
+    .examples_localized("en-US", [
+      "/grant-roles list",
+      "/grant-roles list @Helper"
+    ])
+)]
+async fn grant_roles_list(
+  ctx: MelodyContext<'_>,
+  #[name_localized("en-US", "role")]
+  #[description_localized("en-US", "The role who's granters should be listed, if desired")]
+  role: Option<Role>
+) -> MelodyResult {
+  let core = Core::from(ctx);
+  let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
 
   let response = core.operate_persist_guild(guild_id, |persist_guild| {
     let content = if let Some(role) = role {
@@ -300,7 +372,7 @@ async fn grant_roles_list(core: Core, args: BlueprintCommandArgs) -> MelodyResul
         let granters_list = stringify_granters_list(&core, guild_id, granters);
         format!("The role `@{}` has the following granters:\n{granters_list}", role.name)
       } else {
-        format!("The role `@{}` is not a grantable", role.name)
+        format!("The role `@{}` is not a grantable role", role.name)
       }
     } else {
       stringify_grant_roles(&core, guild_id, &persist_guild.grant_roles)
@@ -309,8 +381,8 @@ async fn grant_roles_list(core: Core, args: BlueprintCommandArgs) -> MelodyResul
     Ok(content_safe(&core, content, &ContentSafeOptions::new(), &[]))
   }).await?;
 
-  BlueprintCommandResponse::new(response)
-    .send(&core, &args).await
+  ctx.reply(response).await.context("failed to send reply")?;
+  Ok(())
 }
 
 fn stringify_grant_roles(core: &Core, guild_id: GuildId, grant_roles: &HashMap<RoleId, HashSet<Granter>>) -> String {
@@ -353,90 +425,137 @@ fn user_description(core: &Core, user_id: UserId) -> String {
     .unwrap_or_else(|| format!("user `{user_id}`"))
 }
 
-pub const JOIN_ROLES: BlueprintCommand = blueprint_command! {
-  name: "join-roles",
-  description: "Allows roles to be given to users or bots upon joining",
-  info: [
-    "Users will not be able to modify a join role if that role is above their highest role."
-  ],
-  usage: [
-    "/join-roles add <role> ['all'|'bots'|'humans']",
-    "/join-roles remove <role> ['all'|'bots'|'humans']",
-    "/join-roles list"
-  ],
-  examples: [
-    "/join-roles add @Bots bots",
-    "/join-roles add @Members humans",
-    "/join-roles remove @Members",
-    "/join-roles list"
-  ],
-  context: BlueprintCommandContext::OnlyInGuild,
-  default_permissions: Permissions::MANAGE_ROLES,
-  subcommands: [
-    blueprint_subcommand! {
-      name: "add",
-      description: "Adds a role to be given to users or bots on join",
-      arguments: [
-        blueprint_argument!(Role {
-          name: "role",
-          description: "The role to be added",
-          required: true
-        }),
-        FILTER_ARGUMENT
-      ],
-      function: join_roles_add
-    },
-    blueprint_subcommand! {
-      name: "remove",
-      description: "Removes a role from those to be given to users or bots on join",
-      arguments: [
-        blueprint_argument!(Role {
-          name: "role",
-          description: "The role to be removed",
-          required: true
-        }),
-        FILTER_ARGUMENT
-      ],
-      function: join_roles_remove
-    },
-    blueprint_subcommand! {
-      name: "list",
-      description: "Lists all roles that will be given on join",
-      arguments: [],
-      function: join_roles_list
-    }
-  ]
-};
+#[poise::command(
+  slash_command,
+  guild_only,
+  subcommands(
+    "join_roles_add",
+    "join_roles_remove",
+    "join_roles_list"
+  ),
+  rename = "join-roles",
+  name_localized("en-US", "join-roles"),
+  description_localized("en-US", "Allows roles to be given to users or bots upon joining"),
+  default_member_permissions = "MANAGE_ROLES",
+  required_bot_permissions = "MANAGE_ROLES",
+  required_permissions = "MANAGE_ROLES",
+  custom_data = CommandState::new()
+    .info_localized_concat("en-US", [
+      "Users will not be able to modify a join role if that role is above their highest role."
+    ])
+    .usage_localized("en-US", [
+      "/join-roles add <role> ['all'|'bots'|'humans']",
+      "/join-roles remove <role> ['all'|'bots'|'humans']",
+      "/join-roles list"
+    ])
+    .examples_localized("en-US", [
+      "/join-roles add @Bots bots",
+      "/join-roles add @Members humans",
+      "/join-roles remove @Members",
+      "/join-roles list"
+    ])
+)]
+pub async fn join_roles(_ctx: MelodyContext<'_>) -> MelodyResult {
+  Err(MelodyError::command_precondition_violation("root command"))
+}
 
-async fn join_roles_add(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  roles_common(&core, args, |persist_guild, _guild_id, role, filter: Option<Parsed<JoinRoleFilter>>| {
-    let Parsed(filter) = filter.unwrap_or(Parsed(JoinRoleFilter::All));
+#[poise::command(
+  slash_command,
+  guild_only,
+  rename = "add",
+  name_localized("en-US", "add"),
+  description_localized("en-US", "Adds a role to be given to users or bots on join"),
+  default_member_permissions = "MANAGE_ROLES",
+  required_bot_permissions = "MANAGE_ROLES",
+  required_permissions = "MANAGE_ROLES",
+  custom_data = CommandState::new()
+    .usage_localized("en-US", [
+      "/join-roles add <role> ['all'|'bots'|'humans']"
+    ])
+    .examples_localized("en-US", [
+      "/join-roles add @Bots bots",
+      "/join-roles add @Members humans"
+    ])
+)]
+async fn join_roles_add(
+  ctx: MelodyContext<'_>,
+  #[name_localized("en-US", "role")]
+  #[description_localized("en-US", "The role to be added to the join roles list")]
+  role: Role,
+  #[name_localized("en-US", "filter")]
+  #[description_localized("en-US", "What types of accounts this role should be applied to (defaults to 'all')")]
+  filter: Option<JoinRoleFilter>
+) -> MelodyResult {
+  let filter = filter.unwrap_or_default();
+  roles_common(ctx, role, |persist_guild, _guild_id, role| {
     Ok(match persist_guild.join_roles.insert(role.id, filter) {
-      Some(..) => format!("Replaced existing join role for `@{}` with filter `{}`", role.name, filter.to_str()),
+      Some(old_filter) => match filter == old_filter {
+        true => format!("A join role already exists for `@{}` with filter `{}`", role.name, filter.to_str()),
+        false => format!("Replaced existing join role for `@{}` with filter `{}`", role.name, filter.to_str())
+      },
       None => format!("Created new join role for `@{}` with filter `{}`", role.name, filter.to_str())
     })
   }).await
 }
 
-async fn join_roles_remove(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  roles_common(&core, args, |persist_guild, _guild_id, role, filter: Option<Parsed<JoinRoleFilter>>| {
-    let Parsed(filter) = filter.unwrap_or(Parsed(JoinRoleFilter::All));
+#[poise::command(
+  slash_command,
+  guild_only,
+  rename = "remove",
+  name_localized("en-US", "remove"),
+  description_localized("en-US", "Removes a role from those to be given to users or bots on join"),
+  default_member_permissions = "MANAGE_ROLES",
+  required_bot_permissions = "MANAGE_ROLES",
+  required_permissions = "MANAGE_ROLES",
+  custom_data = CommandState::new()
+    .usage_localized("en-US", [
+      "/join-roles remove <role> ['all'|'bots'|'humans']"
+    ])
+    .examples_localized("en-US", [
+      "/join-roles remove @Members"
+    ])
+)]
+async fn join_roles_remove(
+  ctx: MelodyContext<'_>,
+  #[name_localized("en-US", "role")]
+  #[description_localized("en-US", "The role to be removed from the join roles list")]
+  role: Role
+) -> MelodyResult {
+  roles_common(ctx, role, |persist_guild, _guild_id, role| {
     Ok(match persist_guild.join_roles.remove(&role.id) {
-      Some(..) => format!("Removed existing join role for `@{}` with filter `{}`", role.name, filter.to_str()),
+      Some(filter) => format!("Removed existing join role for `@{}` with filter `{}`", role.name, filter.to_str()),
       None => format!("No join role for `@{}` was found", role.name)
     })
   }).await
 }
 
-async fn join_roles_list(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+#[poise::command(
+  slash_command,
+  guild_only,
+  rename = "list",
+  name_localized("en-US", "list"),
+  description_localized("en-US", "Lists all roles that can be given on join"),
+  default_member_permissions = "MANAGE_ROLES",
+  required_bot_permissions = "MANAGE_ROLES",
+  required_permissions = "MANAGE_ROLES",
+  custom_data = CommandState::new()
+    .usage_localized("en-US", [
+      "/join-roles list"
+    ])
+    .examples_localized("en-US", [
+      "/join-roles list"
+    ])
+)]
+async fn join_roles_list(ctx: MelodyContext<'_>) -> MelodyResult {
+  let core = Core::from(ctx);
+  let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let response = core.operate_persist_guild(guild_id, |persist_guild| {
     let content = stringify_join_roles(&core, guild_id, &persist_guild.join_roles);
     Ok(content_safe(&core, content, &ContentSafeOptions::new(), &[]))
   }).await?;
 
-  BlueprintCommandResponse::new(response)
-    .send(&core, &args).await
+  ctx.reply(response).await.context("failed to send reply")?;
+  Ok(())
 }
 
 // TODO: figure out how role positions actually work
@@ -461,38 +580,16 @@ fn stringify_join_roles(core: &Core, guild_id: GuildId, join_roles: &HashMap<Rol
   }
 }
 
-const FILTER_ARGUMENT: BlueprintOption = blueprint_argument!(String {
-  name: "filter",
-  description: "What types of accounts this role should be applied to (defaults to 'all')",
-  required: false,
-  choices: [
-    ("all", "all"),
-    ("bots", "bots"),
-    ("humans", "humans")
-  ]
-});
-
-fn is_granter(persist_guild: &PersistGuild, member: &Member, role_id: RoleId) -> bool {
-  persist_guild.grant_roles.get(&role_id).map_or(false, |granters| {
-    granters.iter().any(|&granter| match granter {
-      Granter::User(user_id) => member.user.id == user_id,
-      Granter::Role(role_id) => member.roles.contains(&role_id)
-    })
-  })
-}
 
 
-
-async fn roles_common<F, A>(core: &Core, args: BlueprintCommandArgs, operation: F) -> MelodyResult
-where for<'a> A: ResolveArgumentValue<'a>, F: FnOnce(&mut crate::data::PersistGuild, GuildId, &Role, A) -> MelodyResult<String> {
-  let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let (role_id, args_remaining) = args.resolve_values::<(RoleId, A)>()?;
-  let role = get_role(core.as_ref(), guild_id, role_id)?;
-
-  let member = args.interaction.member.clone().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+async fn roles_common<F>(ctx: MelodyContext<'_>, role: Role, operation: F) -> MelodyResult
+where F: FnOnce(&mut crate::data::PersistGuild, GuildId, &Role) -> MelodyResult<String> {
+  let core = Core::from(ctx);
+  let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+  let member = ctx.author_member().await.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let user_role_position = member_role_position(&member, &core)
     .ok_or(MelodyError::command_cache_failure("guild"))?;
-  let is_owner = is_owner(&core.cache, guild_id, member.user.id)?;
+  let is_owner = is_owner(ctx, member.user.id)?;
 
   let response = if role.managed {
     MANAGED_ROLE.to_owned()
@@ -502,35 +599,26 @@ where for<'a> A: ResolveArgumentValue<'a>, F: FnOnce(&mut crate::data::PersistGu
     let me = core.current_member(guild_id).await?;
     let my_role_position = member_role_position(&me, &core)
       .ok_or(MelodyError::command_cache_failure("guild"))?;
-    #[allow(deprecated)]
-    let permissions = me.permissions(&core)
-      .context("failed to get permissions for member")?;
 
     let response = core.operate_persist_guild_commit(guild_id, |persist_guild| {
-      operation(persist_guild, guild_id, &role, args_remaining).map(|content| {
+      operation(persist_guild, guild_id, &role).map(|content| {
         content_safe(&core, content, &ContentSafeOptions::new(), &[])
       })
     }).await?;
 
-    std::iter::once(response)
-      .chain((!permissions.manage_roles()).then(|| BOT_MISSING_PERMS.to_owned()))
-      .chain((role.position >= my_role_position).then(|| BOT_ROLE_TOO_LOW.to_owned()))
-      .join("\n")
+    let mut response = response;
+    if role.position >= my_role_position {
+      response.push('\n');
+      response.push_str(BOT_ROLE_TOO_LOW);
+    };
+
+    response
   };
 
-  BlueprintCommandResponse::new(response)
-    .send(&core, &args).await
+  ctx.reply(response).await.context("failed to send reply")?;
+  Ok(())
 }
 
-fn is_owner(cache: &Cache, guild_id: GuildId, user_id: UserId) -> MelodyResult<bool> {
-  cache.guild(guild_id)
-    .ok_or(MelodyError::command_cache_failure("guild"))
-    .map(|guild| guild.owner_id == user_id)
-}
-
-fn get_role(cache: &Cache, guild_id: GuildId, role_id: RoleId) -> MelodyResult<Role> {
-  #[allow(deprecated)]
-  cache.as_ref().role(guild_id, role_id)
-    .ok_or(MelodyError::command_cache_failure("role"))
-    .map(|role_ref| role_ref.clone())
+fn is_owner(ctx: MelodyContext<'_>, user_id: UserId) -> MelodyResult<bool> {
+  ctx.guild().map(|guild| guild.owner_id == user_id).ok_or(MelodyError::COMMAND_NOT_IN_GUILD)
 }

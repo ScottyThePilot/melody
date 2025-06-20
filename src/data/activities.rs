@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use crate::data::Core;
-use crate::utils::Contextualize;
 
 use rand::Rng;
 use rand::distributions::WeightedError;
@@ -242,7 +241,7 @@ fn list_games(core: &Core, guild_id: GuildId) -> HashSet<String> {
 }
 
 fn random_game(core: &Core) -> Option<String> {
-  let mut rng = crate::utils::create_rng();
+  let mut rng = rand::thread_rng();
   let games = core.cache.guilds().into_iter()
     .flat_map(|guild_id| list_games(core, guild_id))
     .collect::<Vec<String>>();

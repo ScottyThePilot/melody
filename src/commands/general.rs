@@ -1,291 +1,195 @@
 use crate::prelude::*;
-use crate::blueprint::*;
 use crate::data::Core;
+use super::{MelodyContext, CommandState};
 
 use chrono::{Utc, Duration};
 use log::Level;
 use rand::Rng;
-use serenity::cache::Cache;
-use serenity::model::user::User;
 use serenity::model::guild::Member;
-use serenity::model::id::UserId;
-use serenity::model::mention::Mentionable;
-use serenity::model::permissions::Permissions;
 use serenity::model::timestamp::Timestamp;
 use serenity::utils::{content_safe, ContentSafeOptions};
 
 
 
-pub const PING: BlueprintCommand = blueprint_command! {
-  name: "ping",
-  description: "Gets a basic response from the bot",
-  usage: ["/ping"],
-  examples: ["/ping"],
-  context: BlueprintCommandContext::Anywhere,
-  arguments: [],
-  function: ping
-};
+const FUNNY_CHANCE: f64 = 0.01;
 
-async fn ping(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let response = if rand::thread_rng().gen_bool(0.01) { "Pog" } else { "Pong" };
-  BlueprintCommandResponse::new(response)
-    .send(&core, &args).await
+#[poise::command(
+  slash_command,
+  name_localized("en-US", "ping"),
+  description_localized("en-US", "Gets a basic response from the bot"),
+  custom_data = CommandState::new()
+    .usage_localized("en-US", ["/ping"])
+    .examples_localized("en-US", ["/ping"])
+)]
+pub async fn ping(ctx: MelodyContext<'_>) -> MelodyResult {
+  let response = if rand::thread_rng().gen_bool(FUNNY_CHANCE) { "Pog" } else { "Pong" };
+  ctx.reply(response).await.context("failed to send reply")?;
+  Ok(())
 }
 
-pub const HELP: BlueprintCommand = blueprint_command! {
-  name: "help",
-  description: "Gets command help",
-  usage: ["/help [command]"],
-  examples: ["/help", "/help connect-four"],
-  context: BlueprintCommandContext::Anywhere,
-  arguments: [
-    blueprint_argument!(String {
-      name: "command",
-      description: "A specific command to get help for, otherwise returns the command list",
-      required: false
-    })
-  ],
-  function: help
-};
-
-async fn help(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let color = super::get_bot_color(&core).await;
-  let response = match args.resolve_values::<Option<String>>()? {
-    // User provided a command, return help for that command
-    Some(command_name) => match find_command(super::COMMANDS, &command_name) {
-      Some(command) => BlueprintCommandResponse::with_ephemeral_embeds(vec![command_embed(command, color)]),
-      None => BlueprintCommandResponse::new_ephemeral("That command does not exist")
-    },
-    // User provided no command, return command list
-    None => {
-      #[allow(deprecated)]
-      let permissions = args.interaction.member.as_ref()
-        // "Use Guild::member_permissions_in instead"? What? That function doesn't exist.
-        .and_then(|member| member.permissions(&core).ok())
-        .unwrap_or(Permissions::all());
-      BlueprintCommandResponse::with_ephemeral_embeds(vec![
-        command_list_embed(super::COMMANDS, permissions, color)
-      ])
-    }
-  };
-
-  response.send(&core, &args).await
-}
-
-pub const ECHO: BlueprintCommand = blueprint_command! {
-  name: "echo",
-  description: "Makes the bot repeat something",
-  usage: ["/echo <text>"],
-  examples: ["/echo 'hello world'"],
-  context: BlueprintCommandContext::Anywhere,
-  arguments: [
-    blueprint_argument!(String {
-      name: "text",
-      description: "The text to be repeated back",
-      required: true,
-      max_length: 1000
-    })
-  ],
-  function: echo
-};
-
-async fn echo(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let text = args.resolve_values::<String>()?;
-  let text_filtered = content_safe(&core.cache, &text, &ContentSafeOptions::default().clean_user(false), &[]);
+#[poise::command(
+  slash_command,
+  name_localized("en-US", "echo"),
+  description_localized("en-US", "Makes the bot repeat something"),
+  custom_data = CommandState::new()
+    .usage_localized("en-US", ["/echo <text>"])
+    .examples_localized("en-US", ["/echo 'hello world'"])
+)]
+pub async fn echo(
+  ctx: MelodyContext<'_>,
+  #[name_localized("en-US", "text")]
+  #[description_localized("en-US", "The text to be repeated back")]
+  #[max_length = 1000]
+  text: String
+) -> MelodyResult {
+  let response = content_safe(&ctx, &text, &ContentSafeOptions::default().clean_user(false), &[]);
   info!("Echoing message (original): {text:?}");
-  info!("Echoing message (filtered): {text_filtered:?}");
-  BlueprintCommandResponse::new(text_filtered)
-    .send(&core, &args).await
+  info!("Echoing message (filtered): {response:?}");
+  ctx.reply(response).await.context("failed to send reply")?;
+  Ok(())
 }
 
-pub const TROLL: BlueprintCommand = blueprint_command! {
-  name: "troll",
-  description: "Conducts epic trollage",
-  usage: ["/troll"],
-  examples: ["/troll"],
-  context: BlueprintCommandContext::OnlyInGuild,
-  arguments: [
-    blueprint_argument!(User {
-      name: "victim",
-      description: "The user to be trolled, if so desired",
-      required: false
-    })
-  ],
-  function: troll
-};
+#[poise::command(
+  slash_command,
+  guild_only,
+  name_localized("en-US", "troll"),
+  description_localized("en-US", "Conducts epic trollage"),
+  custom_data = CommandState::new()
+    .usage_localized("en-US", ["/troll"])
+    .examples_localized("en-US", ["/troll"])
+)]
+pub async fn troll(
+  ctx: MelodyContext<'_>,
+  #[name_localized("en-US", "victim")]
+  #[description_localized("en-US", "The user to be trolled, if so desired")]
+  victim: Option<Member>
+) -> MelodyResult {
+  let mut perpetrator = ctx.author_member().await
+    .ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?
+    .into_owned();
 
-async fn troll(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let mut member = args.interaction.member.clone().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let target = args.resolve_values::<Option<UserId>>()?;
   let time = Timestamp::from(Utc::now() + Duration::seconds(10));
-  let response = match target {
-    Some(target) => {
-      if target == core.current_user_id() {
-        // Shadows `time`, changing it to be 30 seconds instead of 10.
+  let response = match victim {
+    Some(mut victim) => {
+      if victim.user.id == ctx.cache().current_user().id {
         let time = Timestamp::from(Utc::now() + Duration::seconds(30));
-        match member.disable_communication_until_datetime(&core, time).await.log_error() {
+        match perpetrator.disable_communication_until_datetime(&ctx, time).await.log_error() {
           Some(()) => "Impossible. Heresy. Unspeakable. Heresy. Heresy. Silence.".to_owned(),
           None => "Not happening, buddy.".to_owned()
         }
-      } else if target == member.user.id {
-        match member.disable_communication_until_datetime(&core, time).await.log_error() {
-          Some(()) => format!("{} has successfully trolled themselves.", member.user.id.mention()),
+      } else if perpetrator.user.id == victim.user.id {
+        match perpetrator.disable_communication_until_datetime(&ctx, time).await.log_error() {
+          Some(()) => format!("{} has successfully trolled themselves.", perpetrator.user.id.mention()),
           None => "Sorry, I don't have permission to do that.".to_owned()
         }
       } else {
-        if rand::thread_rng().gen_bool(0.01) {
-          let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-          #[allow(deprecated)]
-          let mut target_member = core.cache.member(guild_id, target)
-            .ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?.clone();
-          match target_member.disable_communication_until_datetime(&core, time).await.log_error() {
-            Some(()) => format!("{} has successfully trolled {}.", member.user.id.mention(), target.mention()),
+        if rand::thread_rng().gen_bool(FUNNY_CHANCE) {
+          match victim.disable_communication_until_datetime(&ctx, time).await.log_error() {
+            Some(()) => format!("{} has successfully trolled {}.", perpetrator.mention(), victim.mention()),
             None => "Sorry, even though you succeeded, I don't have permission to do that.".to_owned()
           }
         } else {
-          match member.disable_communication_until_datetime(&core, time).await.log_error() {
-            Some(()) => format!("{}'s attempt at trollage was a royal failure.", member.user.id.mention()),
+          match perpetrator.disable_communication_until_datetime(&ctx, time).await.log_error() {
+            Some(()) => format!("{}'s attempt at trollage was a royal failure.", perpetrator.mention()),
             None => "Sorry, I don't have permission to do that.".to_owned()
           }
         }
       }
     },
     None => {
-      match member.disable_communication_until_datetime(&core, time).await.log_error() {
-        Some(()) => format!("{} has been trolled.", member.user.id.mention()),
+      match perpetrator.disable_communication_until_datetime(&ctx, time).await.log_error() {
+        Some(()) => format!("{} has been trolled.", perpetrator.user.id.mention()),
         None => "Sorry, I cannot do that.".to_owned()
       }
     }
   };
 
-  BlueprintCommandResponse::new(response)
-    .send(&core, &args).await
+  ctx.reply(response).await.context("failed to send reply")?;
+  Ok(())
 }
 
-pub const AVATAR: BlueprintCommand = blueprint_command! {
-  name: "avatar",
-  description: "Gets another user's avatar",
-  usage: ["/avatar [user]"],
-  examples: ["/avatar", "/avatar @Nanachi"],
-  context: BlueprintCommandContext::Anywhere,
-  arguments: [
-    blueprint_argument!(User {
-      name: "user",
-      description: "The user whose avatar should be retrieved, defaults to the caller if not set",
-      required: false
-    }),
-    blueprint_argument!(Boolean {
-      name: "get-global-avatar",
-      description: "Whether to get this user's global avatar instead of their server avatar",
-      required: false
-    })
-  ],
-  function: avatar
-};
+#[poise::command(
+  slash_command,
+  guild_only,
+  name_localized("en-US", "avatar"),
+  description_localized("en-US", "Gets another user's avatar"),
+  custom_data = CommandState::new()
+    .usage_localized("en-US", ["/avatar [user] [get-global-avatar]"])
+    .examples_localized("en-US", ["/avatar @Nanachi", "/avatar @Nanachi false"])
+)]
+pub async fn avatar(
+  ctx: MelodyContext<'_>,
+  #[rename = "user"]
+  #[name_localized("en-US", "user")]
+  #[description_localized("en-US", "The user whose avatar should be retrieved, defaults to the caller if not set")]
+  member: Option<Member>,
+  #[rename = "get-global-avatar"]
+  #[name_localized("en-US", "get-global-avatar")]
+  #[description_localized("en-US", "Whether to get this user's global avatar instead of their server avatar")]
+  get_global: Option<bool>
+) -> MelodyResult {
+  let member = member
+    .map(std::borrow::Cow::Owned)
+    .or(ctx.author_member().await)
+    .ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+  let get_global = get_global.unwrap_or(false);
 
-async fn avatar(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let (user_id, get_globally) = args.resolve_values::<(Option<UserId>, Option<bool>)>()?;
-  let avatar_url = get_user_or_member_thing(
-    &core, &args.interaction, user_id, get_globally.unwrap_or(false),
-    |user| Some(user.face()),
-    |member| Some(member.face()),
-  );
-
-  let response = match avatar_url {
-    Some(avatar_url) => avatar_url,
-    None => "Failed to get that user's avatar".to_owned()
-  };
-
-  BlueprintCommandResponse::new_ephemeral(response)
-    .send(&core, &args).await
+  let response = if get_global { member.user.face() } else { member.face() };
+  ctx.reply(response).await.context("failed to send reply")?;
+  Ok(())
 }
 
-pub const BANNER: BlueprintCommand = blueprint_command! {
-  name: "banner",
-  description: "Gets another user's banner",
-  usage: ["/banner [user]"],
-  examples: ["/banner", "/banner @Nanachi"],
-  context: BlueprintCommandContext::Anywhere,
-  arguments: [
-    blueprint_argument!(User {
-      name: "user",
-      description: "The user whose banner should be retrieved, defaults to the caller if not set",
-      required: false
-    })
-  ],
-  function: banner
-};
+#[poise::command(
+  slash_command,
+  guild_only,
+  name_localized("en-US", "banner"),
+  description_localized("en-US", "Gets another user's banner"),
+  custom_data = CommandState::new()
+    .usage_localized("en-US", ["/banner [user]"])
+    .examples_localized("en-US", ["/banner @Nanachi"])
+)]
+pub async fn banner(
+  ctx: MelodyContext<'_>,
+  #[rename = "user"]
+  #[name_localized("en-US", "user")]
+  #[description_localized("en-US", "The user whose banner should be retrieved, defaults to the caller if not set")]
+  member: Option<Member>
+) -> MelodyResult {
+  let member = member
+    .map(std::borrow::Cow::Owned)
+    .or(ctx.author_member().await)
+    .ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
 
-async fn banner(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let banner_url = match args.resolve_values::<Option<UserId>>()? {
-    Some(user_id) => core.cache.user(user_id).and_then(|user| user.banner_url()),
-    None => args.interaction.user.banner_url()
-  };
-
-  let response = match banner_url {
-    Some(banner_url) => banner_url,
-    None => "Failed to get that user's banner".to_owned()
-  };
-
-  BlueprintCommandResponse::new_ephemeral(response)
-    .send(&core, &args).await
+  let response = member.user.banner_url()
+    .unwrap_or_else(|| "Failed to get that user's banner".to_owned());
+  ctx.reply(response).await.context("failed to send reply")?;
+  Ok(())
 }
 
-fn get_user_or_member_thing<T>(
-  cache: impl AsRef<Cache>,
-  interaction: &serenity::model::application::CommandInteraction,
-  target_user_id: Option<UserId>,
-  get_globally: bool,
-  get_from_user: impl FnOnce(&User) -> Option<T>,
-  get_from_member: impl FnOnce(&Member) -> Option<T>
-) -> Option<T> {
-  let cache = cache.as_ref();
+#[poise::command(
+  slash_command,
+  guild_only,
+  rename = "emoji-stats",
+  name_localized("en-US", "emoji-stats"),
+  description_localized("en-US", "Gets usage statistics of emojis for this server"),
+  custom_data = CommandState::new()
+    .usage_localized("en-US", ["/emoji-stats [page]"])
+    .examples_localized("en-US", ["/emoji-stats 3"])
+)]
+pub async fn emoji_stats(
+  ctx: MelodyContext<'_>,
+  #[name_localized("en-US", "page")]
+  #[description_localized("en-US", "The page of results to display (results are grouped 20 at a time)")]
+  #[min = 1]
+  #[max = 65536]
+  page: Option<usize>
+) -> MelodyResult {
+  const PER_PAGE: usize = 20;
 
-  let member_thing = if !get_globally {
-    match target_user_id {
-      None => interaction.member.as_deref().and_then(get_from_member),
-      Some(user_id) => interaction.guild_id.and_then(|guild_id| {
-        cache.guild(guild_id).and_then(|guild| {
-          guild.members.get(&user_id).and_then(get_from_member)
-        })
-      })
-    }
-  } else {
-    None
-  };
+  let core = Core::from(ctx);
 
-  let user_thing = member_thing.or_else(|| {
-    if let Some(user_id) = target_user_id {
-      cache.user(user_id).and_then(|user| get_from_user(&user))
-    } else {
-      get_from_user(&interaction.user)
-    }
-  });
-
-  user_thing
-}
-
-pub const EMOJI_STATS: BlueprintCommand = blueprint_command! {
-  name: "emoji-stats",
-  description: "Gets usage statistics of emojis for this server",
-  usage: ["/emoji-stats [page]"],
-  examples: ["/emoji-stats", "/emoji-stats 3"],
-  context: BlueprintCommandContext::OnlyInGuild,
-  arguments: [
-    blueprint_argument!(Integer {
-      name: "page",
-      description: "The page of results to display (results are grouped 10 at a time)",
-      required: false,
-      min_value: 1
-    })
-  ],
-  function: emoji_stats
-};
-
-async fn emoji_stats(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  const PER_PAGE: u64 = 10;
-  let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let page = args.resolve_values::<Option<u64>>()?.unwrap_or(1) - 1;
+  let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+  let page = page.unwrap_or(1) - 1;
 
   let emoji_statistics = core.operate_persist_guild(guild_id, |persist_guild| {
     core.cache.guild(guild_id).map(|guild| {
@@ -293,7 +197,7 @@ async fn emoji_stats(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
     }).ok_or(MelodyError::command_cache_failure("guild"))
   }).await?;
 
-  let page_start = (page * PER_PAGE) as usize;
+  let page_start = page * PER_PAGE;
   let entries = emoji_statistics.into_iter()
     .enumerate().skip(page_start).take(PER_PAGE as usize)
     .map(|(i, (emoji, count))| format!("`#{}` {emoji} ({count} times)", i + 1))
@@ -304,66 +208,71 @@ async fn emoji_stats(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
     false => entries.join("\n")
   };
 
-  BlueprintCommandResponse::new(response)
-    .send(&core, &args).await
+  ctx.reply(response).await.context("failed to send reply")?;
+  Ok(())
 }
 
-pub const CONSOLE: BlueprintCommand = blueprint_command! {
-  name: "console",
-  description: "Execute an internal command",
-  info: [
-    "This command is only usable by the bot owner."
-  ],
-  context: BlueprintCommandContext::Anywhere,
-  arguments: [
-    blueprint_argument!(String {
-      name: "internal-command",
-      description: "The internal command to be submitted",
-      required: true,
-      max_length: 1000
-    })
-  ],
-  function: console
-};
+#[poise::command(
+  slash_command,
+  owners_only, dm_only,
+  name_localized("en-US", "console"),
+  description_localized("en-US", "Execute an internal command"),
+  custom_data = CommandState::new()
+    .info_localized("en-US", "This command is only usable by the bot owner.")
+)]
+pub async fn console(
+  ctx: MelodyContext<'_>,
+  #[rename = "internal-command-text"]
+  #[name_localized("en-US", "internal-command-text")]
+  #[description_localized("en-US", "The internal command to be executed")]
+  #[max_length = 1000]
+  internal_command_text: String,
+) -> MelodyResult {
+  ctx.defer_ephemeral().await.context("failed to defer response")?;
 
-async fn console(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let internal_command = args.resolve_values::<String>()?;
-  let is_owner = core.operate_config(|config| config.owner_id == args.interaction.user.id).await;
-
-  let response = if is_owner {
-    info!("External console input: {internal_command:?}");
-    args.defer(&core).await?;
-    let mut input_agent = crate::handler::InputAgent::new(&core);
-    let result = input_agent.line(internal_command).await;
-    if let Err(err) = result {
-      input_agent.error(err.to_string());
-    };
-
-    if input_agent.output().is_empty() {
-      input_agent.trace("(no output)");
-    };
-
-    let mut output = String::new();
-    output.push_str("```\n");
-    for (level, line) in input_agent.into_output() {
-      output.push_str(match level {
-        Level::Error => "[ERROR]: ",
-        Level::Warn => "[WARN]: ",
-        Level::Info => "[INFO]: ",
-        Level::Debug => "[DEBUG]: ",
-        Level::Trace => "[TRACE]: ",
-      });
-
-      output.push_str(&line);
-      output.push('\n');
-    };
-    output.push_str("```\n");
-
-    output
-  } else {
-    "You cannot use this command.".to_owned()
+  info!("External console input: {internal_command_text:?}");
+  let mut input_agent = crate::handler::InputAgent::new(Core::from(ctx));
+  let result = input_agent.line(internal_command_text).await;
+  if let Err(err) = result {
+    input_agent.error(err.to_string());
   };
 
-  BlueprintCommandResponse::new_ephemeral(response)
-    .send(&core, &args).await
+  if input_agent.output().is_empty() {
+    input_agent.trace("(no output)");
+  };
+
+  let mut output = Vec::new();
+  for (level, line) in input_agent.into_output() {
+    let level_prefix = match level {
+      Level::Error => "[ERROR]: ",
+      Level::Warn => "[WARN]: ",
+      Level::Info => "[INFO]: ",
+      Level::Debug => "[DEBUG]: ",
+      Level::Trace => "[TRACE]: ",
+    };
+
+    output.push(format!("{level_prefix}{line}"));
+  };
+
+  fn output_length(output: &[String]) -> usize {
+    #[allow(unstable_name_collisions)]
+    output.iter().map(String::len)
+      .intersperse("\n".len())
+      .sum::<usize>()
+  }
+
+  let mut truncated = false;
+  while output_length(&mut output) + 6 + 32 > 2000 {
+    output.pop();
+    truncated = true;
+  };
+
+  let output_full = output.into_iter()
+    .chain(truncated.then(|| "...".to_owned()))
+    .join("\n");
+
+  let response = format!("```\n{output_full}\n```");
+  let response = content_safe(&ctx, &response, &ContentSafeOptions::default().clean_user(false), &[]);
+  ctx.reply(response).await.context("failed to send reply")?;
+  Ok(())
 }

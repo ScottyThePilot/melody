@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use crate::data::Core;
 use crate::ratelimiter::RateLimiter;
-use crate::utils::Contextualize;
 
 pub use cleverbot::Error as CleverBotError;
 pub use cleverbot_logs::Error as CleverBotLogError;

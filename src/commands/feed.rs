@@ -1,92 +1,115 @@
 use crate::prelude::*;
-use crate::blueprint::*;
 use crate::feature::feed::{Feed, FeedState};
 use crate::data::Core;
-use crate::utils::{Timestamp, TimestampFormat};
+use crate::utils::{Timestamp, TimestampFormat, LazyRegex};
+use super::{MelodyContext, CommandState};
 
 use chrono::{DateTime, Utc};
-use itertools::Itertools;
-use once_cell::sync::Lazy;
-use regex::Regex;
-use serenity::model::Permissions;
 use serenity::model::id::{ChannelId, GuildId};
-use serenity::model::mention::Mentionable;
+use poise::macros::ChoiceParameter;
 
 
 
-pub const FEEDS: BlueprintCommand = blueprint_command! {
-  name: "feeds",
-  description: "Set up channels to recieve posts from social media websites or from RSS feeds",
-  usage: [
-    "/feeds add <'youtube'|'twitter'> <feed-source>",
-    "/feeds remove <'youtube'|'twitter'> <feed-source>",
-    "/feeds remove-all",
-    "/feeds list"
+#[poise::command(
+  slash_command,
+  guild_only,
+  subcommands(
+    "feeds_add",
+    "feeds_remove",
+    "feeds_remove_all",
+    "feeds_list"
+  ),
+  category = "feed",
+  name_localized("en-US", "feeds"),
+  description_localized("en-US", "Set up channels to recieve posts from social media websites or from RSS feeds"),
+  default_member_permissions = "MANAGE_WEBHOOKS",
+  custom_data = CommandState::new()
+    .usage_localized("en-US", [
+      "/feeds add <'youtube'|'twitter'> <feed-source>",
+      "/feeds remove <'youtube'|'twitter'> <feed-source>",
+      "/feeds remove-all",
+      "/feeds list"
+    ])
+    .examples_localized("en-US", [
+      "/feeds add youtube UC7_YxT-KID8kRbqZo7MyscQ",
+      "/feeds add twitter markiplier",
+      "/feeds remove twitter elonmusk",
+      "/feeds remove-all",
+      "/feeds list"
+    ])
+)]
+pub async fn feeds(_ctx: MelodyContext<'_>) -> MelodyResult {
+  Err(MelodyError::command_precondition_violation("root command"))
+}
+
+/*
+blueprint_subcommand! {
+  name: "add",
+  description: "Adds a feed to this server",
+  arguments: [
+    blueprint_argument!(String {
+      name: "feed-type",
+      description: "What type this feed should be",
+      required: true,
+      choices: [
+        ("twitter", "twitter"),
+        ("youtube", "youtube")
+      ]
+    }),
+    blueprint_argument!(String {
+      name: "feed-source",
+      description: "For YouTube feeds, the channel ID, for Twitter feeds, the account's handle",
+      required: true,
+      max_length: 64
+    }),
+    blueprint_argument!(Channel {
+      name: "channel",
+      description: "Which channel messages for this feed should be sent",
+      required: false
+    })
   ],
-  examples: [
-    "/feeds add youtube UC7_YxT-KID8kRbqZo7MyscQ",
-    "/feeds add twitter markiplier",
-    "/feeds remove twitter elonmusk",
-    "/feeds remove-all",
-    "/feeds list"
-  ],
-  plugin: "feed",
-  context: BlueprintCommandContext::OnlyInGuild,
-  default_permissions: Permissions::MANAGE_WEBHOOKS,
-  subcommands: [
-    blueprint_subcommand! {
-      name: "add",
-      description: "Adds a feed to this server",
-      arguments: [
-        FEED_SOURCE_ARGUMENT,
-        blueprint_argument!(String {
-          name: "feed-source",
-          description: "For YouTube feeds, the channel ID, for Twitter feeds, the account's handle",
-          required: true,
-          max_length: 64
-        }),
-        blueprint_argument!(Channel {
-          name: "channel",
-          description: "Which channel messages for this feed should be sent",
-          required: false
-        })
-      ],
-      function: feeds_add
-    },
-    blueprint_subcommand! {
-      name: "remove",
-      description: "Removes a feed from this server",
-      arguments: [
-        FEED_SOURCE_ARGUMENT,
-        blueprint_argument!(String {
-          name: "feed-source",
-          description: "For YouTube feeds, the channel ID, for Twitter feeds, the account's handle",
-          required: true,
-          max_length: 64
-        })
-      ],
-      function: feeds_remove
-    },
-    blueprint_subcommand! {
-      name: "remove-all",
-      description: "Removes all feeds from this server",
-      arguments: [],
-      function: feeds_remove_all
-    },
-    blueprint_subcommand! {
-      name: "list",
-      description: "Lists all feeds in this server",
-      arguments: [],
-      function: feeds_list
-    }
-  ]
-};
+  function: feeds_add
+}
+*/
+#[poise::command(
+  slash_command,
+  guild_only,
+  category = "feed",
+  rename = "add",
+  name_localized("en-US", "add"),
+  description_localized("en-US", "Adds a feed to this server"),
+  default_member_permissions = "MANAGE_WEBHOOKS",
+  custom_data = CommandState::new()
+    .usage_localized("en-US", [
+      "/feeds add <'youtube'|'twitter'> <feed-source>"
+    ])
+    .examples_localized("en-US", [
+      "/feeds add youtube UC7_YxT-KID8kRbqZo7MyscQ",
+      "/feeds add twitter markiplier"
+    ])
+)]
+async fn feeds_add(
+  ctx: MelodyContext<'_>,
+  #[rename = "feed-type"]
+  #[name_localized("en-US", "feed-type")]
+  #[description_localized("en-US", "The type of feed to add, YouTube or Twitter")]
+  feed_type: FeedType,
+  #[rename = "feed-source"]
+  #[name_localized("en-US", "feed-source")]
+  #[description_localized("en-US", "For YouTube feeds, the channel ID, for Twitter feeds, the account's handle")]
+  #[max_length = 64]
+  feed_source: String,
+  #[rename = "channel"]
+  #[name_localized("en-US", "channel")]
+  #[description_localized("en-US", "Which channel messages for this feed should be sent")]
+  #[channel_types("Text")]
+  channel_id: Option<ChannelId>
+) -> MelodyResult {
+  let core = Core::from(ctx);
+  let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+  let channel_id = channel_id.unwrap_or(ctx.channel_id());
 
-async fn feeds_add(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let (feed_type, feed_source, channel_id) = args.resolve_values::<(String, String, Option<ChannelId>)>()?;
-  let feed_type = FeedType::from_str(&feed_type).ok_or(MelodyError::COMMAND_INVALID_ARGUMENTS_STRUCTURE)?;
-  let channel_id = channel_id.unwrap_or(args.interaction.channel_id);
+  // validate that channel id is a text channel
 
   let response = if let Some(feed) = feed_type.with_source(&feed_source) {
     let (was_replaced, is_disabled) = register_feed(&core, feed.clone(), guild_id, channel_id).await?;
@@ -98,14 +121,65 @@ async fn feeds_add(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
     "Failed to parse feed source".to_owned()
   };
 
-  BlueprintCommandResponse::new(response)
-    .send(&core, &args).await
+  ctx.reply(response).await.context("failed to send reply")?;
+  Ok(())
 }
 
-async fn feeds_remove(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let (feed_type, feed_source) = args.resolve_values::<(String, String)>()?;
-  let feed_type = FeedType::from_str(&feed_type).ok_or(MelodyError::COMMAND_INVALID_ARGUMENTS_STRUCTURE)?;
+/*
+blueprint_subcommand! {
+  name: "remove",
+  description: "Removes a feed from this server",
+  arguments: [
+    blueprint_argument!(String {
+      name: "feed-type",
+      description: "What type this feed should be",
+      required: true,
+      choices: [
+        ("twitter", "twitter"),
+        ("youtube", "youtube")
+      ]
+    }),
+    blueprint_argument!(String {
+      name: "feed-source",
+      description: "For YouTube feeds, the channel ID, for Twitter feeds, the account's handle",
+      required: true,
+      max_length: 64
+    })
+  ],
+  function: feeds_remove
+}
+*/
+#[poise::command(
+  slash_command,
+  guild_only,
+  category = "feed",
+  rename = "remove",
+  name_localized("en-US", "remove"),
+  description_localized("en-US", "Removes a feed from this server"),
+  default_member_permissions = "MANAGE_WEBHOOKS",
+  custom_data = CommandState::new()
+    .usage_localized("en-US", [
+      "/feeds remove <'youtube'|'twitter'> <feed-source>"
+    ])
+    .examples_localized("en-US", [
+      "/feeds remove twitter elonmusk",
+      "/feeds remove-all"
+    ])
+)]
+async fn feeds_remove(
+  ctx: MelodyContext<'_>,
+  #[rename = "feed-type"]
+  #[name_localized("en-US", "feed-type")]
+  #[description_localized("en-US", "The type of feed to remove, YouTube or Twitter")]
+  feed_type: FeedType,
+  #[rename = "feed-source"]
+  #[name_localized("en-US", "feed-source")]
+  #[description_localized("en-US", "For YouTube feeds, the channel ID, for Twitter feeds, the account's handle")]
+  #[max_length = 64]
+  feed_source: String
+) -> MelodyResult {
+  let core = Core::from(ctx);
+  let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
 
   let response = if let Some(feed) = feed_type.with_source(&feed_source) {
     match unregister_feed(&core, &feed, guild_id).await? {
@@ -116,12 +190,33 @@ async fn feeds_remove(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
     "Failed to parse feed source".to_owned()
   };
 
-  BlueprintCommandResponse::new(response)
-    .send(&core, &args).await
+  ctx.reply(response).await.context("failed to send reply")?;
+  Ok(())
 }
 
-async fn feeds_remove_all(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+/*
+blueprint_subcommand! {
+  name: "remove-all",
+  description: "Removes all feeds from this server",
+  arguments: [],
+  function: feeds_remove_all
+}
+*/
+#[poise::command(
+  slash_command,
+  guild_only,
+  category = "feed",
+  rename = "remove-all",
+  name_localized("en-US", "remove-all"),
+  description_localized("en-US", "Removes all feeds from this server"),
+  default_member_permissions = "MANAGE_WEBHOOKS",
+  custom_data = CommandState::new()
+    .usage_localized("en-US", ["/feeds remove-all"])
+    .examples_localized("en-US", ["/feeds remove-all"])
+)]
+async fn feeds_remove_all(ctx: MelodyContext<'_>) -> MelodyResult {
+  let core = Core::from(ctx);
+  let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let removed = unregister_guild_feeds(&core, guild_id).await?;
 
   let response = match removed {
@@ -129,12 +224,35 @@ async fn feeds_remove_all(core: Core, args: BlueprintCommandArgs) -> MelodyResul
     r => format!("Successfully removed {r} feeds")
   };
 
-  BlueprintCommandResponse::new(response)
-    .send(&core, &args).await
+  ctx.reply(response).await.context("failed to send reply")?;
+  Ok(())
 }
 
-async fn feeds_list(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+/*
+blueprint_subcommand! {
+  name: "list",
+  description: "Lists all feeds in this server",
+  arguments: [],
+  function: feeds_list
+}
+*/
+#[poise::command(
+  slash_command,
+  guild_only,
+  category = "feed",
+  rename = "list",
+  name_localized("en-US", "list"),
+  description_localized("en-US", "Lists all feeds in this server"),
+  default_member_permissions = "MANAGE_WEBHOOKS",
+  custom_data = CommandState::new()
+    .usage_localized("en-US", ["/feeds list"])
+    .examples_localized("en-US", ["/feeds list"])
+)]
+async fn feeds_list(
+  ctx: MelodyContext<'_>
+) -> MelodyResult {
+  let core = Core::from(ctx);
+  let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let feeds = list_guild_feeds(&core, guild_id).await;
 
   let response = if feeds.is_empty() {
@@ -148,8 +266,8 @@ async fn feeds_list(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
       .join("\n")
   };
 
-  BlueprintCommandResponse::new(response)
-    .send(&core, &args).await
+  ctx.reply(response).await.context("failed to send reply")?;
+  Ok(())
 }
 
 async fn register_feed(core: &Core, feed: Feed, guild_id: GuildId, channel_id: ChannelId) -> MelodyResult<(bool, bool)> {
@@ -160,7 +278,7 @@ async fn register_feed(core: &Core, feed: Feed, guild_id: GuildId, channel_id: C
   })).await?;
 
   // Ensure the feed has its task spawned (if possible)
-  let feed_wrapper = core.get::<crate::data::FeedKey>().await;
+  let feed_wrapper = core.state.feed.clone();
   let is_disabled = feed_wrapper.lock().await.register(&core, feed).await.is_none();
 
   Ok((was_replaced, is_disabled))
@@ -184,9 +302,8 @@ async fn unregister_feed(core: &Core, feed: &Feed, guild_id: GuildId) -> MelodyR
   }).await?;
 
   if should_abort {
-    operate!(core, operate_lock::<crate::data::FeedKey>, |feed_manager| {
-      feed_manager.abort(feed);
-    });
+    let feed_wrapper = core.state.feed.clone();
+    feed_wrapper.lock().await.abort(feed);
   };
 
   Ok(result)
@@ -209,11 +326,10 @@ async fn unregister_guild_feeds(core: &Core, guild_id: GuildId) -> MelodyResult<
   }).await?;
 
   if !removed.is_empty() {
-    operate!(core, operate_lock::<crate::data::FeedKey>, |feed_manager| {
-      for feed in removed.iter() {
-        feed_manager.abort(feed);
-      };
-    });
+    let feed_wrapper = core.state.feed.clone();
+    for feed in removed.iter() {
+      feed_wrapper.lock().await.abort(feed);
+    };
   };
 
   Ok(removed.len())
@@ -229,35 +345,21 @@ async fn list_guild_feeds(core: &Core, guild_id: GuildId) -> Vec<(Feed, ChannelI
   }).await
 }
 
-const FEED_SOURCE_ARGUMENT: BlueprintOption = blueprint_argument!(String {
-  name: "feed-type",
-  description: "What type this feed should be",
-  required: true,
-  choices: [
-    ("twitter", "twitter"),
-    ("youtube", "youtube")
-  ]
-});
-
 #[repr(u8)]
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, ChoiceParameter, Serialize, Deserialize)]
 pub enum FeedType {
+  #[name = "YouTube"]
+  #[name_localized("en-US", "YouTube")]
   YouTube,
+  #[name = "Twitter"]
+  #[name_localized("en-US", "Twitter")]
   Twitter
 }
 
 impl FeedType {
-  pub fn from_str(s: &str) -> Option<Self> {
-    match s {
-      "youtube" => Some(Self::YouTube),
-      "twitter" => Some(Self::Twitter),
-      _ => None
-    }
-  }
-
   pub fn with_source(self, source: &str) -> Option<Feed> {
-    static RX_YOUTUBE_CHANNEL: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(UC[0-9A-Za-z_-]{21}[AQgw]{1})$").unwrap());
-    static RX_TWITTER_HANDLE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^@?([A-Za-z0-9_]{1,15})$").unwrap());
+    static RX_YOUTUBE_CHANNEL: LazyRegex = LazyRegex::new(r"^(UC[0-9A-Za-z_-]{21}[AQgw]{1})$");
+    static RX_TWITTER_HANDLE: LazyRegex = LazyRegex::new(r"^@?([A-Za-z0-9_]{1,15})$");
     match self {
       Self::YouTube => {
         let source = RX_YOUTUBE_CHANNEL.captures(source)?.get(1)?.as_str();

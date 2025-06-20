@@ -15,7 +15,6 @@ extern crate log;
 extern crate melody_commander;
 extern crate melody_flag;
 extern crate melody_rss_feed;
-extern crate once_cell;
 extern crate rand;
 extern crate regex;
 #[macro_use]
@@ -31,7 +30,6 @@ extern crate url;
 extern crate yggdrasil;
 
 #[macro_use] pub(crate) mod utils;
-#[macro_use] pub(crate) mod blueprint;
 pub(crate) mod prelude;
 pub(crate) mod commands;
 pub(crate) mod data;
@@ -40,7 +38,6 @@ pub(crate) mod handler;
 pub(crate) mod ratelimiter;
 
 use serenity::prelude::SerenityError;
-use serenity::model::id::GenericId;
 use term_stratum::StratumEvent;
 use tokio::sync::mpsc::UnboundedReceiver as AsyncReceiver;
 
@@ -112,16 +109,13 @@ pub enum MelodyError {
 
 impl MelodyError {
   pub const COMMAND_NOT_IN_GUILD: Self = MelodyError::CommandError(MelodyCommandError::NotInGuild);
-  pub const COMMAND_INVALID_ARGUMENTS_STRUCTURE: Self = MelodyError::CommandError(MelodyCommandError::InvalidArgumentsStructure);
+
+  pub const fn command_precondition_violation(message: &'static str) -> Self {
+    MelodyError::CommandError(MelodyCommandError::PreconditionViolation(message))
+  }
 
   pub const fn command_cache_failure(message: &'static str) -> Self {
     MelodyError::CommandError(MelodyCommandError::CacheFailure(message))
-  }
-}
-
-impl From<MelodyParseCommandError> for MelodyError {
-  fn from(error: MelodyParseCommandError) -> Self {
-    MelodyError::CommandError(MelodyCommandError::FailedToParse(error))
   }
 }
 
@@ -140,26 +134,18 @@ pub enum MelodyFileError {
   CleverBotLog(#[from] cleverbot_logs::Error)
 }
 
-#[derive(Debug, Error, Clone)]
+#[derive(Debug, Error)]
 pub enum MelodyCommandError {
   #[error("not in a guild")]
   NotInGuild,
-  #[error("failed to parse interaction: {0}")]
-  FailedToParse(#[from] MelodyParseCommandError),
-  #[error("invalid arguments structure")]
-  InvalidArgumentsStructure,
-  #[error("invalid arguments: {0}")]
-  InvalidArguments(String),
   #[error("data not cached: {0}")]
-  CacheFailure(&'static str)
-}
-
-#[derive(Debug, Error, Clone, Copy)]
-pub enum MelodyParseCommandError {
-  #[error("no command found")]
-  NoCommandFound,
-  #[error("unresolved mentionable (generic) id")]
-  UnresolvedGenericId(GenericId),
-  #[error("invalid structure")]
-  InvalidStructure
+  CacheFailure(&'static str),
+  #[error("precondition violated: {0}")]
+  PreconditionViolation(&'static str),
+  #[error("failed to parse command argument {0:?}: {1}")]
+  ArgumentParse(Option<String>, Box<dyn std::error::Error + Send + Sync + 'static>),
+  #[error("failed to parse interaction for command {0:?}: {1}")]
+  InvalidCommandStructure(String, &'static str),
+  #[error("command panicked during execution with payload: {0:?}")]
+  CommandPanic(Option<String>)
 }

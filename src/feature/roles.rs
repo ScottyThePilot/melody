@@ -1,8 +1,9 @@
-use crate::blueprint::RoleOrUser;
+use crate::utils::RoleOrUser;
 
 use serenity::all::GuildId;
 use serenity::model::id::{UserId, RoleId};
 use serenity::cache::Cache;
+use poise::macros::ChoiceParameter;
 
 use std::fmt;
 use std::str::FromStr;
@@ -87,9 +88,18 @@ impl<'a> fmt::Display for DisplayUser<'a> {
 }
 
 #[repr(u8)]
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, ChoiceParameter, Serialize, Deserialize)]
 pub enum JoinRoleFilter {
-  All, Bots, Humans
+  #[default]
+  #[name = "All"]
+  #[name_localized("en-US", "All")]
+  All,
+  #[name = "Bots"]
+  #[name_localized("en-US", "Bots")]
+  Bots,
+  #[name = "Humans"]
+  #[name_localized("en-US", "Humans")]
+  Humans
 }
 
 impl JoinRoleFilter {

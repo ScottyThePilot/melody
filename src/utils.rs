@@ -3,21 +3,69 @@ pub mod youtube;
 use crate::prelude::*;
 
 use chrono::{DateTime, Utc};
-use itertools::Itertools;
-use once_cell::sync::Lazy;
-use rand::SeedableRng;
-use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use regex::Regex;
-use serenity::model::id::{EmojiId, GuildId, UserId};
+use serenity::model::id::{EmojiId, GuildId, RoleId, UserId};
 use serenity::cache::Cache;
+use poise::slash_argument::{SlashArgument, SlashArgError};
 
 use std::fmt;
+use std::ops::Deref;
+use std::sync::OnceLock;
 
 
 
-pub fn create_rng() -> SmallRng {
-  SmallRng::from_rng(rand::thread_rng()).expect("failed to seed smallrng")
+#[derive(Debug)]
+pub struct LazyRegex {
+  lock: OnceLock<Regex>,
+  pattern: &'static str
+}
+
+impl LazyRegex {
+  #[inline]
+  pub const fn new(pattern: &'static str) -> Self {
+    LazyRegex { lock: OnceLock::new(), pattern }
+  }
+
+  #[inline]
+  pub fn force(this: &Self) -> &Regex {
+    this.lock.get_or_init(|| Regex::new(this.pattern).unwrap())
+  }
+}
+
+impl Deref for LazyRegex {
+  type Target = Regex;
+
+  #[inline]
+  fn deref(&self) -> &Self::Target {
+    LazyRegex::force(self)
+  }
+}
+
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RoleOrUser {
+  User(UserId),
+  Role(RoleId)
+}
+
+#[serenity::async_trait]
+impl SlashArgument for RoleOrUser {
+  async fn extract(
+    ctx: &serenity::client::Context,
+    interaction: &serenity::model::application::CommandInteraction,
+    value: &serenity::model::application::ResolvedValue<'_>
+  ) -> Result<Self, SlashArgError> {
+    Result::or(
+      <UserId as SlashArgument>::extract(ctx, interaction, value).await.map(RoleOrUser::User),
+      <RoleId as SlashArgument>::extract(ctx, interaction, value).await.map(RoleOrUser::Role)
+    )
+  }
+
+  fn create(builder: serenity::builder::CreateCommandOption) -> serenity::builder::CreateCommandOption {
+    builder.kind(serenity::model::application::CommandOptionType::Mentionable)
+  }
 }
 
 pub fn shuffle<T>(list: &mut [T]) {
@@ -33,8 +81,8 @@ pub fn capitalize(s: impl AsRef<str>) -> String {
   })
 }
 
-pub fn kebab_case_to_words(s: impl AsRef<str>) -> String {
-  s.as_ref().split("-").map(capitalize).join(" ")
+pub fn to_words(s: impl AsRef<str>) -> String {
+  s.as_ref().split(&['-', '_']).map(capitalize).join(" ")
 }
 
 pub fn guild_name(cache: impl AsRef<Cache>, guild_id: GuildId) -> String {
@@ -42,21 +90,11 @@ pub fn guild_name(cache: impl AsRef<Cache>, guild_id: GuildId) -> String {
 }
 
 pub fn parse_emojis(message: &str) -> Vec<EmojiId> {
-  static RX: Lazy<Regex> = Lazy::new(|| Regex::new(r"<a?:[0-9a-zA-Z_]+:(\d+)>").unwrap());
+  static RX: LazyRegex = LazyRegex::new(r"<a?:[0-9a-zA-Z_]+:(\d+)>");
   RX.captures_iter(message)
     .filter_map(|captures| captures.get(1).map(<&str>::from))
     .filter_map(|id| id.parse::<u64>().ok().map(EmojiId::new))
     .collect::<Vec<EmojiId>>()
-}
-
-/// Takes message content and a user ID, returning the remainder of the message if the string
-/// mentioned the user at the start of it.
-pub fn strip_user_mention(msg: &str, user_id: UserId) -> Option<&str> {
-  let msg = msg.trim().strip_prefix("<@")?;
-  let msg = msg.strip_prefix("!").unwrap_or(msg);
-  let msg = msg.strip_prefix(&user_id.to_string())?;
-  let msg = msg.strip_prefix(">")?.trim_start();
-  Some(msg)
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -111,8 +149,8 @@ impl<S: fmt::Display> fmt::Display for Blockify<S> {
 pub struct Timestamp(pub DateTime<Utc>, pub TimestampFormat);
 
 impl Timestamp {
-  pub const fn new(timestamp: DateTime<Utc>, format: TimestampFormat) -> Self {
-    Timestamp(timestamp, format)
+  pub const fn new(datetime: DateTime<Utc>, format: TimestampFormat) -> Self {
+    Timestamp(datetime, format)
   }
 }
 
@@ -218,228 +256,6 @@ impl<T> Contextualize for Result<T, serenity::Error> {
 #[macro_export]
 macro_rules! operate {
   ($core:expr, $function:ident::<$Key:ty>, $operation:expr) => {
-    crate::data::$function($core.get::<$Key>().await, $operation).await
+    $crate::data::$function($core.get::<$Key>().await, $operation).await
   };
 }
-
-macro_rules! impl_chain_tuple {
-  ([$($Left:ident: $left:ident),*], [$($Right:ident: $right:ident),*]) => (
-    impl<$($Left,)* $($Right,)*> ChainTuple<($($Right,)*)> for ($($Left,)*) {
-      type Output = ($($Left,)* $($Right,)*);
-
-      #[inline]
-      fn chain_tuple(self, rhs: ($($Right,)*)) -> Self::Output {
-        let ($($left,)*) = self;
-        let ($($right,)*) = rhs;
-        ($($left,)* $($right,)*)
-      }
-    }
-  );
-}
-
-#[allow(unused)]
-pub trait ChainTuple<Rhs> {
-  type Output;
-
-  fn chain_tuple(self, rhs: Rhs) -> Self::Output;
-}
-
-#[allow(unused)]
-pub type Chained<Lhs, Rhs> = <Lhs as ChainTuple<Rhs>>::Output;
-
-impl_chain_tuple!([], []);
-impl_chain_tuple!([], [A: a]);
-impl_chain_tuple!([], [A: a, B: b]);
-impl_chain_tuple!([], [A: a, B: b, C: c]);
-impl_chain_tuple!([], [A: a, B: b, C: c, D: d]);
-impl_chain_tuple!([], [A: a, B: b, C: c, D: d, E: e]);
-impl_chain_tuple!([], [A: a, B: b, C: c, D: d, E: e, F: f]);
-impl_chain_tuple!([], [A: a, B: b, C: c, D: d, E: e, F: f, G: g]);
-impl_chain_tuple!([], [A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h]);
-impl_chain_tuple!([], [A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i]);
-impl_chain_tuple!([], [A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j]);
-impl_chain_tuple!([], [A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k]);
-impl_chain_tuple!([], [A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l]);
-impl_chain_tuple!([], [A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m]);
-impl_chain_tuple!([A: a], []);
-impl_chain_tuple!([A: a], [B: b]);
-impl_chain_tuple!([A: a], [B: b, C: c]);
-impl_chain_tuple!([A: a], [B: b, C: c, D: d]);
-impl_chain_tuple!([A: a], [B: b, C: c, D: d, E: e]);
-impl_chain_tuple!([A: a], [B: b, C: c, D: d, E: e, F: f]);
-impl_chain_tuple!([A: a], [B: b, C: c, D: d, E: e, F: f, G: g]);
-impl_chain_tuple!([A: a], [B: b, C: c, D: d, E: e, F: f, G: g, H: h]);
-impl_chain_tuple!([A: a], [B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i]);
-impl_chain_tuple!([A: a], [B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j]);
-impl_chain_tuple!([A: a], [B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k]);
-impl_chain_tuple!([A: a], [B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l]);
-impl_chain_tuple!([A: a], [B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m]);
-impl_chain_tuple!([A: a], [B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m, N: n]);
-impl_chain_tuple!([A: a, B: b], []);
-impl_chain_tuple!([A: a, B: b], [C: c]);
-impl_chain_tuple!([A: a, B: b], [C: c, D: d]);
-impl_chain_tuple!([A: a, B: b], [C: c, D: d, E: e]);
-impl_chain_tuple!([A: a, B: b], [C: c, D: d, E: e, F: f]);
-impl_chain_tuple!([A: a, B: b], [C: c, D: d, E: e, F: f, G: g]);
-impl_chain_tuple!([A: a, B: b], [C: c, D: d, E: e, F: f, G: g, H: h]);
-impl_chain_tuple!([A: a, B: b], [C: c, D: d, E: e, F: f, G: g, H: h, I: i]);
-impl_chain_tuple!([A: a, B: b], [C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j]);
-impl_chain_tuple!([A: a, B: b], [C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k]);
-impl_chain_tuple!([A: a, B: b], [C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l]);
-impl_chain_tuple!([A: a, B: b], [C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m]);
-impl_chain_tuple!([A: a, B: b], [C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m, N: n]);
-impl_chain_tuple!([A: a, B: b], [C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m, N: n, O: o]);
-impl_chain_tuple!([A: a, B: b, C: c], []);
-impl_chain_tuple!([A: a, B: b, C: c], [D: d]);
-impl_chain_tuple!([A: a, B: b, C: c], [D: d, E: e]);
-impl_chain_tuple!([A: a, B: b, C: c], [D: d, E: e, F: f]);
-impl_chain_tuple!([A: a, B: b, C: c], [D: d, E: e, F: f, G: g]);
-impl_chain_tuple!([A: a, B: b, C: c], [D: d, E: e, F: f, G: g, H: h]);
-impl_chain_tuple!([A: a, B: b, C: c], [D: d, E: e, F: f, G: g, H: h, I: i]);
-impl_chain_tuple!([A: a, B: b, C: c], [D: d, E: e, F: f, G: g, H: h, I: i, J: j]);
-impl_chain_tuple!([A: a, B: b, C: c], [D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k]);
-impl_chain_tuple!([A: a, B: b, C: c], [D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l]);
-impl_chain_tuple!([A: a, B: b, C: c], [D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m]);
-impl_chain_tuple!([A: a, B: b, C: c], [D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m, N: n]);
-impl_chain_tuple!([A: a, B: b, C: c], [D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m, N: n, O: o]);
-impl_chain_tuple!([A: a, B: b, C: c], [D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m, N: n, O: o, P: p]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d], []);
-impl_chain_tuple!([A: a, B: b, C: c, D: d], [E: e]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d], [E: e, F: f]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d], [E: e, F: f, G: g]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d], [E: e, F: f, G: g, H: h]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d], [E: e, F: f, G: g, H: h, I: i]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d], [E: e, F: f, G: g, H: h, I: i, J: j]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d], [E: e, F: f, G: g, H: h, I: i, J: j, K: k]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d], [E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d], [E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d], [E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m, N: n]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d], [E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m, N: n, O: o]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d], [E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m, N: n, O: o, P: p]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d], [E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m, N: n, O: o, P: p, Q: q]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e], []);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e], [F: f]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e], [F: f, G: g]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e], [F: f, G: g, H: h]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e], [F: f, G: g, H: h, I: i]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e], [F: f, G: g, H: h, I: i, J: j]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e], [F: f, G: g, H: h, I: i, J: j, K: k]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e], [F: f, G: g, H: h, I: i, J: j, K: k, L: l]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e], [F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e], [F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m, N: n]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e], [F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m, N: n, O: o]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e], [F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m, N: n, O: o, P: p]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e], [F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m, N: n, O: o, P: p, Q: q]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e], [F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m, N: n, O: o, P: p, Q: q, R: r]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f], []);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f], [G: g]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f], [G: g, H: h]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f], [G: g, H: h, I: i]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f], [G: g, H: h, I: i, J: j]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f], [G: g, H: h, I: i, J: j, K: k]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f], [G: g, H: h, I: i, J: j, K: k, L: l]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f], [G: g, H: h, I: i, J: j, K: k, L: l, M: m]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f], [G: g, H: h, I: i, J: j, K: k, L: l, M: m, N: n]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f], [G: g, H: h, I: i, J: j, K: k, L: l, M: m, N: n, O: o]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f], [G: g, H: h, I: i, J: j, K: k, L: l, M: m, N: n, O: o, P: p]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f], [G: g, H: h, I: i, J: j, K: k, L: l, M: m, N: n, O: o, P: p, Q: q]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f], [G: g, H: h, I: i, J: j, K: k, L: l, M: m, N: n, O: o, P: p, Q: q, R: r]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f], [G: g, H: h, I: i, J: j, K: k, L: l, M: m, N: n, O: o, P: p, Q: q, R: r, S: s]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g], []);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g], [H: h]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g], [H: h, I: i]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g], [H: h, I: i, J: j]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g], [H: h, I: i, J: j, K: k]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g], [H: h, I: i, J: j, K: k, L: l]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g], [H: h, I: i, J: j, K: k, L: l, M: m]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g], [H: h, I: i, J: j, K: k, L: l, M: m, N: n]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g], [H: h, I: i, J: j, K: k, L: l, M: m, N: n, O: o]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g], [H: h, I: i, J: j, K: k, L: l, M: m, N: n, O: o, P: p]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g], [H: h, I: i, J: j, K: k, L: l, M: m, N: n, O: o, P: p, Q: q]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g], [H: h, I: i, J: j, K: k, L: l, M: m, N: n, O: o, P: p, Q: q, R: r]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g], [H: h, I: i, J: j, K: k, L: l, M: m, N: n, O: o, P: p, Q: q, R: r, S: s]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g], [H: h, I: i, J: j, K: k, L: l, M: m, N: n, O: o, P: p, Q: q, R: r, S: s, T: t]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h], []);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h], [I: i]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h], [I: i, J: j]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h], [I: i, J: j, K: k]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h], [I: i, J: j, K: k, L: l]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h], [I: i, J: j, K: k, L: l, M: m]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h], [I: i, J: j, K: k, L: l, M: m, N: n]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h], [I: i, J: j, K: k, L: l, M: m, N: n, O: o]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h], [I: i, J: j, K: k, L: l, M: m, N: n, O: o, P: p]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h], [I: i, J: j, K: k, L: l, M: m, N: n, O: o, P: p, Q: q]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h], [I: i, J: j, K: k, L: l, M: m, N: n, O: o, P: p, Q: q, R: r]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h], [I: i, J: j, K: k, L: l, M: m, N: n, O: o, P: p, Q: q, R: r, S: s]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h], [I: i, J: j, K: k, L: l, M: m, N: n, O: o, P: p, Q: q, R: r, S: s, T: t]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h], [I: i, J: j, K: k, L: l, M: m, N: n, O: o, P: p, Q: q, R: r, S: s, T: t, U: u]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i], []);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i], [J: j]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i], [J: j, K: k]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i], [J: j, K: k, L: l]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i], [J: j, K: k, L: l, M: m]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i], [J: j, K: k, L: l, M: m, N: n]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i], [J: j, K: k, L: l, M: m, N: n, O: o]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i], [J: j, K: k, L: l, M: m, N: n, O: o, P: p]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i], [J: j, K: k, L: l, M: m, N: n, O: o, P: p, Q: q]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i], [J: j, K: k, L: l, M: m, N: n, O: o, P: p, Q: q, R: r]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i], [J: j, K: k, L: l, M: m, N: n, O: o, P: p, Q: q, R: r, S: s]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i], [J: j, K: k, L: l, M: m, N: n, O: o, P: p, Q: q, R: r, S: s, T: t]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i], [J: j, K: k, L: l, M: m, N: n, O: o, P: p, Q: q, R: r, S: s, T: t, U: u]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i], [J: j, K: k, L: l, M: m, N: n, O: o, P: p, Q: q, R: r, S: s, T: t, U: u, V: v]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j], []);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j], [K: k]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j], [K: k, L: l]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j], [K: k, L: l, M: m]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j], [K: k, L: l, M: m, N: n]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j], [K: k, L: l, M: m, N: n, O: o]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j], [K: k, L: l, M: m, N: n, O: o, P: p]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j], [K: k, L: l, M: m, N: n, O: o, P: p, Q: q]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j], [K: k, L: l, M: m, N: n, O: o, P: p, Q: q, R: r]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j], [K: k, L: l, M: m, N: n, O: o, P: p, Q: q, R: r, S: s]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j], [K: k, L: l, M: m, N: n, O: o, P: p, Q: q, R: r, S: s, T: t]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j], [K: k, L: l, M: m, N: n, O: o, P: p, Q: q, R: r, S: s, T: t, U: u]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j], [K: k, L: l, M: m, N: n, O: o, P: p, Q: q, R: r, S: s, T: t, U: u, V: v]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j], [K: k, L: l, M: m, N: n, O: o, P: p, Q: q, R: r, S: s, T: t, U: u, V: v, W: w]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k], []);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k], [L: l]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k], [L: l, M: m]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k], [L: l, M: m, N: n]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k], [L: l, M: m, N: n, O: o]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k], [L: l, M: m, N: n, O: o, P: p]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k], [L: l, M: m, N: n, O: o, P: p, Q: q]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k], [L: l, M: m, N: n, O: o, P: p, Q: q, R: r]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k], [L: l, M: m, N: n, O: o, P: p, Q: q, R: r, S: s]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k], [L: l, M: m, N: n, O: o, P: p, Q: q, R: r, S: s, T: t]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k], [L: l, M: m, N: n, O: o, P: p, Q: q, R: r, S: s, T: t, U: u]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k], [L: l, M: m, N: n, O: o, P: p, Q: q, R: r, S: s, T: t, U: u, V: v]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k], [L: l, M: m, N: n, O: o, P: p, Q: q, R: r, S: s, T: t, U: u, V: v, W: w]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k], [L: l, M: m, N: n, O: o, P: p, Q: q, R: r, S: s, T: t, U: u, V: v, W: w, X: x]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l], []);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l], [M: m]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l], [M: m, N: n]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l], [M: m, N: n, O: o]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l], [M: m, N: n, O: o, P: p]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l], [M: m, N: n, O: o, P: p, Q: q]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l], [M: m, N: n, O: o, P: p, Q: q, R: r]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l], [M: m, N: n, O: o, P: p, Q: q, R: r, S: s]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l], [M: m, N: n, O: o, P: p, Q: q, R: r, S: s, T: t]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l], [M: m, N: n, O: o, P: p, Q: q, R: r, S: s, T: t, U: u]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l], [M: m, N: n, O: o, P: p, Q: q, R: r, S: s, T: t, U: u, V: v]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l], [M: m, N: n, O: o, P: p, Q: q, R: r, S: s, T: t, U: u, V: v, W: w]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l], [M: m, N: n, O: o, P: p, Q: q, R: r, S: s, T: t, U: u, V: v, W: w, X: x]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l], [M: m, N: n, O: o, P: p, Q: q, R: r, S: s, T: t, U: u, V: v, W: w, X: x, Y: y]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m], []);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m], [N: n]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m], [N: n, O: o]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m], [N: n, O: o, P: p]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m], [N: n, O: o, P: p, Q: q]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m], [N: n, O: o, P: p, Q: q, R: r]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m], [N: n, O: o, P: p, Q: q, R: r, S: s]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m], [N: n, O: o, P: p, Q: q, R: r, S: s, T: t]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m], [N: n, O: o, P: p, Q: q, R: r, S: s, T: t, U: u]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m], [N: n, O: o, P: p, Q: q, R: r, S: s, T: t, U: u, V: v]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m], [N: n, O: o, P: p, Q: q, R: r, S: s, T: t, U: u, V: v, W: w]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m], [N: n, O: o, P: p, Q: q, R: r, S: s, T: t, U: u, V: v, W: w, X: x]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m], [N: n, O: o, P: p, Q: q, R: r, S: s, T: t, U: u, V: v, W: w, X: x, Y: y]);
-impl_chain_tuple!([A: a, B: b, C: c, D: d, E: e, F: f, G: g, H: h, I: i, J: j, K: k, L: l, M: m], [N: n, O: o, P: p, Q: q, R: r, S: s, T: t, U: u, V: v, W: w, X: x, Y: y, Z: z]);

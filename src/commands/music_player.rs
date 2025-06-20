@@ -1,215 +1,141 @@
 use crate::prelude::*;
-use crate::blueprint::*;
-use crate::data::{Core, MusicPlayerKey};
+use crate::data::Core;
 use crate::feature::music_player::{MusicPlayer, QueueItem, AttachmentItem, YouTubeItem};
 use crate::utils::youtube;
+use super::{MelodyContext, CommandState};
 
-use serenity::model::mention::Mentionable;
 use serenity::model::id::{ChannelId, GuildId, UserId};
 use serenity::model::channel::Attachment;
 
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 
-pub const MUSIC_PLAYER: BlueprintCommand = blueprint_command! {
-  name: "music-player",
-  description: "Play audio from various sources in voice channels",
-  info: [
-    "Player functionality may be spotty or unreliable.",
-    "If the player breaks or stops on a track indefinitely, command the bot to skip, leave the channel, and join the channel again.",
-    "Issuing the stop command will clear the queue, the leave command will not."
-  ],
-  usage: [
-    "/music-player play youtube <video-url>",
-    "/music-player play youtube-playlist <playlist-url>",
-    "/music-player play attachment <attachment>",
-    "/music-player queue show [page]",
-    "/music-player queue clear",
-    "/music-player queue remove <index>",
-    "/music-player queue shuffle",
-    "/music-player join",
-    "/music-player leave",
-    "/music-player pause <true|false>",
-    "/music-player loop <true|false>",
-    "/music-player skip",
-    "/music-player stop"
-  ],
-  examples: [
-    "/music-player play youtube 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'",
-    "/music-player join",
-    "/music-player leave",
-    "/music-player pause false",
-    "/music-player loop true",
-    "/music-player stop"
-  ],
-  plugin: "music-player",
-  context: BlueprintCommandContext::OnlyInGuild,
-  subcommands: [
-    blueprint_subcommand! {
-      name: "play",
-      description: "Adds a track to the queue to be played in your voice channel",
-      subcommands: [
-        blueprint_subcommand! {
-          name: "youtube",
-          description: "Plays a YouTube video in your voice channel",
-          arguments: [
-            blueprint_argument!(String {
-              name: "video-url",
-              description: "The URL of the YouTube video to play",
-              required: true,
-              max_length: 256
-            })
-          ],
-          function: music_player_play_youtube
-        },
-        blueprint_subcommand! {
-          name: "youtube-playlist",
-          description: "Plays a YouTube playlist in your voice channel",
-          arguments: [
-            blueprint_argument!(String {
-              name: "playlist-url",
-              description: "The URL of the YouTube playlist to play",
-              required: true,
-              max_length: 512
-            }),
-            blueprint_argument!(Boolean {
-              name: "shuffle",
-              description: "Whether to randomly shuffle the playlist or not",
-              required: false
-            })
-          ],
-          function: music_player_play_youtube_playlist
-        },
-        blueprint_subcommand! {
-          name: "attachment",
-          description: "Plays an audio file attachment in your voice channel",
-          arguments: [
-            blueprint_argument!(Attachment {
-              name: "attachment",
-              description: "The audio file attachment to play",
-              required: true
-            })
-          ],
-          function: music_player_play_attachment
-        }
-      ]
-    },
-    blueprint_subcommand! {
-      name: "queue",
-      description: "Commands relating to the music player queue",
-      subcommands: [
-        blueprint_subcommand! {
-          name: "show",
-          description: "Displays the full list of tracks in the queue",
-          arguments: [
-            blueprint_argument!(Integer {
-              name: "page",
-              description: "The page of the queue to be shown",
-              required: false,
-              min_value: 1
-            })
-          ],
-          function: music_player_queue_show
-        },
-        blueprint_subcommand! {
-          name: "clear",
-          description: "Clears the queue, except for the currently playing track",
-          arguments: [],
-          function: music_player_queue_clear
-        },
-        blueprint_subcommand! {
-          name: "remove",
-          description: "Removes an item from the queue",
-          arguments: [
-            blueprint_argument!(Integer {
-              name: "index",
-              description: "The index of the item in the queue to remove",
-              required: true,
-              min_value: 1
-            })
-          ],
-          function: music_player_queue_remove
-        },
-        blueprint_subcommand! {
-          name: "shuffle",
-          description: "Shuffles the queue, except for the currently playing track",
-          arguments: [],
-          function: music_player_queue_shuffle
-        }
-      ]
-    },
-    blueprint_subcommand! {
-      name: "join",
-      description: "Makes the bot join your voice channel",
-      arguments: [],
-      function: music_player_join
-    },
-    blueprint_subcommand! {
-      name: "leave",
-      description: "Makes the bot leave your voice channel (does not clear the queue)",
-      arguments: [],
-      function: music_player_leave
-    },
-    blueprint_subcommand! {
-      name: "pause",
-      description: "Pauses (or unpauses) the music player",
-      arguments: [
-        blueprint_argument!(Boolean {
-          name: "state",
-          description: "Whether to pause (true) or unpause (false)",
-          required: true
-        })
-      ],
-      function: music_player_pause
-    },
-    blueprint_subcommand! {
-      name: "loop",
-      description: "Enables (or disables) looping on the music player queue",
-      arguments: [
-        blueprint_argument!(Boolean {
-          name: "state",
-          description: "Whether to enable looping (true) or disable looping (false)",
-          required: true
-        })
-      ],
-      function: music_player_loop
-    },
-    blueprint_subcommand! {
-      name: "skip",
-      description: "Skips the current song in the music player queue",
-      arguments: [],
-      function: music_player_skip
-    },
-    blueprint_subcommand! {
-      name: "stop",
-      description: "Stops the music player, clearing the queue",
-      arguments: [],
-      function: music_player_stop
-    },
-    blueprint_subcommand! {
-      name: "kill",
-      description: "Makes the bot leave your voice channel, stopping the music player and clearing the queue",
-      arguments: [],
-      function: music_player_kill
-    }
-  ]
-};
 
-async fn music_player_play_youtube(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let user_id = args.interaction.user.id;
-  let video_url = args.resolve_values::<&str>()?;
 
-  send_response_result(&core, &args, {
+#[poise::command(
+  slash_command,
+  guild_only,
+  subcommands(
+    "music_player_play",
+    "music_player_queue",
+    "music_player_join",
+    "music_player_leave",
+    "music_player_pause",
+    "music_player_loop",
+    "music_player_skip",
+    "music_player_stop",
+    "music_player_kill"
+  ),
+  category = "music-player",
+  rename = "music-player",
+  name_localized("en-US", "music-player"),
+  description_localized("en-US", "Play audio from various sources in voice channels"),
+  custom_data = CommandState::new()
+    .info_localized_concat("en-US", [
+      "Player functionality may be spotty or unreliable.",
+      "If the player breaks or stops on a track indefinitely, command the bot to skip, leave the channel, and join the channel again.",
+      "Issuing the stop command will clear the queue, the leave command will not."
+    ])
+    .usage_localized("en-US", [
+      "/music-player play youtube <video-url>",
+      "/music-player play youtube-playlist <playlist-url>",
+      "/music-player play attachment <attachment>",
+      "/music-player queue show [page]",
+      "/music-player queue clear",
+      "/music-player queue remove <index>",
+      "/music-player queue shuffle",
+      "/music-player join",
+      "/music-player leave",
+      "/music-player pause <true|false>",
+      "/music-player loop <true|false>",
+      "/music-player skip",
+      "/music-player stop",
+      "/music-player kill"
+    ])
+    .examples_localized("en-US", [
+      "/music-player play youtube 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'",
+      "/music-player play youtube-playlist 'https://www.youtube.com/playlist?list=OLAK5uy_kZx-hTxk_EfczAhOP3eQT-kJlBsH7NJXs'",
+      "/music-player queue show",
+      "/music-player queue clear",
+      "/music-player queue remove 3",
+      "/music-player queue shuffle",
+      "/music-player join",
+      "/music-player leave",
+      "/music-player pause false",
+      "/music-player loop true",
+      "/music-player skip",
+      "/music-player stop",
+      "/music-player kill"
+    ])
+)]
+pub async fn music_player(_ctx: MelodyContext<'_>) -> MelodyResult {
+  Err(MelodyError::command_precondition_violation("root command"))
+}
+
+#[poise::command(
+  slash_command,
+  guild_only,
+  subcommands(
+    "music_player_play_youtube",
+    "music_player_play_youtube_playlist",
+    "music_player_play_attachment"
+  ),
+  category = "music-player",
+  rename = "play",
+  name_localized("en-US", "play"),
+  description_localized("en-US", "Adds a track to the queue to be played in your voice channel"),
+  custom_data = CommandState::new()
+    .usage_localized("en-US", [
+      "/music-player play youtube <video-url>",
+      "/music-player play youtube-playlist <playlist-url>",
+      "/music-player play attachment <attachment>"
+    ])
+    .examples_localized("en-US", [
+      "/music-player play youtube 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'",
+      "/music-player play youtube-playlist 'https://www.youtube.com/playlist?list=OLAK5uy_kZx-hTxk_EfczAhOP3eQT-kJlBsH7NJXs'"
+    ])
+)]
+async fn music_player_play(_ctx: MelodyContext<'_>) -> MelodyResult {
+  Err(MelodyError::command_precondition_violation("root command"))
+}
+
+#[poise::command(
+  slash_command,
+  guild_only,
+  category = "music-player",
+  rename = "youtube",
+  name_localized("en-US", "youtube"),
+  description_localized("en-US", "Plays a YouTube video in your voice channel"),
+  custom_data = CommandState::new()
+    .usage_localized("en-US", [
+      "/music-player play youtube <video-url>"
+    ])
+    .examples_localized("en-US", [
+      "/music-player play youtube 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'"
+    ])
+)]
+async fn music_player_play_youtube(
+  ctx: MelodyContext<'_>,
+  #[rename = "video-url"]
+  #[name_localized("en-US", "video-url")]
+  #[description_localized("en-US", "The URL of the YouTube video to play")]
+  #[max_length = 256]
+  video_url: String
+) -> MelodyResult {
+  let core = Core::from(ctx);
+  let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+  let user_id = ctx.author().id;
+
+  send_response_result(ctx, {
     match ensure_in_channel(&core, guild_id, user_id).await {
       Err(response) => Err(response),
-      Ok((music_player, channel_id)) => match youtube::parse_video_url(video_url) {
+      Ok((music_player, channel_id)) => match youtube::parse_video_url(&video_url) {
         None => Err("Invalid YouTube link".to_owned()),
         Some(video_id) => Ok({
           let item = QueueItem::YouTube(YouTubeItem { id: video_id });
           let item_str = item.to_string();
 
-          args.defer(&core).await?;
+          ctx.defer().await.context("failed to defer response")?;
 
           match music_player.play(&core, guild_id, channel_id, vec![item]).await {
             Ok(()) => format!("Added video {item_str} to queue"),
@@ -224,19 +150,45 @@ async fn music_player_play_youtube(core: Core, args: BlueprintCommandArgs) -> Me
   }).await
 }
 
-async fn music_player_play_youtube_playlist(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let user_id = args.interaction.user.id;
-  let (playlist_url, shuffle) = args.resolve_values::<(&str, Option<bool>)>()?;
+#[poise::command(
+  slash_command,
+  guild_only,
+  category = "music-player",
+  rename = "youtube-playlist",
+  name_localized("en-US", "youtube-playlist"),
+  description_localized("en-US", "Plays a YouTube playlist in your voice channel"),
+  custom_data = CommandState::new()
+    .usage_localized("en-US", [
+      "/music-player play youtube-playlist <playlist-url>"
+    ])
+    .examples_localized("en-US", [
+      "/music-player play youtube-playlist 'https://www.youtube.com/playlist?list=OLAK5uy_kZx-hTxk_EfczAhOP3eQT-kJlBsH7NJXs'"
+    ])
+)]
+async fn music_player_play_youtube_playlist(
+  ctx: MelodyContext<'_>,
+  #[rename = "playlist-url"]
+  #[name_localized("en-US", "playlist-url")]
+  #[description_localized("en-US", "The URL of the YouTube playlist to play")]
+  #[max_length = 1000]
+  playlist_url: String,
+  #[name_localized("en-US", "internal-command-text")]
+  #[description_localized("en-US", "Whether to randomly shuffle the playlist or not")]
+  #[max_length = 1000]
+  shuffle: Option<bool>
+) -> MelodyResult {
+  let core = Core::from(ctx);
+  let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+  let user_id = ctx.author().id;
   let shuffle = shuffle.unwrap_or(false);
 
-  send_response_result(&core, &args, {
+  send_response_result(ctx, {
     match ensure_in_channel(&core, guild_id, user_id).await {
       Err(response) => Err(response),
-      Ok((music_player, channel_id)) => match youtube::parse_playlist_url(playlist_url) {
+      Ok((music_player, channel_id)) => match youtube::parse_playlist_url(&playlist_url) {
         None => Err("Invalid YouTube link".to_owned()),
         Some(playlist_id) => Ok({
-          args.defer(&core).await?;
+          ctx.defer().await.context("failed to defer response")?;
 
           match youtube::get_playlist_info(music_player.ytdlp_path(), &playlist_id).await {
             Ok(playlist_info) => {
@@ -268,10 +220,25 @@ async fn music_player_play_youtube_playlist(core: Core, args: BlueprintCommandAr
   }).await
 }
 
-async fn music_player_play_attachment(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let user_id = args.interaction.user.id;
-  let attachment = args.resolve_values::<&Attachment>()?;
+#[poise::command(
+  slash_command,
+  guild_only,
+  category = "music-player",
+  rename = "attachment",
+  name_localized("en-US", "attachment"),
+  description_localized("en-US", "Plays an audio file attachment in your voice channel"),
+  custom_data = CommandState::new()
+    .usage_localized("en-US", ["/music-player play attachment <attachment>"])
+)]
+async fn music_player_play_attachment(
+  ctx: MelodyContext<'_>,
+  #[name_localized("en-US", "attachment")]
+  #[description_localized("en-US", "The audio file attachment to play")]
+  attachment: Attachment
+) -> MelodyResult {
+  let core = Core::from(ctx);
+  let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+  let user_id = ctx.author().id;
   let item = QueueItem::Attachment(AttachmentItem {
     id: attachment.id,
     filename: attachment.filename.clone(),
@@ -280,11 +247,11 @@ async fn music_player_play_attachment(core: Core, args: BlueprintCommandArgs) ->
   });
   let item_str = item.to_string();
 
-  send_response_result(&core, &args, {
+  send_response_result(ctx, {
     match ensure_in_channel(&core, guild_id, user_id).await {
       Err(response) => Err(response),
       Ok((music_player, channel_id)) => Ok({
-        args.defer(&core).await?;
+        ctx.defer().await.context("failed to defer response")?;
 
         match music_player.play(&core, guild_id, channel_id, vec![item]).await {
           Ok(()) => format!("Added attachment {item_str} to queue"),
@@ -299,20 +266,76 @@ async fn music_player_play_attachment(core: Core, args: BlueprintCommandArgs) ->
   }).await
 }
 
-async fn music_player_queue_show(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  const PER_PAGE: usize = 10;
-  let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let page = args.resolve_values::<Option<usize>>()?.unwrap_or(1) - 1;
+#[poise::command(
+  slash_command,
+  guild_only,
+  subcommands(
+    "music_player_queue_show",
+    "music_player_queue_clear",
+    "music_player_queue_shuffle",
+    "music_player_queue_remove"
+  ),
+  category = "music-player",
+  rename = "queue",
+  name_localized("en-US", "queue"),
+  description_localized("en-US", "Commands relating to the music player queue"),
+  custom_data = CommandState::new()
+    .info_localized_concat("en-US", [
+      "Player functionality may be spotty or unreliable.",
+      "If the player breaks or stops on a track indefinitely, command the bot to skip, leave the channel, and join the channel again.",
+      "Issuing the stop command will clear the queue, the leave command will not."
+    ])
+    .usage_localized("en-US", [
+      "/music-player queue show [page]",
+      "/music-player queue clear",
+      "/music-player queue remove <index>",
+      "/music-player queue shuffle"
+    ])
+    .examples_localized("en-US", [
+      "/music-player queue show",
+      "/music-player queue clear",
+      "/music-player queue remove 3",
+      "/music-player queue shuffle"
+    ])
+)]
+async fn music_player_queue(_ctx: MelodyContext<'_>) -> MelodyResult {
+  Err(MelodyError::command_precondition_violation("root command"))
+}
 
-  send_response_result(&core, &args, {
-    match ensure_in_same_channel(&core, guild_id, args.interaction.user.id).await {
+#[poise::command(
+  slash_command,
+  guild_only,
+  category = "music-player",
+  rename = "show",
+  name_localized("en-US", "show"),
+  description_localized("en-US", "Displays the full list of tracks in the queue"),
+  custom_data = CommandState::new()
+    .usage_localized("en-US", ["/music-player queue show [page]"])
+    .examples_localized("en-US", ["/music-player queue show"])
+)]
+async fn music_player_queue_show(
+  ctx: MelodyContext<'_>,
+  #[name_localized("en-US", "page")]
+  #[description_localized("en-US", "The page of the queue to display (results are grouped 10 at a time)")]
+  #[min = 1]
+  #[max = 65536]
+  page: Option<usize>
+) -> MelodyResult {
+  const PER_PAGE: usize = 10;
+
+  let core = Core::from(ctx);
+  let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+  let page = page.unwrap_or(1) - 1;
+
+  send_response_result(ctx, {
+    match ensure_in_same_channel(&core, guild_id, ctx.author().id).await {
       Err(response) => Err(response),
       Ok((music_player, ..)) => Ok({
         let (queue_list, queue_looped) = music_player.queue_list(guild_id).await;
 
-        let page_start = (page * PER_PAGE) as usize;
+        let page_start = page * PER_PAGE;
         let entries = queue_list.into_iter()
-          .enumerate().skip(page_start).take(PER_PAGE as usize)
+          .enumerate().skip(page_start).take(PER_PAGE)
           .map(|(i, queue_item)| match i == 0 {
             true => format!("Now Playing {queue_item}"),
             false => format!("`#{}` {queue_item}", i)
@@ -333,11 +356,23 @@ async fn music_player_queue_show(core: Core, args: BlueprintCommandArgs) -> Melo
   }).await
 }
 
-async fn music_player_queue_clear(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+#[poise::command(
+  slash_command,
+  guild_only,
+  category = "music-player",
+  rename = "clear",
+  name_localized("en-US", "clear"),
+  description_localized("en-US", "Clears the queue, except for the currently playing track"),
+  custom_data = CommandState::new()
+    .usage_localized("en-US", ["/music-player queue clear"])
+    .examples_localized("en-US", ["/music-player queue clear"])
+)]
+async fn music_player_queue_clear(ctx: MelodyContext<'_>) -> MelodyResult {
+  let core = Core::from(ctx);
+  let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
 
-  send_response_result(&core, &args, {
-    match ensure_in_same_channel(&core, guild_id, args.interaction.user.id).await {
+  send_response_result(ctx, {
+    match ensure_in_same_channel(&core, guild_id, ctx.author().id).await {
       Err(response) => Err(response),
       Ok((music_player, ..)) => Ok({
         music_player.queue_clear_keep_one(guild_id).await;
@@ -348,11 +383,23 @@ async fn music_player_queue_clear(core: Core, args: BlueprintCommandArgs) -> Mel
   }).await
 }
 
-async fn music_player_queue_shuffle(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+#[poise::command(
+  slash_command,
+  guild_only,
+  category = "music-player",
+  rename = "shuffle",
+  name_localized("en-US", "shuffle"),
+  description_localized("en-US", "Shuffles the queue, except for the currently playing track"),
+  custom_data = CommandState::new()
+    .usage_localized("en-US", ["/music-player queue shuffle"])
+    .examples_localized("en-US", ["/music-player queue shuffle"])
+)]
+async fn music_player_queue_shuffle(ctx: MelodyContext<'_>) -> MelodyResult {
+  let core = Core::from(ctx);
+  let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
 
-  send_response_result(&core, &args, {
-    match ensure_in_same_channel(&core, guild_id, args.interaction.user.id).await {
+  send_response_result(ctx, {
+    match ensure_in_same_channel(&core, guild_id, ctx.author().id).await {
       Err(response) => Err(response),
       Ok((music_player, ..)) => Ok({
         music_player.queue_shuffle(guild_id).await;
@@ -363,12 +410,32 @@ async fn music_player_queue_shuffle(core: Core, args: BlueprintCommandArgs) -> M
   }).await
 }
 
-async fn music_player_queue_remove(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let index = args.resolve_values::<NonZeroUsize>()?;
+#[poise::command(
+  slash_command,
+  guild_only,
+  category = "music-player",
+  rename = "remove",
+  name_localized("en-US", "remove"),
+  description_localized("en-US", "Removes an item from the queue"),
+  custom_data = CommandState::new()
+    .usage_localized("en-US", ["/music-player queue remove <index>"])
+    .examples_localized("en-US", ["/music-player queue remove 3"])
+)]
+async fn music_player_queue_remove(
+  ctx: MelodyContext<'_>,
+  #[name_localized("en-US", "index")]
+  #[description_localized("en-US", "The index of the item in the queue to remove")]
+  #[min = 1]
+  #[max = 65536]
+  index: Option<usize>
+) -> MelodyResult {
+  let core = Core::from(ctx);
+  let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+  let index = NonZeroUsize::new(index.unwrap_or(1))
+    .ok_or_else(|| MelodyError::command_precondition_violation("number between 1 and 65536"))?;
 
-  send_response_result(&core, &args, {
-    match ensure_in_same_channel(&core, guild_id, args.interaction.user.id).await {
+  send_response_result(ctx, {
+    match ensure_in_same_channel(&core, guild_id, ctx.author().id).await {
       Err(response) => Err(response),
       Ok((music_player, ..)) => Ok({
         match music_player.queue_remove(guild_id, index).await {
@@ -380,11 +447,23 @@ async fn music_player_queue_remove(core: Core, args: BlueprintCommandArgs) -> Me
   }).await
 }
 
-async fn music_player_join(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+#[poise::command(
+  slash_command,
+  guild_only,
+  category = "music-player",
+  rename = "join",
+  name_localized("en-US", "join"),
+  description_localized("en-US", "Makes the bot join your voice channel"),
+  custom_data = CommandState::new()
+    .usage_localized("en-US", ["/music-player join"])
+    .examples_localized("en-US", ["/music-player join"])
+)]
+async fn music_player_join(ctx: MelodyContext<'_>) -> MelodyResult {
+  let core = Core::from(ctx);
+  let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
 
-  send_response_result(&core, &args, {
-    match ensure_in_channel(&core, guild_id, args.interaction.user.id).await {
+  send_response_result(ctx, {
+    match ensure_in_channel(&core, guild_id, ctx.author().id).await {
       Err(response) => Err(response),
       Ok((music_player, channel_id)) => Ok({
         match music_player.join(&core, guild_id, channel_id).await {
@@ -399,11 +478,23 @@ async fn music_player_join(core: Core, args: BlueprintCommandArgs) -> MelodyResu
   }).await
 }
 
-async fn music_player_leave(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+#[poise::command(
+  slash_command,
+  guild_only,
+  category = "music-player",
+  rename = "leave",
+  name_localized("en-US", "leave"),
+  description_localized("en-US", "Makes the bot leave your voice channel (does not clear the queue)"),
+  custom_data = CommandState::new()
+    .usage_localized("en-US", ["/music-player leave"])
+    .examples_localized("en-US", ["/music-player leave"])
+)]
+async fn music_player_leave(ctx: MelodyContext<'_>) -> MelodyResult {
+  let core = Core::from(ctx);
+  let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
 
-  send_response_result(&core, &args, {
-    match ensure_in_same_channel(&core, guild_id, args.interaction.user.id).await {
+  send_response_result(ctx, {
+    match ensure_in_same_channel(&core, guild_id, ctx.author().id).await {
       Err(response) => Err(response),
       Ok((music_player, channel_id)) => Ok({
         match music_player.leave(&core, guild_id).await {
@@ -418,12 +509,28 @@ async fn music_player_leave(core: Core, args: BlueprintCommandArgs) -> MelodyRes
   }).await
 }
 
-async fn music_player_pause(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let state = args.resolve_values::<bool>()?;
+#[poise::command(
+  slash_command,
+  guild_only,
+  category = "music-player",
+  rename = "pause",
+  name_localized("en-US", "pause"),
+  description_localized("en-US", "Pauses (or unpauses) the music player"),
+  custom_data = CommandState::new()
+    .usage_localized("en-US", ["/music-player pause <true|false>"])
+    .examples_localized("en-US", ["/music-player pause false"])
+)]
+async fn music_player_pause(
+  ctx: MelodyContext<'_>,
+  #[name_localized("en-US", "state")]
+  #[description_localized("en-US", "Whether to pause (true) or unpause (false)")]
+  state: bool
+) -> MelodyResult {
+  let core = Core::from(ctx);
+  let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
 
-  send_response_result(&core, &args, {
-    match ensure_in_same_channel(&core, guild_id, args.interaction.user.id).await {
+  send_response_result(ctx, {
+    match ensure_in_same_channel(&core, guild_id, ctx.author().id).await {
       Err(response) => Err(response),
       Ok((music_player, ..)) => Ok({
         music_player.set_pause(guild_id, state).await;
@@ -436,12 +543,28 @@ async fn music_player_pause(core: Core, args: BlueprintCommandArgs) -> MelodyRes
   }).await
 }
 
-async fn music_player_loop(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let state = args.resolve_values::<bool>()?;
+#[poise::command(
+  slash_command,
+  guild_only,
+  category = "music-player",
+  rename = "loop",
+  name_localized("en-US", "loop"),
+  description_localized("en-US", "Enables (or disables) looping on the music player queue"),
+  custom_data = CommandState::new()
+    .usage_localized("en-US", ["/music-player loop <true|false>"])
+    .examples_localized("en-US", ["/music-player loop true"])
+)]
+async fn music_player_loop(
+  ctx: MelodyContext<'_>,
+  #[name_localized("en-US", "state")]
+  #[description_localized("en-US", "Whether to enable looping (true) or disable looping (false)")]
+  state: bool
+) -> MelodyResult {
+  let core = Core::from(ctx);
+  let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
 
-  send_response_result(&core, &args, {
-    match ensure_in_same_channel(&core, guild_id, args.interaction.user.id).await {
+  send_response_result(ctx, {
+    match ensure_in_same_channel(&core, guild_id, ctx.author().id).await {
       Err(response) => Err(response),
       Ok((music_player, ..)) => Ok({
         music_player.set_loop(guild_id, state).await;
@@ -454,14 +577,26 @@ async fn music_player_loop(core: Core, args: BlueprintCommandArgs) -> MelodyResu
   }).await
 }
 
-async fn music_player_skip(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+#[poise::command(
+  slash_command,
+  guild_only,
+  category = "music-player",
+  rename = "skip",
+  name_localized("en-US", "skip"),
+  description_localized("en-US", "Skips the current song in the music player queue"),
+  custom_data = CommandState::new()
+    .usage_localized("en-US", ["/music-player skip"])
+    .examples_localized("en-US", ["/music-player skip"])
+)]
+async fn music_player_skip(ctx: MelodyContext<'_>) -> MelodyResult {
+  let core = Core::from(ctx);
+  let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
 
-  send_response_result(&core, &args, {
-    match ensure_in_same_channel(&core, guild_id, args.interaction.user.id).await {
+  send_response_result(ctx, {
+    match ensure_in_same_channel(&core, guild_id, ctx.author().id).await {
       Err(response) => Err(response),
       Ok((music_player, ..)) => Ok({
-        args.defer(&core).await?;
+        ctx.defer().await.context("failed to defer response")?;
         music_player.skip(&core, guild_id).await;
 
         "Skipped currently playing track".to_owned()
@@ -470,14 +605,26 @@ async fn music_player_skip(core: Core, args: BlueprintCommandArgs) -> MelodyResu
   }).await
 }
 
-async fn music_player_stop(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+#[poise::command(
+  slash_command,
+  guild_only,
+  category = "music-player",
+  rename = "stop",
+  name_localized("en-US", "stop"),
+  description_localized("en-US", "Stops the music player, clearing the queue"),
+  custom_data = CommandState::new()
+    .usage_localized("en-US", ["/music-player stop"])
+    .examples_localized("en-US", ["/music-player stop"])
+)]
+async fn music_player_stop(ctx: MelodyContext<'_>) -> MelodyResult {
+  let core = Core::from(ctx);
+  let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
 
-  send_response_result(&core, &args, {
-    match ensure_in_same_channel(&core, guild_id, args.interaction.user.id).await {
+  send_response_result(ctx, {
+    match ensure_in_same_channel(&core, guild_id, ctx.author().id).await {
       Err(response) => Err(response),
       Ok((music_player, ..)) => Ok({
-        args.defer(&core).await?;
+        ctx.defer().await.context("failed to defer response")?;
         music_player.stop(&core, guild_id).await;
 
         "Stopped the player and cleared the queue".to_owned()
@@ -486,14 +633,26 @@ async fn music_player_stop(core: Core, args: BlueprintCommandArgs) -> MelodyResu
   }).await
 }
 
-async fn music_player_kill(core: Core, args: BlueprintCommandArgs) -> MelodyResult {
-  let guild_id = args.interaction.guild_id.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+#[poise::command(
+  slash_command,
+  guild_only,
+  category = "music-player",
+  rename = "kill",
+  name_localized("en-US", "kill"),
+  description_localized("en-US", "Makes the bot leave your voice channel, stopping the music player and clearing the queue"),
+  custom_data = CommandState::new()
+    .usage_localized("en-US", ["/music-player kill"])
+    .examples_localized("en-US", ["/music-player kill"])
+)]
+async fn music_player_kill(ctx: MelodyContext<'_>) -> MelodyResult {
+  let core = Core::from(ctx);
+  let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
 
-  send_response_result(&core, &args, {
-    match ensure_in_same_channel(&core, guild_id, args.interaction.user.id).await {
+  send_response_result(ctx, {
+    match ensure_in_same_channel(&core, guild_id, ctx.author().id).await {
       Err(response) => Err(response),
       Ok((music_player, channel_id)) => Ok({
-        args.defer(&core).await?;
+        ctx.defer().await.context("failed to defer response")?;
         match music_player.kill(&core, guild_id).await {
           Ok(()) => format!("Left channel {} and cleared the queue", channel_id.mention()),
           Err(err) => {
@@ -509,7 +668,7 @@ async fn music_player_kill(core: Core, args: BlueprintCommandArgs) -> MelodyResu
 async fn ensure_in_channel(
   core: &Core, guild_id: GuildId, user_id: UserId
 ) -> Result<(Arc<MusicPlayer>, ChannelId), String> {
-  let music_player = get_music_player(core).await?;
+  let music_player = get_music_player(core)?;
   if let Some(channel_id) = user_voice_channel(core, guild_id, user_id) {
     Ok((music_player, channel_id))
   } else {
@@ -520,7 +679,7 @@ async fn ensure_in_channel(
 async fn ensure_in_same_channel(
   core: &Core, guild_id: GuildId, user_id: UserId
 ) -> Result<(Arc<MusicPlayer>, ChannelId), String> {
-  let music_player = get_music_player(core).await?;
+  let music_player = get_music_player(core)?;
   if let Some(channel_id) = user_voice_channel(core, guild_id, user_id) {
     if let Some(bot_channel_id) = music_player.current_channel(core, guild_id).await {
       if channel_id == bot_channel_id {
@@ -536,21 +695,13 @@ async fn ensure_in_same_channel(
   }
 }
 
-async fn send_response_result(
-  core: &Core, args: &BlueprintCommandArgs,
-  result: Result<String, String>
-) -> MelodyResult {
-  match result {
-    Ok(response) => {
-      BlueprintCommandResponse::new(response)
-        .send(&core, &args).await?;
-    },
-    Err(response) => {
-      BlueprintCommandResponse::new_ephemeral(response)
-        .send(&core, &args).await?;
-    }
+async fn send_response_result(ctx: MelodyContext<'_>, result: Result<String, String>) -> MelodyResult {
+  let response = match result {
+    Ok(response) => response,
+    Err(response) => response
   };
 
+  ctx.reply(response).await.context("failed to send reply")?;
   Ok(())
 }
 
@@ -559,6 +710,6 @@ fn user_voice_channel(core: &Core, guild_id: GuildId, user_id: UserId) -> Option
   Some(channel_id)
 }
 
-async fn get_music_player(core: &Core) -> Result<Arc<MusicPlayer>, String> {
-  core.get::<MusicPlayerKey>().await.ok_or_else(|| "Music player is not enabled".to_owned())
+fn get_music_player(core: &Core) -> Result<Arc<MusicPlayer>, String> {
+  core.state.music_player.clone().ok_or_else(|| "Music player is not enabled".to_owned())
 }

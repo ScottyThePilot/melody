@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use crate::data::Core;
 
-use itertools::Itertools;
 use log::Level;
 use melody_commander::{Command, CommandError, CommandOutput, Parsed, resolve_args};
 use serenity::model::id::GuildId;
@@ -102,15 +101,15 @@ impl TargetArgs {
         agent.info(format!("Disabled plugin {plugin} for guild ({guild_id})"));
       },
       TargetArgs::FeedsRespawnAll => {
-        let feed_wrapper = agent.core.get::<crate::data::FeedKey>().await;
+        let feed_wrapper = agent.core.state.feed.clone();
         feed_wrapper.lock().await.respawn_all(&agent.core).await;
       },
       TargetArgs::FeedsAbortAll => {
-        let feed_wrapper = agent.core.get::<crate::data::FeedKey>().await;
+        let feed_wrapper = agent.core.state.feed.clone();
         feed_wrapper.lock().await.abort_all();
       },
       TargetArgs::FeedsListTasks => {
-        let feed_wrapper = agent.core.get::<crate::data::FeedKey>().await;
+        let feed_wrapper = agent.core.state.feed.clone();
         for (feed, running) in feed_wrapper.lock().await.tasks() {
           agent.debug(format!("Feed task: {feed} ({})", if running { "running" } else { "stopped" }));
         };
@@ -185,7 +184,9 @@ impl InputAgent {
   }
 
   async fn plugins_modify(&self, guild_id: GuildId, operation: impl FnOnce(&mut HashSet<String>)) -> MelodyResult {
-    crate::commands::register_guild_commands(&self.core, guild_id, {
+    use crate::data::MelodyFrameworkKey;
+    let framework = self.core.get::<MelodyFrameworkKey>().await.lock_owned().await;
+    crate::commands::register_guild_commands(&self.core, &framework.options().commands, guild_id, {
       self.core.operate_persist_commit(|persist| {
         let guild_plugins = persist.get_guild_plugins_mut(guild_id);
         operation(guild_plugins);

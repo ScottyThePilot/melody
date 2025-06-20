@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use crate::feature::roles::{Granter, JoinRoleFilter};
 use crate::feature::feed::{Feed, FeedState};
-use crate::utils::Contextualize;
 
 use serenity::model::id::{GuildId, UserId, RoleId};
 use singlefile::container_shared_async::ContainerSharedAsyncWritableLocked;
@@ -91,11 +90,11 @@ impl PersistGuilds {
     Ok(PersistGuilds { guilds })
   }
 
-  pub async fn get(wrapper: PersistGuildsWrapper, id: GuildId) -> Option<PersistGuildContainer> {
+  pub async fn get(wrapper: &PersistGuildsWrapper, id: GuildId) -> Option<PersistGuildContainer> {
     wrapper.read().await.guilds.get(&id).cloned()
   }
 
-  pub async fn get_default(wrapper: PersistGuildsWrapper, id: GuildId) -> MelodyResult<PersistGuildContainer> {
+  pub async fn get_default(wrapper: &PersistGuildsWrapper, id: GuildId) -> MelodyResult<PersistGuildContainer> {
     use std::collections::hash_map::Entry;
     match wrapper.write().await.guilds.entry(id) {
       Entry::Occupied(occupied) => Ok(occupied.get().clone()),

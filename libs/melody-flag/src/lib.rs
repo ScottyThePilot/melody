@@ -19,4 +19,8 @@ impl Flag {
   pub fn set(&self, state: bool) {
     self.0.store(state, Ordering::Relaxed);
   }
+
+  pub fn swap(&self, state: bool) -> bool {
+    self.0.swap(state, Ordering::Relaxed)
+  }
 }
