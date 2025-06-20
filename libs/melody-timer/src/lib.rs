@@ -42,13 +42,17 @@ pub struct TimerReceiver<T, D: Deadline> {
 }
 
 impl<T, D: Deadline> TimerReceiver<T, D> {
-  fn next_deadline(&self) -> Option<Instant> {
-    self.deadlines.peek().map(|item| item.deadline.to_instant())
+  pub fn next_deadline(&self) -> Option<D> {
+    self.deadlines.peek().map(|item| item.deadline)
+  }
+
+  pub fn next_deadline_instant(&self) -> Option<Instant> {
+    self.next_deadline().map(Deadline::to_instant)
   }
 
   pub async fn next(&mut self) -> Option<T> {
     loop {
-      let result = match self.next_deadline() {
+      let result = match self.next_deadline_instant() {
         None => Err(self.deadlines.push(self.reciever.recv().await?)),
         Some(instant) => tokio::select! {
           item = self.reciever.recv() => Err(self.deadlines.push(item?)),
@@ -65,6 +69,10 @@ impl<T, D: Deadline> TimerReceiver<T, D> {
 
   pub fn push(&mut self, value: T, deadline: D) {
     self.deadlines.push(TimerItem { deadline, value });
+  }
+
+  pub fn remaining(&self) -> usize {
+    self.deadlines.len()
   }
 }
 
