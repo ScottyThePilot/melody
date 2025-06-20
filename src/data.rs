@@ -14,13 +14,13 @@ pub use self::config::*;
 pub use self::persist::*;
 
 use reqwest::Client as HttpClient;
+use serenity::cache::Cache;
 use serenity::client::{Client, Context};
 use serenity::framework::Framework;
 use serenity::gateway::{ShardManager, ShardRunnerInfo};
-use serenity::model::id::{GuildId, UserId, ShardId};
-use serenity::model::guild::Member;
-use serenity::cache::Cache;
 use serenity::http::{CacheHttp, Http};
+use serenity::model::guild::Member;
+use serenity::model::id::{GuildId, UserId, ShardId};
 use serenity::prelude::{TypeMap, TypeMapKey};
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
@@ -47,7 +47,6 @@ macro_rules! key {
 
 key!(pub struct MelodyFrameworkKey, FrameworkWrapper<crate::handler::MelodyFramework>);
 key!(pub struct ShardManagerKey, Arc<ShardManager>);
-key!(pub struct DataKey, Arc<State>);
 
 #[derive(Debug)]
 pub struct State {
@@ -140,18 +139,6 @@ pub struct CacheHttpData {
   pub data: Arc<RwLock<TypeMap>>,
   pub cache: Arc<Cache>,
   pub http: Arc<Http>
-}
-
-impl CacheHttpData {
-  pub async fn init_core(self, state: Arc<State>) -> Core {
-    self.data.write().await.insert::<DataKey>(Arc::clone(&state));
-    Core {
-      state,
-      data: self.data,
-      cache: self.cache,
-      http: self.http
-    }
-  }
 }
 
 impl CacheHttp for CacheHttpData {

@@ -42,35 +42,6 @@ pub async fn feeds(_ctx: MelodyContext<'_>) -> MelodyResult {
   Err(MelodyError::command_precondition_violation("root command"))
 }
 
-/*
-blueprint_subcommand! {
-  name: "add",
-  description: "Adds a feed to this server",
-  arguments: [
-    blueprint_argument!(String {
-      name: "feed-type",
-      description: "What type this feed should be",
-      required: true,
-      choices: [
-        ("twitter", "twitter"),
-        ("youtube", "youtube")
-      ]
-    }),
-    blueprint_argument!(String {
-      name: "feed-source",
-      description: "For YouTube feeds, the channel ID, for Twitter feeds, the account's handle",
-      required: true,
-      max_length: 64
-    }),
-    blueprint_argument!(Channel {
-      name: "channel",
-      description: "Which channel messages for this feed should be sent",
-      required: false
-    })
-  ],
-  function: feeds_add
-}
-*/
 #[poise::command(
   slash_command,
   guild_only,
@@ -125,30 +96,6 @@ async fn feeds_add(
   Ok(())
 }
 
-/*
-blueprint_subcommand! {
-  name: "remove",
-  description: "Removes a feed from this server",
-  arguments: [
-    blueprint_argument!(String {
-      name: "feed-type",
-      description: "What type this feed should be",
-      required: true,
-      choices: [
-        ("twitter", "twitter"),
-        ("youtube", "youtube")
-      ]
-    }),
-    blueprint_argument!(String {
-      name: "feed-source",
-      description: "For YouTube feeds, the channel ID, for Twitter feeds, the account's handle",
-      required: true,
-      max_length: 64
-    })
-  ],
-  function: feeds_remove
-}
-*/
 #[poise::command(
   slash_command,
   guild_only,
@@ -194,14 +141,6 @@ async fn feeds_remove(
   Ok(())
 }
 
-/*
-blueprint_subcommand! {
-  name: "remove-all",
-  description: "Removes all feeds from this server",
-  arguments: [],
-  function: feeds_remove_all
-}
-*/
 #[poise::command(
   slash_command,
   guild_only,
@@ -228,14 +167,6 @@ async fn feeds_remove_all(ctx: MelodyContext<'_>) -> MelodyResult {
   Ok(())
 }
 
-/*
-blueprint_subcommand! {
-  name: "list",
-  description: "Lists all feeds in this server",
-  arguments: [],
-  function: feeds_list
-}
-*/
 #[poise::command(
   slash_command,
   guild_only,

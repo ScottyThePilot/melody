@@ -13,10 +13,10 @@ use poise::framework::Framework as PoiseFramework;
 use poise::structs::{FrameworkError as PoiseFrameworkError, FrameworkOptions as PoiseFrameworkOptions};
 use rand::seq::SliceRandom;
 use reqwest::Client as HttpClient;
-use serenity::gateway::ShardManager;
-use serenity::model::channel::Message;
 use serenity::client::{Context, Client, EventHandler};
+use serenity::gateway::ShardManager;
 use serenity::model::channel::{Reaction, ReactionType};
+use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::model::guild::Member;
 use serenity::model::id::{ChannelId, GuildId, UserId, RoleId};
@@ -97,8 +97,7 @@ pub async fn launch(event_receiver: MpscReceiver<StratumEvent>) -> MelodyResult 
     data.insert::<ShardManagerKey>(client.shard_manager.clone());
   }).await;
 
-  let core = CacheHttpData::from(&client).init_core(state).await;
-
+  let core = Core::new(&client, state);
   let events_task = tokio::spawn(events_task(
     core.clone(), client.shard_manager.clone(), event_receiver
   ));

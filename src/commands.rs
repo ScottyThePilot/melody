@@ -2,7 +2,6 @@ mod connect_four;
 mod feed;
 mod general;
 mod music_player;
-mod role_playing;
 mod roles;
 
 use crate::prelude::*;
@@ -11,12 +10,12 @@ use crate::utils::{Blockify, Contextualize};
 
 use poise::{Context as PoiseContext, Command as PoiseCommand};
 use poise::reply::CreateReply;
+use serenity::builder::{CreateEmbed, CreateEmbedFooter};
 use serenity::cache::Cache;
-use serenity::model::id::GuildId;
 use serenity::model::application::Command as SerenityCommand;
 use serenity::model::colour::Color;
+use serenity::model::id::GuildId;
 use serenity::model::permissions::Permissions;
-use serenity::builder::{CreateEmbed, CreateEmbedFooter};
 
 use std::collections::{HashSet, HashMap};
 use std::sync::Arc;
@@ -32,7 +31,7 @@ const COMMANDS: &[fn() -> MelodyCommand] = &[
   self::general::banner,
   self::general::emoji_stats,
   self::general::console,
-  self::role_playing::roll,
+  self::general::roll,
   self::feed::feeds,
   self::music_player::music_player,
   self::connect_four::connect_four,
