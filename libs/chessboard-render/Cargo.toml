@@ -7,4 +7,4 @@ edition = "2021"
 glam = { version = "0.30" }
 shakmaty = { version = "0.26.0" }
 image = { version = "0.24", default-features = false, features = ["png"] }
-once_cell = { version = "1.17" }
+fontdue = "0.9.3"

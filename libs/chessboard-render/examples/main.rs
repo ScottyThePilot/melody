@@ -42,7 +42,12 @@ fn main() {
 
   let color = game.turn().other();
 
-  let img = chessboard_render::render_board(&game, color, &[Square::D8, Square::H4]);
+  let img = chessboard_render::render_board(
+    &game, color,
+    &[Square::D8, Square::H4],
+    ["White", "Black"]
+  );
+
   let writer = BufWriter::new(File::create("board.png").unwrap());
   chessboard_render::encode_image_rgb(&img, writer).unwrap();
 }

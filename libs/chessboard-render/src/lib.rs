@@ -1,29 +1,41 @@
 pub extern crate shakmaty;
 pub extern crate image;
 
+use fontdue::{Font, FontSettings};
+use fontdue::layout::{Layout, LayoutSettings, CoordinateSystem, TextStyle, HorizontalAlign, VerticalAlign};
 use glam::{Vec2, UVec2};
 use shakmaty::{Color, Piece, Role, Square, File, Rank, Position};
-use image::{DynamicImage, GenericImageView, GrayAlphaImage, ImageResult, Pixel, Rgb, Rgba, RgbImage, RgbaImage};
-use once_cell::sync::OnceCell;
+use image::{DynamicImage, GenericImageView, ImageResult, Pixel, Rgb, Rgba, RgbImage, RgbaImage};
 
 use std::io::{Read, Write};
+use std::sync::OnceLock;
 
-type GrayAlphaSubImage<'a> = image::SubImage<&'a GrayAlphaImage>;
-type Pos = (u32, u32);
+type RgbaSubImage<'a> = image::SubImage<&'a RgbaImage>;
 
-const BOARD_FULL: u32 = BOARD + EDGE * 2;
-const BOARD: u32 = 512;
-const TILE: u32 = 64;
-const EDGE: u32 = 32;
+const TILE_SIZE: u32 = 64;
+const MARGIN_SIZE: UVec2 = UVec2::new(16, 32);
+const BOARD_SIZE: UVec2 = UVec2::splat(TILE_SIZE * 8);
+const BOARD_SIZE_FULL: UVec2 = UVec2::new(
+  BOARD_SIZE.x + MARGIN_SIZE.x * 2,
+  BOARD_SIZE.y + MARGIN_SIZE.y * 2
+);
 
+const NAME_POS_TOP: UVec2 = UVec2::new(
+  BOARD_SIZE_FULL.x / 2,
+  MARGIN_SIZE.y / 2
+);
+
+const NAME_POS_BOTTOM: UVec2 = UVec2::new(
+  BOARD_SIZE_FULL.x / 2,
+  BOARD_SIZE_FULL.y - MARGIN_SIZE.y / 2
+);
+
+const BLACK: Rgb<u8> = Rgb([0x00; 3]);
 const DARK: Rgb<u8> = Rgb([0xb5, 0x88, 0x63]);
 const LIGHT: Rgb<u8> = Rgb([0xf0, 0xd9, 0xb5]);
 const DARK_HIGHLIGHT: Rgb<u8> = Rgb([0xaa, 0xa2, 0x3b]);
 const LIGHT_HIGHLIGHT: Rgb<u8> = Rgb([0xce, 0xd2, 0x6b]);
 const NEUTRAL: Rgb<u8> = Rgb([0xc9, 0xa3, 0x7e]);
-
-const RANKS: Pos = (0, EDGE);
-const FILES: Pos = (EDGE, BOARD + EDGE);
 
 /// Returns true if the given position has a king that is in check
 fn should_show_check(position: &impl Position, square: Square) -> bool {
@@ -44,32 +56,87 @@ pub fn init() {
 /// Renders the given chessboard to a image buffer.
 /// The chessboard will be oriented from the perspective specified by `side`.
 /// Squares included in `highlighted` will be highlighted in green.
-pub fn render_board(position: &impl Position, side: Color, highlighted: &[Square]) -> RgbImage {
+pub fn render_board(
+  position: &impl Position,
+  side: Color,
+  highlighted: &[Square],
+  players: [&str; 2]
+) -> RgbImage {
   let assets = Assets::instance();
-  let mut img = RgbImage::from_pixel(BOARD_FULL, BOARD_FULL, NEUTRAL);
-  // get the correct textures for the files and ranks markings and copy them to the image buffer
-  copy(&mut img, &*assets.get_files(side), FILES);
-  copy(&mut img, &*assets.get_ranks(side), RANKS);
+  let mut img = RgbImage::from_pixel(BOARD_SIZE_FULL.x, BOARD_SIZE_FULL.y, NEUTRAL);
+
+  let (top_player, bottom_player) = match side {
+    Color::White => (players[1], players[0]),
+    Color::Black => (players[0], players[1])
+  };
+
+  fill_text(&mut img, BLACK, top_player, TextOptions {
+    pos: NAME_POS_TOP,
+    size: 24.0,
+    horizontal_align: HorizontalAlign::Center,
+    vertical_align: VerticalAlign::Middle,
+    window: UVec2::splat(1024)
+  });
+
+  fill_text(&mut img, BLACK, bottom_player, TextOptions {
+    pos: NAME_POS_BOTTOM,
+    size: 24.0,
+    horizontal_align: HorizontalAlign::Center,
+    vertical_align: VerticalAlign::Middle,
+    window: UVec2::splat(1024)
+  });
+
   for bx in 0u32..8u32 {
     for by in 0u32..8u32 {
       // the board is flipped vertically, to put the player on the bottom
       // if the player is black, it is flipped vertically (again), and horizontally
-      let (x, y) = match side {
-        Color::Black => (7 - bx, by),
-        Color::White => (bx, 7 - by)
+      let pos = match side {
+        Color::Black => UVec2::new(7 - bx, by),
+        Color::White => UVec2::new(bx, 7 - by)
       };
 
-      let pos = (x * TILE + EDGE, y * TILE + EDGE);
+      let show_rank_numbers = pos.x == 0;
+      let show_file_letters = pos.y == 7;
+
+      let pos = pos * TILE_SIZE + MARGIN_SIZE;
       let square = Square::from_coords(File::new(bx), Rank::new(by));
       // the chess board always has dark squares in the bottom left and top right
       let is_dark = bx % 2 == by % 2;
-      let color = if highlighted.contains(&square) {
-        if is_dark { DARK_HIGHLIGHT } else { LIGHT_HIGHLIGHT }
-      } else {
-        if is_dark { DARK } else { LIGHT }
+      let is_highlighted = highlighted.contains(&square);
+      let color = get_color(is_dark, is_highlighted);
+      let color_inverted = get_color(!is_dark, is_highlighted);
+
+      fill_square(&mut img, color, pos, TILE_SIZE);
+
+      // Only print file letters for the bottom-most rank of tiles
+      if show_file_letters {
+        let file_letter = (b'A' + bx as u8) as char;
+        let mut text_temporary = [0x00];
+        let text = file_letter.encode_utf8(&mut text_temporary);
+
+        fill_text(&mut img, color_inverted, text, TextOptions {
+          pos: pos + TILE_SIZE - UVec2::new(2, 0),
+          size: 12.0,
+          horizontal_align: HorizontalAlign::Right,
+          vertical_align: VerticalAlign::Bottom,
+          window: UVec2::splat(256)
+        });
       };
 
-      fill_square(&mut img, color, pos, TILE);
+      // Only print rank numbers for the right-most file of tiles
+      if show_rank_numbers {
+        let rank_number = (b'1' + by as u8) as char;
+        let mut text_temporary = [0x00];
+        let text = rank_number.encode_utf8(&mut text_temporary);
+
+        fill_text(&mut img, color_inverted, text, TextOptions {
+          pos: pos + UVec2::new(2, 0),
+          size: 12.0,
+          horizontal_align: HorizontalAlign::Left,
+          vertical_align: VerticalAlign::Top,
+          window: UVec2::splat(256)
+        });
+      };
 
       if should_show_check(position, square) {
         copy(&mut img, &assets.check, pos);
@@ -84,29 +151,22 @@ pub fn render_board(position: &impl Position, side: Color, highlighted: &[Square
   img
 }
 
+fn get_color(is_dark: bool, is_highlighted: bool) -> Rgb<u8> {
+  if is_dark {
+    if is_highlighted { DARK_HIGHLIGHT } else { DARK }
+  } else {
+    if is_highlighted { LIGHT_HIGHLIGHT } else { LIGHT }
+  }
+}
+
 struct Assets {
-  files: GrayAlphaImage,
-  ranks: GrayAlphaImage,
-  pieces: GrayAlphaImage,
+  font: Font,
+  pieces: RgbaImage,
   check: RgbaImage
 }
 
 impl Assets {
-  fn get_files(&self, color: Color) -> GrayAlphaSubImage {
-    self.files.view(0, match color {
-      Color::White => 0,
-      Color::Black => EDGE
-    }, BOARD, EDGE)
-  }
-
-  fn get_ranks(&self, color: Color) -> GrayAlphaSubImage {
-    self.ranks.view(match color {
-      Color::White => 0,
-      Color::Black => EDGE
-    }, 0, EDGE, BOARD)
-  }
-
-  fn get_piece(&self, piece: Piece) -> GrayAlphaSubImage {
+  fn get_piece(&self, piece: Piece) -> RgbaSubImage {
     let column = match piece.role {
       Role::Queen => 0,
       Role::King => 1,
@@ -121,19 +181,20 @@ impl Assets {
       Color::Black => 1
     };
 
-    self.pieces.view(column * TILE, row * TILE, TILE, TILE)
+    self.pieces.view(column * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE)
   }
 
   fn instance() -> &'static Self {
-    static INSTANCE: OnceCell<Assets> = OnceCell::new();
+    static INSTANCE: OnceLock<Assets> = OnceLock::new();
     INSTANCE.get_or_init(Self::load)
   }
 
   fn load() -> Self {
+    let font_settings = FontSettings::default();
+
     Assets {
-      files: decode_static_image(include_bytes!("../assets/files.png")).into_luma_alpha8(),
-      ranks: decode_static_image(include_bytes!("../assets/ranks.png")).into_luma_alpha8(),
-      pieces: decode_static_image(include_bytes!("../assets/pieces.png")).into_luma_alpha8(),
+      font: Font::from_bytes(include_bytes!("../assets/Roboto-Bold.ttf").as_slice(), font_settings).unwrap(),
+      pieces: decode_static_image(include_bytes!("../assets/Pieces.png")).into_rgba8(),
       check: generate_image_check()
     }
   }
@@ -149,24 +210,83 @@ fn generate_image_check() -> RgbaImage {
   })
 }
 
-fn fill_square(destination: &mut RgbImage, pixel: Rgb<u8>, (x, y): Pos, size: u32) {
-  debug_assert!(destination.width() > x + size);
-  debug_assert!(destination.height() > y + size);
-  for sx in x..(x + size) {
-    for sy in y..(y + size) {
+fn fill_square(destination: &mut RgbImage, pixel: Rgb<u8>, pos: UVec2, size: u32) {
+  debug_assert!(destination.width() > pos.x + size);
+  debug_assert!(destination.height() > pos.y + size);
+  for sx in pos.x..(pos.x + size) {
+    for sy in pos.y..(pos.y + size) {
       destination.put_pixel(sx, sy, pixel);
     };
   };
 }
 
-fn copy<P, S>(destination: &mut RgbImage, source: &S, (x, y): Pos)
+struct TextOptions {
+  pos: UVec2,
+  size: f32,
+  horizontal_align: HorizontalAlign,
+  vertical_align: VerticalAlign,
+  window: UVec2
+}
+
+fn fill_text(destination: &mut RgbImage, pixel: Rgb<u8>, text: &str, text_options: TextOptions) {
+  let font = &Assets::instance().font;
+
+  let mut layout = Layout::new(CoordinateSystem::PositiveYDown);
+  layout.reset(&LayoutSettings {
+    x: text_options.pos.x as f32,
+    y: text_options.pos.y as f32,
+    max_width: Some(text_options.window.x as f32),
+    max_height: Some(text_options.window.y as f32),
+    horizontal_align: text_options.horizontal_align,
+    vertical_align: text_options.vertical_align,
+    ..LayoutSettings::default()
+  });
+
+  let global_offset = UVec2::new(
+    match text_options.horizontal_align {
+      HorizontalAlign::Left => 0,
+      HorizontalAlign::Center => text_options.window.x / 2,
+      HorizontalAlign::Right => text_options.window.x
+    },
+    match text_options.vertical_align {
+      VerticalAlign::Top => 0,
+      VerticalAlign::Middle => text_options.window.y / 2,
+      VerticalAlign::Bottom => text_options.window.y
+    }
+  );
+
+  layout.append(&[font], &TextStyle::new(text, text_options.size, 0));
+  for glyph in layout.glyphs() {
+    let glyph_offset = Vec2::new(glyph.x, glyph.y).round().as_ivec2()
+      .saturating_sub_unsigned(global_offset);
+    let (metrics, bitmap) = font.rasterize_config(glyph.key);
+    for sx in 0..metrics.width {
+      for sy in 0..metrics.height {
+        let alpha = bitmap[sx + sy * metrics.width];
+        if alpha == 0x00 { continue };
+
+        let s_pos = UVec2::new(sx as u32, sy as u32);
+        let destination_pos = (s_pos).checked_add_signed(glyph_offset)
+          .filter(|pos| destination.width() > pos.x && destination.height() > pos.y);
+        if let Some(destination_pos) = destination_pos {
+          let source_pixel = Rgba([pixel[0], pixel[1], pixel[2], alpha]);
+          let destination_pixel = destination.get_pixel_mut(destination_pos.x, destination_pos.y);
+          *destination_pixel = blend(*destination_pixel, source_pixel);
+        };
+      };
+    };
+  };
+}
+
+fn copy<P, S>(destination: &mut RgbImage, source: &S, pos: UVec2)
 where P: Pixel<Subpixel = u8>, S: GenericImageView<Pixel = P> {
   for sx in 0..source.width() {
     for sy in 0..source.height() {
       let source_pixel = source.get_pixel(sx, sy).to_rgba();
+      let pos = pos + UVec2::new(sx, sy);
       // don't do anything if the source pixel is transparent
       if source_pixel[3] != 0x00 {
-        let destination_pixel = destination.get_pixel_mut(sx + x, sy + y);
+        let destination_pixel = destination.get_pixel_mut(pos.x, pos.y);
         *destination_pixel = blend(*destination_pixel, source_pixel);
       };
     };
