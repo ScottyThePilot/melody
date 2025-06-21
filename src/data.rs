@@ -16,7 +16,6 @@ use melody_ratelimiter::RateLimiter;
 use reqwest::Client as HttpClient;
 use serenity::cache::Cache;
 use serenity::client::{Client, Context};
-use serenity::framework::Framework;
 use serenity::gateway::{ShardManager, ShardRunnerInfo};
 use serenity::http::{CacheHttp, Http};
 use serenity::model::guild::Member;
@@ -45,7 +44,7 @@ macro_rules! key {
   };
 }
 
-key!(pub struct MelodyFrameworkKey, FrameworkWrapper<crate::handler::MelodyFramework>);
+key!(pub struct MelodyFrameworkKey, crate::handler::MelodyFramework);
 key!(pub struct ShardManagerKey, Arc<ShardManager>);
 
 #[derive(Debug)]
@@ -319,9 +318,21 @@ impl From<&Core> for Core {
   }
 }
 
-impl<'a> From<crate::commands::MelodyContext<'a>> for Core {
-  fn from(value: crate::commands::MelodyContext) -> Self {
+impl<'a> From<crate::handler::MelodyContext<'a>> for Core {
+  fn from(value: crate::handler::MelodyContext) -> Self {
     Core::new(value.serenity_context(), Arc::clone(value.data()))
+  }
+}
+
+impl<'a> From<crate::handler::MelodyHandlerContext<'a>> for Core {
+  fn from(value: crate::handler::MelodyHandlerContext<'a>) -> Self {
+    Core::new(value.context, value.state)
+  }
+}
+
+impl<'a> From<&crate::handler::MelodyHandlerContext<'a>> for Core {
+  fn from(value: &crate::handler::MelodyHandlerContext<'a>) -> Self {
+    Core::new(value.context.clone(), value.state.clone())
   }
 }
 
@@ -353,40 +364,4 @@ pub async fn operate_ratelimiter<T, F, R>(container: RateLimiter<T>, operation: 
 where F: FnOnce(&mut T) -> R {
   let mut timeslice = container.get().await;
   operation(&mut *timeslice)
-}
-
-
-
-#[derive(Debug)]
-pub struct FrameworkWrapper<F> {
-  inner: Arc<RwLock<F>>
-}
-
-impl<F: Framework> FrameworkWrapper<F> {
-  pub fn new(inner: F) -> Self {
-    FrameworkWrapper {
-      inner: Arc::new(RwLock::new(inner))
-    }
-  }
-
-  pub async fn lock_owned(self) -> tokio::sync::OwnedRwLockReadGuard<F> {
-    self.inner.read_owned().await
-  }
-}
-
-impl<F: Framework> Clone for FrameworkWrapper<F> {
-  fn clone(&self) -> Self {
-    FrameworkWrapper { inner: Arc::clone(&self.inner) }
-  }
-}
-
-#[serenity::async_trait]
-impl<F: Framework> Framework for FrameworkWrapper<F> {
-  async fn init(&mut self, client: &Client) {
-    self.inner.write().await.init(client).await;
-  }
-
-  async fn dispatch(&self, ctx: Context, event: serenity::all::FullEvent) {
-    self.inner.read().await.dispatch(ctx, event).await;
-  }
 }

@@ -1814,6 +1814,7 @@ dependencies = [
  "log",
  "melody-commander",
  "melody-flag",
+ "melody-framework",
  "melody-ratelimiter",
  "melody-rss-feed",
  "poise",

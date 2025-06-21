@@ -19,6 +19,7 @@ itertools = { version = "0.14" }
 log = { version = "0.4" }
 melody-commander = { path = "./libs/melody-commander" }
 melody-flag = { path = "./libs/melody-flag" }
+melody-framework = { path = "./libs/melody-framework" }
 melody-ratelimiter = { path = "./libs/melody-ratelimiter" }
 melody-rss-feed = { path = "./libs/melody-rss-feed" }
 rand = { version = "0.8", features = ["small_rng"] }

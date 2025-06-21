@@ -7,13 +7,13 @@ use crate::feature::feed::{Feed, FeedEventHandler};
 pub use self::input::InputAgent;
 
 use melody_flag::Flag;
+use melody_framework::MelodyHandler;
 use melody_rss_feed::{TwitterPost, YouTubeVideo};
 use melody_rss_feed::url::Url;
-use poise::framework::Framework as PoiseFramework;
-use poise::structs::{FrameworkError as PoiseFrameworkError, FrameworkOptions as PoiseFrameworkOptions};
 use rand::seq::SliceRandom;
 use reqwest::Client as HttpClient;
-use serenity::client::{Context, Client, EventHandler};
+use serenity::builder::CreateAllowedMentions;
+use serenity::client::Client;
 use serenity::gateway::ShardManager;
 use serenity::model::channel::{Reaction, ReactionType};
 use serenity::model::channel::Message;
@@ -30,22 +30,14 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
+pub type MelodyCommand = melody_framework::MelodyCommand<State, MelodyError>;
+pub type MelodyContext<'a> = melody_framework::MelodyContext<'a, State, MelodyError>;
+pub type MelodyFramework = melody_framework::MelodyFramework<State, MelodyError>;
+pub type MelodyFrameworkError = melody_framework::MelodyFrameworkError<MelodyError>;
+pub type MelodyFrameworkOptions = melody_framework::MelodyFrameworkOptions<State, MelodyError>;
+pub type MelodyHandlerContext<'a> = melody_framework::MelodyHandlerContext<'a, State, MelodyError>;
 
 
-// This awful hack is necessary here due to the following:
-// - I need to do setup after the `cache_ready` event with the command list,
-//   rather than just the `ready` event with the command list.
-// - I need to do this because I need the guild list (provided by `cache_ready`)
-//   in order to determine which guilds should recieve exclusive commands.
-// - The command list cannot be stored elsewhere because Poise commands
-//   cannot be cloned, and the framework appears to be impossible to retrieve
-//   literally anywhere once it's been instantiated and the client created.
-// - Thus I need to create an `Arc<RwLock<Framework>>` wrapper around the
-//   Poise framework so that I can share it directly with the handler
-//   so that I can retrieve the command list during `cache_ready`.
-
-pub type MelodyFramework = PoiseFramework<Arc<State>, MelodyError>;
-pub type MelodyFrameworkError<'a> = PoiseFrameworkError<'a, Arc<State>, MelodyError>;
 
 /// Performs a clean launch of the bot
 pub async fn launch(event_receiver: MpscReceiver<StratumEvent>) -> MelodyResult {
@@ -64,31 +56,23 @@ pub async fn launch(event_receiver: MpscReceiver<StratumEvent>) -> MelodyResult 
     activities, http_client, FeedHandler
   ).await?);
 
-  let framework = FrameworkWrapper::new({
-    let state = Arc::clone(&state);
-    MelodyFramework::builder()
-      .options(PoiseFrameworkOptions {
-        owners: HashSet::from_iter([owner_id]),
-        commands: crate::commands::create_commands_list(),
-        on_error: |framework_error| Box::pin(async {
-          if let Err(error) = on_error(framework_error).await {
-            error!("error handler: {error}");
-          };
-        }),
-        ..PoiseFrameworkOptions::default()
-      })
-      .setup(move |_ctx, _ready, _framework| {
-        Box::pin(std::future::ready(Ok(state)))
-      })
-      .build()
+  let allowed_mentions = CreateAllowedMentions::default()
+    .all_users(true).replied_user(true);
+
+  let framework = MelodyFramework::new(MelodyFrameworkOptions {
+    state: state.clone(),
+    commands: crate::commands::create_commands_list(),
+    handler: Arc::new(Handler { setup_done: Flag::new(false) }),
+    allowed_mentions: Some(allowed_mentions),
+    reply_callback: None,
+    manual_cooldowns: false,
+    require_cache_for_guild_check: false,
+    owners: HashSet::from_iter([owner_id]),
+    initialize_owners: true
   });
 
   let mut client = Client::builder(&token, intents)
     .framework(framework.clone())
-    .event_handler(Handler {
-      setup_done: Flag::new(false),
-      state: Arc::clone(&state)
-    })
     .register_songbird_from_config(SongbirdConfig::default())
     .await.context("failed to init client")?;
 
@@ -109,19 +93,38 @@ pub async fn launch(event_receiver: MpscReceiver<StratumEvent>) -> MelodyResult 
   Ok(())
 }
 
+#[derive(Debug)]
 struct Handler {
-  setup_done: Flag,
-  state: Arc<State>
+  setup_done: Flag
 }
 
-impl Handler {
-  fn get_core(&self, ctx: Context) -> Core {
-    Core::new(ctx, Arc::clone(&self.state))
+#[serenity::async_trait]
+impl MelodyHandler<State, MelodyError> for Handler {
+  async fn ready(&self, _ctx: MelodyHandlerContext<'_>, ready_info: Ready) {
+    info!("Bot connected: {} ({})", ready_info.user.tag(), ready_info.user.id);
   }
 
-  async fn setup(&self, ctx: Context, guilds: &[GuildId]) {
+  async fn cache_ready(&self, ctx: MelodyHandlerContext<'_>, guilds: Vec<GuildId>) {
     if self.setup_done.swap(true) { return };
-    let core = self.get_core(ctx);
+    let core = Core::from(&ctx);
+
+    for (guild_id, guild_name) in crate::utils::iter_guilds(&ctx, &guilds) {
+      info!("Discovered guild: {guild_name} ({guild_id})");
+    };
+
+    if core.is_new_build() {
+      info!("New build detected, registering commands");
+      let guilds = core.operate_persist(|persist| {
+        guilds.iter()
+          .map(|&guild_id| (guild_id, persist.get_guild_plugins(guild_id)))
+          .collect::<Vec<(GuildId, HashSet<String>)>>()
+      }).await;
+
+      ctx.register_commands(guilds).await
+        .context("failed to register commands").log_error();
+    } else {
+      info!("Old build detected, commands will not be re-registered");
+    };
 
     // Attempt to register all subscribed RSS feeds
     let feed_wrapper = core.state.feed.clone();
@@ -144,33 +147,10 @@ impl Handler {
         tokio::spawn(respawn_feed_tasks_task(core.clone()))
       });
     }).await;
-
-    if core.is_new_build() {
-      info!("New build detected, registering commands");
-      let framework = core.get::<MelodyFrameworkKey>().await.lock_owned().await;
-      crate::commands::register_commands(&core, &framework.options().commands, &guilds).await.log_error();
-    } else {
-      info!("Old build detected, commands will not be re-registered");
-    };
-  }
-}
-
-#[serenity::async_trait]
-impl EventHandler for Handler {
-  async fn ready(&self, _ctx: Context, ready_info: Ready) {
-    info!("Bot connected: {} ({})", ready_info.user.tag(), ready_info.user.id);
   }
 
-  async fn cache_ready(&self, ctx: Context, guilds: Vec<GuildId>) {
-    for (guild_id, guild_name) in crate::commands::iter_guilds(&ctx, &guilds) {
-      info!("Discovered guild: {guild_name} ({guild_id})");
-    };
-
-    self.setup(ctx, &guilds).await;
-  }
-
-  async fn message(&self, ctx: Context, message: Message) {
-    let core = self.get_core(ctx);
+  async fn message(&self, ctx: MelodyHandlerContext<'_>, message: Message) {
+    let core = Core::from(ctx);
 
     let me = core.current_user_id();
     if message.author.id == me || message.content.is_empty() { return };
@@ -216,14 +196,14 @@ impl EventHandler for Handler {
     };
   }
 
-  async fn guild_member_addition(&self, ctx: Context, mut member: Member) {
-    let core = self.get_core(ctx);
+  async fn guild_member_addition(&self, ctx: MelodyHandlerContext<'_>, mut member: Member) {
+    let core = Core::from(ctx);
 
     add_join_roles(&core, &mut member).await.log_error();
   }
 
-  async fn reaction_add(&self, ctx: Context, reaction: Reaction) {
-    let core = self.get_core(ctx);
+  async fn reaction_add(&self, ctx: MelodyHandlerContext<'_>, reaction: Reaction) {
+    let core = Core::from(ctx);
 
     if let (Some(guild_id), Some(user_id), ReactionType::Custom { id: emoji_id, .. }) = (reaction.guild_id, reaction.user_id, reaction.emoji) {
       core.operate_persist_guild_commit(guild_id, |persist_guild| {
@@ -233,8 +213,8 @@ impl EventHandler for Handler {
     };
   }
 
-  async fn reaction_remove(&self, ctx: Context, reaction: Reaction) {
-    let core = self.get_core(ctx);
+  async fn reaction_remove(&self, ctx: MelodyHandlerContext<'_>, reaction: Reaction) {
+    let core = Core::from(ctx);
 
     if let (Some(guild_id), Some(user_id), ReactionType::Custom { id: emoji_id, .. }) = (reaction.guild_id, reaction.user_id, reaction.emoji) {
       core.operate_persist_guild_commit(guild_id, |persist_guild| {
@@ -243,75 +223,15 @@ impl EventHandler for Handler {
       }).await.log_error();
     };
   }
-}
 
-async fn on_error(framework_error: MelodyFrameworkError<'_>) -> MelodyResult {
-  const NO_PREFIX_COMMANDS: MelodyError = MelodyError::command_precondition_violation("no prefix commands");
+  async fn command_error(&self, ctx: MelodyContext<'_>, error: MelodyFrameworkError) {
+    error!("command error ({}): {error}", ctx.command().name);
 
-  let (to_user, to_log) = match framework_error {
-    PoiseFrameworkError::Setup { .. } => return Ok(()),
-    PoiseFrameworkError::EventHandler { error, .. } => (None, Some(error)),
-    PoiseFrameworkError::Command { ctx, error, .. } => {
-      (Some((ctx, "An unexpected internal error has occurred".to_owned())), Some(error))
-    },
-    PoiseFrameworkError::SubcommandRequired { .. } => (None, Some(NO_PREFIX_COMMANDS)),
-    PoiseFrameworkError::CommandPanic { ctx, payload, .. } => {
-      let error = MelodyError::CommandError(MelodyCommandError::CommandPanic(payload));
-      (Some((ctx, "An unexpected internal error has occurred".to_owned())), Some(error))
-    },
-    PoiseFrameworkError::ArgumentParse { error, input, .. } => {
-      let error = MelodyError::CommandError(MelodyCommandError::ArgumentParse(input, error));
-      (None, Some(error))
-    },
-    PoiseFrameworkError::CommandStructureMismatch { ctx, description, .. } => {
-      let error = MelodyError::CommandError(MelodyCommandError::InvalidCommandStructure(ctx.command.name.clone(), description));
-      (None, Some(error))
-    },
-    PoiseFrameworkError::CooldownHit { ctx, remaining_cooldown, .. } => {
-      let response = format!("Please wait {:.2} seconds before using that action again", remaining_cooldown.as_secs_f64());
-      (Some((ctx, response)), None)
-    },
-    PoiseFrameworkError::MissingBotPermissions { ctx, missing_permissions, .. } => {
-      let response = format!("I am missing '{missing_permissions}' permissions");
-      (Some((ctx, response)), None)
-    },
-    PoiseFrameworkError::MissingUserPermissions { ctx, missing_permissions, .. } => {
-      let response = if let Some(missing_permissions) = missing_permissions {
-        format!("You do not have permission to do that (missing '{missing_permissions}' permissions)")
-      } else {
-        format!("You do not have permission to do that")
-      };
-
-      (Some((ctx, response)), None)
-    },
-    PoiseFrameworkError::NotAnOwner { ctx, .. } => {
-      (Some((ctx, "You do not have permission to do that (you are not a bot owner)".to_owned())), None)
-    },
-    PoiseFrameworkError::GuildOnly { ctx, .. } => {
-      (Some((ctx, "This command cannot be used in DM channels".to_owned())), None)
-    },
-    PoiseFrameworkError::DmOnly { ctx, .. } => {
-      (Some((ctx, "This command cannot be used in guild channels".to_owned())), None)
-    },
-    PoiseFrameworkError::NsfwOnly { ctx, .. } => {
-      (Some((ctx, "This command can only be used in NSFW channels".to_owned())), None)
-    },
-    PoiseFrameworkError::DynamicPrefix { .. } => (None, Some(NO_PREFIX_COMMANDS)),
-    PoiseFrameworkError::UnknownCommand { .. } => (None, Some(NO_PREFIX_COMMANDS)),
-    framework_error => {
-      return poise::builtins::on_error(framework_error).await.context("poise::builtins::on_error")
-    }
-  };
-
-  if let Some((ctx, response)) = to_user {
-    ctx.reply(response).await.context("failed to send error handler reply")?;
-  };
-
-  if let Some(error) = to_log {
-    error!("{error}");
-  };
-
-  Ok(())
+    let response = framework_error_friendly_name(error);
+    ctx.reply(response).await
+      .context("failed to send error handler reply")
+      .log_error();
+  }
 }
 
 const FEED_POST_DELAY: Duration = Duration::from_secs(3);
@@ -456,4 +376,46 @@ async fn cycle_activity_task(core: Core) {
     interval.tick().await;
     core.randomize_activities().await;
   };
+}
+
+fn framework_error_friendly_name(framework_error: MelodyFrameworkError) -> String {
+  match framework_error {
+    MelodyFrameworkError::Command(..) => {
+      "An unexpected internal error has occurred".to_owned()
+    },
+    MelodyFrameworkError::CommandPanic(..) => {
+      "An unexpected internal error has occurred".to_owned()
+    },
+    MelodyFrameworkError::CommandStructureMismatch(..) => {
+      "An unexpected internal error has occurred".to_owned()
+    },
+    MelodyFrameworkError::ArgumentParse(..) => {
+      "An unexpected internal error has occurred".to_owned()
+    },
+    MelodyFrameworkError::CooldownHit(remaining_cooldown) => {
+      format!("Please wait {:.2} seconds before using that action again", remaining_cooldown.as_secs_f64())
+    },
+    MelodyFrameworkError::MissingBotPermissions(missing_permissions) => {
+      format!("I am missing '{missing_permissions}' permissions")
+    },
+    MelodyFrameworkError::MissingUserPermissions(missing_permissions) => {
+      if let Some(missing_permissions) = missing_permissions {
+        format!("You do not have permission to do that (missing '{missing_permissions}' permissions)")
+      } else {
+        format!("You do not have permission to do that")
+      }
+    },
+    MelodyFrameworkError::NotAnOwner => {
+      "You do not have permission to do that (you are not a bot owner)".to_owned()
+    },
+    MelodyFrameworkError::GuildOnly => {
+      "This command cannot be used in DM channels".to_owned()
+    },
+    MelodyFrameworkError::DmOnly => {
+      "This command cannot be used in guild channels".to_owned()
+    },
+    MelodyFrameworkError::NsfwOnly => {
+      "This command cannot be used in NSFW channels".to_owned()
+    }
+  }
 }

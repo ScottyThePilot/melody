@@ -89,8 +89,8 @@ fn create_application_commands<'a, S: 'a, E: 'a>(commands: impl IntoIterator<Ite
 
 pub async fn register_guild_commands<S, E>(
   cache_http: &(impl AsRef<Http> + AsRef<Cache>),
-  guild_id: GuildId,
   commands: &[MelodyCommand<S, E>],
+  guild_id: GuildId,
   categories: HashSet<String>
 ) -> Result<(), SerenityError> {
   let guild_name = guild_name(cache_http, guild_id);
@@ -111,8 +111,8 @@ pub async fn register_guild_commands<S, E>(
 
 pub async fn register_commands<S, E>(
   cache_http: &(impl AsRef<Http> + AsRef<Cache>),
+  commands: &[MelodyCommand<S, E>],
   guilds: impl IntoIterator<Item = (GuildId, HashSet<String>)>,
-  commands: &[MelodyCommand<S, E>]
 ) -> Result<(), SerenityError> {
   let common_commands_count = iter_common_commands(commands).count();
   let exclusive_commands_count = iter_exclusive_commands(commands).count();
@@ -121,7 +121,7 @@ pub async fn register_commands<S, E>(
   let commands_list = create_application_commands(iter_common_commands(commands));
   SerenityCommand::set_global_commands(cache_http, commands_list).await?;
   for (guild_id, categories) in guilds {
-    register_guild_commands(cache_http, guild_id, commands, categories).await?;
+    register_guild_commands(cache_http, commands, guild_id, categories).await?;
   };
 
   Ok(())
@@ -197,11 +197,11 @@ pub fn find_command<'a, S, E>(commands: &'a [MelodyCommand<S, E>], locale: &str,
 }
 
 pub fn build_help_reply<S, E>(
-  locale: &str,
   argument: Option<&str>,
   commands: &[MelodyCommand<S, E>],
   categories: &HashSet<String>,
   permissions: Permissions,
+  locale: &str,
   text: HelpLocalization,
   embed_color: Color
 ) -> Option<CreateReply> {
@@ -219,22 +219,22 @@ pub fn build_help_reply<S, E>(
       .filter(|command| permissions.contains(command.required_permissions | command.default_member_permissions))
       .filter(|command| command.category.as_deref().map_or(true, |category| categories.contains(category)));
     if let Some(command) = command {
-      build_command_help_embed(locale, command, text, embed_builder)
+      build_command_help_embed(command, locale, text, embed_builder)
         .map(|embed_builder| reply_builder.embed(embed_builder))
     } else {
       Some(reply_builder.content(text.fallback_message))
     }
   } else {
-    build_command_list_help_embed(locale, commands, categories, permissions, text, embed_builder)
+    build_command_list_help_embed(commands, categories, permissions, locale, text, embed_builder)
       .map(|embed_builder| reply_builder.embed(embed_builder))
   }
 }
 
 pub fn build_command_list_help_embed<S, E>(
-  locale: &str,
   commands: &[MelodyCommand<S, E>],
   categories: &HashSet<String>,
   permissions: Permissions,
+  locale: &str,
   text: HelpLocalization,
   embed_builder: CreateEmbed
 ) -> Option<CreateEmbed> {
@@ -263,8 +263,8 @@ pub fn build_command_list_help_embed<S, E>(
 }
 
 pub fn build_command_help_embed<S, E>(
-  locale: &str,
   command: &MelodyCommand<S, E>,
+  locale: &str,
   text: HelpLocalization,
   embed_builder: CreateEmbed
 ) -> Option<CreateEmbed> {

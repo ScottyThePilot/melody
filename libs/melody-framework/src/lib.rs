@@ -27,6 +27,8 @@ use serenity::builder::CreateAllowedMentions;
 use serenity::model::Permissions;
 use serenity::model::id::{GuildId, UserId};
 use serenity::gateway::ShardManager;
+use serenity::cache::Cache;
+use serenity::http::{CacheHttp, Http};
 use serenity::client::{Client, Context, FullEvent};
 use serenity::framework::Framework;
 use thiserror::Error;
@@ -48,7 +50,6 @@ pub struct MelodyFrameworkOptions<S, E> {
   pub reply_callback: Option<fn(MelodyContext<'_, S, E>, CreateReply) -> CreateReply>,
   pub manual_cooldowns: bool,
   pub require_cache_for_guild_check: bool,
-  pub skip_checks_for_owners: bool,
   pub initialize_owners: bool
 }
 
@@ -67,7 +68,6 @@ where
       .options(PoiseFrameworkOptions {
         commands: self.commands,
         on_error: crate::on_error,
-        skip_checks_for_owners: self.skip_checks_for_owners,
         allowed_mentions: self.allowed_mentions,
         reply_callback: self.reply_callback,
         manual_cooldowns: self.manual_cooldowns,
@@ -101,7 +101,6 @@ impl<S: fmt::Debug, E> fmt::Debug for MelodyFrameworkOptions<S, E> {
       .field("reply_callback", &self.reply_callback)
       .field("manual_cooldowns", &self.manual_cooldowns)
       .field("require_cache_for_guild_check", &self.require_cache_for_guild_check)
-      .field("skip_checks_for_owners", &self.skip_checks_for_owners)
       .field("initialize_owners", &self.initialize_owners)
       .finish()
   }
@@ -142,11 +141,34 @@ pub struct MelodyHandlerContext<'a, S, E> {
 
 impl<'a, S, E> MelodyHandlerContext<'a, S, E> {
   pub async fn register_guild_commands(&self, guild_id: GuildId, categories: HashSet<String>) -> Result<(), SerenityError> {
-    crate::commands::register_guild_commands(&self.context, guild_id, self.commands, categories).await
+    crate::commands::register_guild_commands(&self.context, self.commands, guild_id, categories).await
   }
 
   pub async fn register_commands(&self, guilds: impl IntoIterator<Item = (GuildId, HashSet<String>)>) -> Result<(), SerenityError> {
-    crate::commands::register_commands(&self.context, guilds, &self.commands).await
+    crate::commands::register_commands(&self.context, self.commands, guilds).await
+  }
+}
+
+impl<'a, S, E> CacheHttp for MelodyHandlerContext<'a, S, E>
+where S: Send + Sync, E: Send + Sync {
+  fn cache(&self) -> Option<&Arc<Cache>> {
+    Some(&self.context.cache)
+  }
+
+  fn http(&self) -> &Http {
+    &self.context.http
+  }
+}
+
+impl<'a, S, E> AsRef<Cache> for MelodyHandlerContext<'a, S, E> {
+  fn as_ref(&self) -> &Cache {
+    &self.context.cache
+  }
+}
+
+impl<'a, S, E> AsRef<Http> for MelodyHandlerContext<'a, S, E> {
+  fn as_ref(&self) -> &Http {
+    &self.context.http
   }
 }
 

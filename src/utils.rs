@@ -72,17 +72,11 @@ pub fn shuffle<T>(list: &mut [T]) {
   list.shuffle(&mut rand::thread_rng());
 }
 
-pub fn capitalize(s: impl AsRef<str>) -> String {
-  let mut chars = s.as_ref().chars();
-  chars.next().map_or_else(String::new, |first| {
-    first.to_uppercase()
-      .chain(chars.map(|c| c.to_ascii_lowercase()))
-      .collect()
+pub fn iter_guilds<'a>(cache: impl AsRef<Cache> + 'a, guilds: &'a [GuildId])
+-> impl Iterator<Item = (GuildId, String)> + 'a {
+  guilds.into_iter().map(move |&guild_id| {
+    (guild_id, guild_name(cache.as_ref(), guild_id))
   })
-}
-
-pub fn to_words(s: impl AsRef<str>) -> String {
-  s.as_ref().split(&['-', '_']).map(capitalize).join(" ")
 }
 
 pub fn guild_name(cache: impl AsRef<Cache>, guild_id: GuildId) -> String {
@@ -132,12 +126,6 @@ impl<T> fmt::Debug for NoDebug<T> {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Blockify<S>(pub S);
-
-impl<S: fmt::Display> Blockify<S> {
-  pub const fn new(s: S) -> Self {
-    Blockify(s)
-  }
-}
 
 impl<S: fmt::Display> fmt::Display for Blockify<S> {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

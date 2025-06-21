@@ -185,14 +185,14 @@ impl InputAgent {
 
   async fn plugins_modify(&self, guild_id: GuildId, operation: impl FnOnce(&mut HashSet<String>)) -> MelodyResult {
     use crate::data::MelodyFrameworkKey;
-    let framework = self.core.get::<MelodyFrameworkKey>().await.lock_owned().await;
-    crate::commands::register_guild_commands(&self.core, &framework.options().commands, guild_id, {
+    let commands = self.core.get::<MelodyFrameworkKey>().await.read_commands_owned().await;
+    melody_framework::commands::register_guild_commands(&self.core, &commands, guild_id, {
       self.core.operate_persist_commit(|persist| {
         let guild_plugins = persist.get_guild_plugins_mut(guild_id);
         operation(guild_plugins);
         Ok(guild_plugins.clone())
       }).await?
-    }).await
+    }).await.context("failed to register commands")
   }
 
   #[allow(unused)]
