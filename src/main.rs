@@ -104,12 +104,12 @@ pub type MelodyResult<T = ()> = Result<T, MelodyError>;
 /// An error that can occur during operation of the bot.
 #[derive(Debug, Error)]
 pub enum MelodyError {
-  #[error("File Error: {1} ({0})")]
-  FileError(MelodyFileError, String),
-  #[error("Serenity Error: {1} ({0})")]
-  SerenityError(SerenityError, String),
+  #[error("File Error: {0}")]
+  FileError(#[from] defy::ContextualError<MelodyFileError>),
+  #[error("Serenity Error: {0}")]
+  SerenityError(#[from] defy::ContextualError<SerenityError>),
   #[error("Command Error: {0}")]
-  CommandError(MelodyCommandError),
+  CommandError(#[from] MelodyCommandError),
   #[error("Input Error: {0}")]
   InputError(#[from] crate::melody_commander::CommandError),
   #[error("YT-DLP Error: {0}")]
@@ -117,14 +117,16 @@ pub enum MelodyError {
 }
 
 impl MelodyError {
-  pub const COMMAND_NOT_IN_GUILD: Self = MelodyError::CommandError(MelodyCommandError::NotInGuild);
-
-  pub const fn command_precondition_violation(message: &'static str) -> Self {
-    MelodyError::CommandError(MelodyCommandError::PreconditionViolation(message))
-  }
+  pub const COMMAND_NOT_IN_GUILD: Self = MelodyError::CommandError(MelodyCommandError::NOT_IN_GUILD);
+  pub const COMMAND_PRECONDITION_VIOLATION_ARGUMENTS: Self = MelodyError::CommandError(MelodyCommandError::PRECONDITION_VIOLATION_ARGUMENTS);
+  pub const COMMAND_PRECONDITION_VIOLATION_ROOT_COMMAND: Self = MelodyError::CommandError(MelodyCommandError::PRECONDITION_VIOLATION_ROOT_COMMAND);
 
   pub const fn command_cache_failure(message: &'static str) -> Self {
-    MelodyError::CommandError(MelodyCommandError::CacheFailure(message))
+    MelodyError::CommandError(MelodyCommandError::cache_failure(message))
+  }
+
+  pub const fn command_precondition_violation(message: &'static str) -> Self {
+    MelodyError::CommandError(MelodyCommandError::precondition_violation(message))
   }
 }
 
@@ -143,18 +145,26 @@ pub enum MelodyFileError {
   CleverBotLog(#[from] cleverbot_logs::Error)
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum MelodyCommandError {
   #[error("not in a guild")]
   NotInGuild,
   #[error("data not cached: {0}")]
   CacheFailure(&'static str),
   #[error("precondition violated: {0}")]
-  PreconditionViolation(&'static str),
-  #[error("failed to parse command argument {0:?}: {1}")]
-  ArgumentParse(Option<String>, Box<dyn std::error::Error + Send + Sync + 'static>),
-  #[error("failed to parse interaction for command {0:?}: {1}")]
-  InvalidCommandStructure(String, &'static str),
-  #[error("command panicked during execution with payload: {0:?}")]
-  CommandPanic(Option<String>)
+  PreconditionViolation(&'static str)
+}
+
+impl MelodyCommandError {
+  pub const NOT_IN_GUILD: Self = MelodyCommandError::NotInGuild;
+  pub const PRECONDITION_VIOLATION_ARGUMENTS: Self = MelodyCommandError::precondition_violation("arguments");
+  pub const PRECONDITION_VIOLATION_ROOT_COMMAND: Self = MelodyCommandError::precondition_violation("root command");
+
+  pub const fn cache_failure(message: &'static str) -> Self {
+    Self::CacheFailure(message)
+  }
+
+  pub const fn precondition_violation(message: &'static str) -> Self {
+    Self::PreconditionViolation(message)
+  }
 }

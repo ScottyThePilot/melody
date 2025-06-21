@@ -3,6 +3,7 @@ pub mod youtube;
 use crate::prelude::*;
 
 use chrono::{DateTime, Utc};
+use defy::ContextualError;
 use rand::seq::SliceRandom;
 use regex::Regex;
 use serenity::model::id::{EmojiId, GuildId, RoleId, UserId};
@@ -192,7 +193,7 @@ impl<T> Contextualize for std::io::Result<T> {
 
   fn context(self, context: impl Into<String>) -> Self::Output {
     self.map_err(|error| {
-      MelodyError::FileError(MelodyFileError::Io(error), context.into())
+      MelodyError::FileError(ContextualError::new(MelodyFileError::Io(error), context.into()))
     })
   }
 }
@@ -203,7 +204,7 @@ where singlefile::Error<FE>: Into<MelodyFileError> {
 
   fn context(self, context: impl Into<String>) -> Self::Output {
     self.map_err(|error| {
-      MelodyError::FileError(error.into(), context.into())
+      MelodyError::FileError(ContextualError::new(error.into(), context.into()))
     })
   }
 }
@@ -214,11 +215,14 @@ where singlefile::Error<FE>: Into<MelodyFileError> {
 
   fn context(self, context: impl Into<String>) -> Self::Output {
     self.map_err(|error| {
-      MelodyError::FileError(match error {
-        singlefile::UserError::Format(error) => singlefile::Error::Format(error).into(),
-        singlefile::UserError::Io(error) => singlefile::Error::Io(error).into(),
-        singlefile::UserError::User(error) => return error
-      }, context.into())
+      MelodyError::FileError(ContextualError::new(
+        match error {
+          singlefile::UserError::Format(error) => singlefile::Error::Format(error).into(),
+          singlefile::UserError::Io(error) => singlefile::Error::Io(error).into(),
+          singlefile::UserError::User(error) => return error
+        },
+        context.into()
+      ))
     })
   }
 }
@@ -228,7 +232,7 @@ impl<T> Contextualize for Result<T, cleverbot_logs::Error> {
 
   fn context(self, context: impl Into<String>) -> Self::Output {
     self.map_err(|error| {
-      MelodyError::FileError(MelodyFileError::CleverBotLog(error), context.into())
+      MelodyError::FileError(ContextualError::new(MelodyFileError::CleverBotLog(error), context.into()))
     })
   }
 }
@@ -237,7 +241,7 @@ impl<T> Contextualize for Result<T, serenity::Error> {
   type Output = MelodyResult<T>;
 
   fn context(self, context: impl Into<String>) -> Self::Output {
-    self.map_err(|error| MelodyError::SerenityError(error, context.into()))
+    self.map_err(|error| MelodyError::SerenityError(ContextualError::new(error, context.into())))
   }
 }
 

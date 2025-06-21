@@ -6,7 +6,6 @@ mod roles;
 
 use crate::prelude::*;
 use crate::data::*;
-use crate::utils::Contextualize;
 use crate::handler::{MelodyCommand, MelodyContext};
 
 pub use melody_framework::commands::{CommandMetaData, HelpLocalization, build_help_reply};

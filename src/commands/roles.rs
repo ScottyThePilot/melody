@@ -36,7 +36,7 @@ const MANAGED_ROLE: &str = "The role you have specified is a managed role and ma
     ])
 )]
 pub async fn role(_ctx: MelodyContext<'_>) -> MelodyResult {
-  Err(MelodyError::command_precondition_violation("root command"))
+  Err(MelodyError::COMMAND_PRECONDITION_VIOLATION_ROOT_COMMAND)
 }
 
 #[poise::command(
@@ -192,7 +192,7 @@ fn is_granter(persist_guild: &PersistGuild, member: &Member, role_id: RoleId) ->
     ])
 )]
 pub async fn grant_roles(_ctx: MelodyContext<'_>) -> MelodyResult {
-  Err(MelodyError::command_precondition_violation("root command"))
+  Err(MelodyError::COMMAND_PRECONDITION_VIOLATION_ROOT_COMMAND)
 }
 
 #[poise::command(
@@ -456,7 +456,7 @@ fn user_description(core: &Core, user_id: UserId) -> String {
     ])
 )]
 pub async fn join_roles(_ctx: MelodyContext<'_>) -> MelodyResult {
-  Err(MelodyError::command_precondition_violation("root command"))
+  Err(MelodyError::COMMAND_PRECONDITION_VIOLATION_ROOT_COMMAND)
 }
 
 #[poise::command(

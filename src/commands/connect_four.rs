@@ -52,7 +52,7 @@ use serenity::model::id::UserId;
     ])
 )]
 pub async fn connect_four(_ctx: MelodyContext<'_>) -> MelodyResult {
-  Err(MelodyError::command_precondition_violation("root command"))
+  Err(MelodyError::COMMAND_PRECONDITION_VIOLATION_ROOT_COMMAND)
 }
 
 #[poise::command(
@@ -200,7 +200,7 @@ async fn connect_four_play(
       Some((game, player_color)) => {
         let &opponent = game.players().other(&player).unwrap();
         let column = crate::feature::connect_four::validate_column(column)
-          .ok_or(MelodyError::command_precondition_violation("arguments"))?;
+          .ok_or(MelodyError::COMMAND_PRECONDITION_VIOLATION_ARGUMENTS)?;
 
         match game.play_move(player_color, column) {
           UserGameResult::Victory(board) => {

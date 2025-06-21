@@ -39,7 +39,7 @@ use poise::macros::ChoiceParameter;
     ])
 )]
 pub async fn feeds(_ctx: MelodyContext<'_>) -> MelodyResult {
-  Err(MelodyError::command_precondition_violation("root command"))
+  Err(MelodyError::COMMAND_PRECONDITION_VIOLATION_ROOT_COMMAND)
 }
 
 #[poise::command(

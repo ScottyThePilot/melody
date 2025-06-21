@@ -69,7 +69,7 @@ use std::sync::Arc;
     ])
 )]
 pub async fn music_player(_ctx: MelodyContext<'_>) -> MelodyResult {
-  Err(MelodyError::command_precondition_violation("root command"))
+  Err(MelodyError::COMMAND_PRECONDITION_VIOLATION_ROOT_COMMAND)
 }
 
 #[poise::command(
@@ -96,7 +96,7 @@ pub async fn music_player(_ctx: MelodyContext<'_>) -> MelodyResult {
     ])
 )]
 async fn music_player_play(_ctx: MelodyContext<'_>) -> MelodyResult {
-  Err(MelodyError::command_precondition_violation("root command"))
+  Err(MelodyError::COMMAND_PRECONDITION_VIOLATION_ROOT_COMMAND)
 }
 
 #[poise::command(
@@ -299,7 +299,7 @@ async fn music_player_play_attachment(
     ])
 )]
 async fn music_player_queue(_ctx: MelodyContext<'_>) -> MelodyResult {
-  Err(MelodyError::command_precondition_violation("root command"))
+  Err(MelodyError::COMMAND_PRECONDITION_VIOLATION_ROOT_COMMAND)
 }
 
 #[poise::command(
@@ -432,7 +432,7 @@ async fn music_player_queue_remove(
   let core = Core::from(ctx);
   let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let index = NonZeroUsize::new(index.unwrap_or(1))
-    .ok_or_else(|| MelodyError::command_precondition_violation("number between 1 and 65536"))?;
+    .ok_or(MelodyError::COMMAND_PRECONDITION_VIOLATION_ARGUMENTS)?;
 
   send_response_result(ctx, {
     match ensure_in_same_channel(&core, guild_id, ctx.author().id).await {
