@@ -14,9 +14,9 @@ use rand::seq::SliceRandom;
 use reqwest::Client as HttpClient;
 use serenity::client::Client;
 use serenity::gateway::ShardManager;
-use serenity::model::channel::{Reaction, ReactionType};
-use serenity::model::channel::Message;
+use serenity::model::channel::{Reaction, ReactionType, Message};
 use serenity::model::gateway::Ready;
+use serenity::model::guild::{Guild, UnavailableGuild};
 use serenity::model::guild::Member;
 use serenity::model::id::{ChannelId, GuildId, UserId, RoleId};
 use serenity::utils::{content_safe, ContentSafeOptions};
@@ -95,10 +95,6 @@ impl MelodyHandler<State, MelodyError> for Handler {
     if self.setup_done.swap(true) { return };
     let core = Core::from(&ctx);
 
-    for (guild_id, guild_name) in crate::utils::iter_guilds(&ctx, &guilds) {
-      info!("Discovered guild: {guild_name} ({guild_id})");
-    };
-
     if core.is_new_build() {
       info!("New build detected, registering commands");
       let guilds = core.operate_persist(|persist| {
@@ -134,6 +130,28 @@ impl MelodyHandler<State, MelodyError> for Handler {
         tokio::spawn(respawn_feed_tasks_task(core.clone()))
       });
     }).await;
+  }
+
+  async fn guild_create(&self, _ctx: MelodyHandlerContext<'_>, guild: Guild, is_new: Option<bool>) {
+    info!("Guild discovered: {} ({}) - {}", guild.name, guild.id, match is_new {
+      Some(true) => "added to guild",
+      Some(false) => "populate",
+      None => "create"
+    });
+  }
+
+  async fn guild_delete(&self, ctx: MelodyHandlerContext<'_>, incomplete: UnavailableGuild, guild_full_cached: Option<Guild>) {
+    let guild_name = guild_full_cached.as_ref().map_or("Unknown", |guild| guild.name.as_str());
+    info!("Guild lost: {} ({}) - {}", guild_name, incomplete.id, match incomplete.unavailable {
+      true => "outage",
+      false => "removed from guild"
+    });
+
+    let core = Core::from(ctx);
+    if !incomplete.unavailable {
+      info!("Unregistering feeds for guild: {} ({})", guild_name, incomplete.id);
+      crate::commands::unregister_guild_feeds(&core, incomplete.id).await.log_error();
+    };
   }
 
   async fn message(&self, ctx: MelodyHandlerContext<'_>, message: Message) {

@@ -6,8 +6,7 @@ use chrono::{DateTime, Utc};
 use defy::ContextualError;
 use rand::seq::SliceRandom;
 use regex::Regex;
-use serenity::model::id::{EmojiId, GuildId, RoleId, UserId};
-use serenity::cache::Cache;
+use serenity::model::id::{EmojiId, RoleId, UserId};
 use poise::slash_argument::{SlashArgument, SlashArgError};
 
 use std::fmt;
@@ -73,56 +72,12 @@ pub fn shuffle<T>(list: &mut [T]) {
   list.shuffle(&mut rand::thread_rng());
 }
 
-pub fn iter_guilds<'a>(cache: impl AsRef<Cache> + 'a, guilds: &'a [GuildId])
--> impl Iterator<Item = (GuildId, String)> + 'a {
-  guilds.into_iter().map(move |&guild_id| {
-    (guild_id, guild_name(cache.as_ref(), guild_id))
-  })
-}
-
-pub fn guild_name(cache: impl AsRef<Cache>, guild_id: GuildId) -> String {
-  cache.as_ref().guild(guild_id).map_or_else(|| "Unknown".to_owned(), |guild| guild.name.clone())
-}
-
 pub fn parse_emojis(message: &str) -> Vec<EmojiId> {
   static RX: LazyRegex = LazyRegex::new(r"<a?:[0-9a-zA-Z_]+:(\d+)>");
   RX.captures_iter(message)
     .filter_map(|captures| captures.get(1).map(<&str>::from))
     .filter_map(|id| id.parse::<u64>().ok().map(EmojiId::new))
     .collect::<Vec<EmojiId>>()
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct NoDebug<T>(pub T);
-
-impl<T> std::ops::Deref for NoDebug<T> {
-  type Target = T;
-
-  #[inline]
-  fn deref(&self) -> &Self::Target {
-    &self.0
-  }
-}
-
-impl<T> std::ops::DerefMut for NoDebug<T> {
-  #[inline]
-  fn deref_mut(&mut self) -> &mut Self::Target {
-    &mut self.0
-  }
-}
-
-impl<T: fmt::Display> fmt::Display for NoDebug<T> {
-  #[inline]
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    <T as fmt::Display>::fmt(&self.0, f)
-  }
-}
-
-impl<T> fmt::Debug for NoDebug<T> {
-  #[inline]
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    f.write_str("..")
-  }
 }
 
 #[derive(Debug, Clone, Copy)]

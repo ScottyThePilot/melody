@@ -7,6 +7,8 @@ use std::collections::HashMap;
 
 
 
+// https://docs.rs/serenity/0.12.4/src/serenity/client/event_handler.rs.html
+
 macro_rules! handler {
   ($($VariantName:ident { $($arg:ident: $Arg:ty),* } => async fn $method:ident();)*) => (
     #[allow(unused_variables)]

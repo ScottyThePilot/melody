@@ -4,6 +4,13 @@ mod general;
 mod music_player;
 mod roles;
 
+#[allow(unused_imports)]
+pub use self::feed::{
+  register_feed,
+  unregister_feed,
+  unregister_guild_feeds,
+  list_guild_feeds
+};
 use crate::prelude::*;
 use crate::data::*;
 use crate::handler::{MelodyCommand, MelodyContext};

@@ -7,6 +7,7 @@ use super::{MelodyContext, CommandMetaData};
 use chrono::{Utc, Duration};
 use log::Level;
 use rand::Rng;
+use poise::reply::CreateReply;
 use serenity::model::guild::Member;
 use serenity::model::timestamp::Timestamp;
 use serenity::utils::{content_safe, ContentSafeOptions};
@@ -275,7 +276,8 @@ pub async fn console(
 
   let response = format!("```\n{output_full}\n```");
   let response = content_safe(&ctx, &response, &ContentSafeOptions::default().clean_user(false), &[]);
-  ctx.reply(response).await.context("failed to send reply")?;
+  let reply = CreateReply::default().ephemeral(true).content(response);
+  ctx.send(reply).await.context("failed to send reply")?;
   Ok(())
 }
 

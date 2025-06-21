@@ -201,7 +201,7 @@ async fn feeds_list(
   Ok(())
 }
 
-async fn register_feed(core: &Core, feed: Feed, guild_id: GuildId, channel_id: ChannelId) -> MelodyResult<(bool, bool)> {
+pub async fn register_feed(core: &Core, feed: Feed, guild_id: GuildId, channel_id: ChannelId) -> MelodyResult<(bool, bool)> {
   // Create a new entry in the persist file's feeds table
   let was_replaced = core.operate_persist_commit(|persist| Ok({
     persist.feeds.entry(feed.clone()).or_insert_with(FeedState::new)
@@ -215,7 +215,7 @@ async fn register_feed(core: &Core, feed: Feed, guild_id: GuildId, channel_id: C
   Ok((was_replaced, is_disabled))
 }
 
-async fn unregister_feed(core: &Core, feed: &Feed, guild_id: GuildId) -> MelodyResult<Option<ChannelId>> {
+pub async fn unregister_feed(core: &Core, feed: &Feed, guild_id: GuildId) -> MelodyResult<Option<ChannelId>> {
   let (should_abort, result) = core.operate_persist_commit(|persist| {
     let (should_abort, result) = persist.feeds.get_mut(feed).map_or((false, None), |feed_state| {
       match feed_state.guilds.remove(&guild_id) {
@@ -240,7 +240,7 @@ async fn unregister_feed(core: &Core, feed: &Feed, guild_id: GuildId) -> MelodyR
   Ok(result)
 }
 
-async fn unregister_guild_feeds(core: &Core, guild_id: GuildId) -> MelodyResult<usize> {
+pub async fn unregister_guild_feeds(core: &Core, guild_id: GuildId) -> MelodyResult<usize> {
   let removed = core.operate_persist_commit(|persist| {
     let mut removed = Vec::new();
     persist.feeds.retain(|feed, feed_state| {
@@ -266,7 +266,7 @@ async fn unregister_guild_feeds(core: &Core, guild_id: GuildId) -> MelodyResult<
   Ok(removed.len())
 }
 
-async fn list_guild_feeds(core: &Core, guild_id: GuildId) -> Vec<(Feed, ChannelId, DateTime<Utc>)> {
+pub async fn list_guild_feeds(core: &Core, guild_id: GuildId) -> Vec<(Feed, ChannelId, DateTime<Utc>)> {
   core.operate_persist(|persist| {
     persist.feeds.iter().filter_map(|(feed, feed_state)| {
       feed_state.guilds.get(&guild_id).map(|&channel_id| {

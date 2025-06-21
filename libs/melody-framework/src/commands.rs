@@ -331,8 +331,8 @@ impl<'t> fmt::Display for Commandify<'t> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     let name = self.name;
     match self.description {
-      Some(description) => write!(f, "/`{name}`: *{description}*"),
-      None => write!(f, "/`{name}`")
+      Some(description) => write!(f, "`/{name}`: *{description}*"),
+      None => write!(f, "`/{name}`")
     }
   }
 }
