@@ -17,9 +17,6 @@ use std::collections::HashSet;
 
 
 
-#[deprecated]
-pub type CommandState = CommandMetaData;
-
 const COMMANDS: &[fn() -> MelodyCommand] = &[
   help,
   self::general::ping,
@@ -45,7 +42,7 @@ pub fn create_commands_list() -> Vec<MelodyCommand> {
 #[poise::command(
   slash_command,
   description_localized("en-US", "Gets command help"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/help [command]"])
     .examples_localized("en-US", ["/help connect-four"])
 )]

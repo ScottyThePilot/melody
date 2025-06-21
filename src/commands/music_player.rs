@@ -2,7 +2,7 @@ use crate::prelude::*;
 use crate::data::Core;
 use crate::feature::music_player::{MusicPlayer, QueueItem, AttachmentItem, YouTubeItem};
 use crate::utils::youtube;
-use super::{MelodyContext, CommandState};
+use super::{MelodyContext, CommandMetaData};
 
 use serenity::model::id::{ChannelId, GuildId, UserId};
 use serenity::model::channel::Attachment;
@@ -30,7 +30,7 @@ use std::sync::Arc;
   rename = "music-player",
   name_localized("en-US", "music-player"),
   description_localized("en-US", "Play audio from various sources in voice channels"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .info_localized_concat("en-US", [
       "Player functionality may be spotty or unreliable.",
       "If the player breaks or stops on a track indefinitely, command the bot to skip, leave the channel, and join the channel again.",
@@ -84,7 +84,7 @@ pub async fn music_player(_ctx: MelodyContext<'_>) -> MelodyResult {
   rename = "play",
   name_localized("en-US", "play"),
   description_localized("en-US", "Adds a track to the queue to be played in your voice channel"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", [
       "/music-player play youtube <video-url>",
       "/music-player play youtube-playlist <playlist-url>",
@@ -106,7 +106,7 @@ async fn music_player_play(_ctx: MelodyContext<'_>) -> MelodyResult {
   rename = "youtube",
   name_localized("en-US", "youtube"),
   description_localized("en-US", "Plays a YouTube video in your voice channel"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", [
       "/music-player play youtube <video-url>"
     ])
@@ -157,7 +157,7 @@ async fn music_player_play_youtube(
   rename = "youtube-playlist",
   name_localized("en-US", "youtube-playlist"),
   description_localized("en-US", "Plays a YouTube playlist in your voice channel"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", [
       "/music-player play youtube-playlist <playlist-url>"
     ])
@@ -227,7 +227,7 @@ async fn music_player_play_youtube_playlist(
   rename = "attachment",
   name_localized("en-US", "attachment"),
   description_localized("en-US", "Plays an audio file attachment in your voice channel"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/music-player play attachment <attachment>"])
 )]
 async fn music_player_play_attachment(
@@ -279,7 +279,7 @@ async fn music_player_play_attachment(
   rename = "queue",
   name_localized("en-US", "queue"),
   description_localized("en-US", "Commands relating to the music player queue"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .info_localized_concat("en-US", [
       "Player functionality may be spotty or unreliable.",
       "If the player breaks or stops on a track indefinitely, command the bot to skip, leave the channel, and join the channel again.",
@@ -309,7 +309,7 @@ async fn music_player_queue(_ctx: MelodyContext<'_>) -> MelodyResult {
   rename = "show",
   name_localized("en-US", "show"),
   description_localized("en-US", "Displays the full list of tracks in the queue"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/music-player queue show [page]"])
     .examples_localized("en-US", ["/music-player queue show"])
 )]
@@ -363,7 +363,7 @@ async fn music_player_queue_show(
   rename = "clear",
   name_localized("en-US", "clear"),
   description_localized("en-US", "Clears the queue, except for the currently playing track"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/music-player queue clear"])
     .examples_localized("en-US", ["/music-player queue clear"])
 )]
@@ -390,7 +390,7 @@ async fn music_player_queue_clear(ctx: MelodyContext<'_>) -> MelodyResult {
   rename = "shuffle",
   name_localized("en-US", "shuffle"),
   description_localized("en-US", "Shuffles the queue, except for the currently playing track"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/music-player queue shuffle"])
     .examples_localized("en-US", ["/music-player queue shuffle"])
 )]
@@ -417,7 +417,7 @@ async fn music_player_queue_shuffle(ctx: MelodyContext<'_>) -> MelodyResult {
   rename = "remove",
   name_localized("en-US", "remove"),
   description_localized("en-US", "Removes an item from the queue"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/music-player queue remove <index>"])
     .examples_localized("en-US", ["/music-player queue remove 3"])
 )]
@@ -454,7 +454,7 @@ async fn music_player_queue_remove(
   rename = "join",
   name_localized("en-US", "join"),
   description_localized("en-US", "Makes the bot join your voice channel"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/music-player join"])
     .examples_localized("en-US", ["/music-player join"])
 )]
@@ -485,7 +485,7 @@ async fn music_player_join(ctx: MelodyContext<'_>) -> MelodyResult {
   rename = "leave",
   name_localized("en-US", "leave"),
   description_localized("en-US", "Makes the bot leave your voice channel (does not clear the queue)"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/music-player leave"])
     .examples_localized("en-US", ["/music-player leave"])
 )]
@@ -516,7 +516,7 @@ async fn music_player_leave(ctx: MelodyContext<'_>) -> MelodyResult {
   rename = "pause",
   name_localized("en-US", "pause"),
   description_localized("en-US", "Pauses (or unpauses) the music player"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/music-player pause <true|false>"])
     .examples_localized("en-US", ["/music-player pause false"])
 )]
@@ -550,7 +550,7 @@ async fn music_player_pause(
   rename = "loop",
   name_localized("en-US", "loop"),
   description_localized("en-US", "Enables (or disables) looping on the music player queue"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/music-player loop <true|false>"])
     .examples_localized("en-US", ["/music-player loop true"])
 )]
@@ -584,7 +584,7 @@ async fn music_player_loop(
   rename = "skip",
   name_localized("en-US", "skip"),
   description_localized("en-US", "Skips the current song in the music player queue"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/music-player skip"])
     .examples_localized("en-US", ["/music-player skip"])
 )]
@@ -612,7 +612,7 @@ async fn music_player_skip(ctx: MelodyContext<'_>) -> MelodyResult {
   rename = "stop",
   name_localized("en-US", "stop"),
   description_localized("en-US", "Stops the music player, clearing the queue"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/music-player stop"])
     .examples_localized("en-US", ["/music-player stop"])
 )]
@@ -640,7 +640,7 @@ async fn music_player_stop(ctx: MelodyContext<'_>) -> MelodyResult {
   rename = "kill",
   name_localized("en-US", "kill"),
   description_localized("en-US", "Makes the bot leave your voice channel, stopping the music player and clearing the queue"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/music-player kill"])
     .examples_localized("en-US", ["/music-player kill"])
 )]

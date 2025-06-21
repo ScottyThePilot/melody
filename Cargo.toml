@@ -26,7 +26,6 @@ rand = { version = "0.8", features = ["small_rng"] }
 regex = { version = "1.8.4" }
 reqwest = { version = "0.12" }
 serde = { version = "1.0", features = ["derive", "rc"] }
-serde_json = { version = "1.0" }
 singlefile = { version = "0.3.1", features = ["shared-async", "fs-err"] }
 singlefile-formats = { version = "0.3.1", features = ["cbor-serde", "json-serde", "toml-serde"] }
 songbird = { version = "0.5" }
@@ -34,6 +33,7 @@ symphonia = { version = "0.5.4", features = ["aac", "alac", "mp3"] }
 term-stratum = { path = "./libs/term-stratum" }
 thiserror = { version = "2.0" }
 tokio = { version = "1.35", features = ["full", "parking_lot"] }
+tracing = { version = "0.1.40", features = ["log-always"] }
 url = { version = "2.4", features = ["serde"] }
 
 [dependencies.serenity]

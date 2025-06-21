@@ -2,7 +2,7 @@ use crate::prelude::*;
 use crate::feature::feed::{Feed, FeedState};
 use crate::data::Core;
 use crate::utils::{Timestamp, TimestampFormat, LazyRegex};
-use super::{MelodyContext, CommandState};
+use super::{MelodyContext, CommandMetaData};
 
 use chrono::{DateTime, Utc};
 use serenity::model::id::{ChannelId, GuildId};
@@ -23,7 +23,7 @@ use poise::macros::ChoiceParameter;
   name_localized("en-US", "feeds"),
   description_localized("en-US", "Set up channels to recieve posts from social media websites or from RSS feeds"),
   default_member_permissions = "MANAGE_WEBHOOKS",
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", [
       "/feeds add <'youtube'|'twitter'> <feed-source>",
       "/feeds remove <'youtube'|'twitter'> <feed-source>",
@@ -50,7 +50,7 @@ pub async fn feeds(_ctx: MelodyContext<'_>) -> MelodyResult {
   name_localized("en-US", "add"),
   description_localized("en-US", "Adds a feed to this server"),
   default_member_permissions = "MANAGE_WEBHOOKS",
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", [
       "/feeds add <'youtube'|'twitter'> <feed-source>"
     ])
@@ -104,7 +104,7 @@ async fn feeds_add(
   name_localized("en-US", "remove"),
   description_localized("en-US", "Removes a feed from this server"),
   default_member_permissions = "MANAGE_WEBHOOKS",
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", [
       "/feeds remove <'youtube'|'twitter'> <feed-source>"
     ])
@@ -149,7 +149,7 @@ async fn feeds_remove(
   name_localized("en-US", "remove-all"),
   description_localized("en-US", "Removes all feeds from this server"),
   default_member_permissions = "MANAGE_WEBHOOKS",
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/feeds remove-all"])
     .examples_localized("en-US", ["/feeds remove-all"])
 )]
@@ -175,7 +175,7 @@ async fn feeds_remove_all(ctx: MelodyContext<'_>) -> MelodyResult {
   name_localized("en-US", "list"),
   description_localized("en-US", "Lists all feeds in this server"),
   default_member_permissions = "MANAGE_WEBHOOKS",
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/feeds list"])
     .examples_localized("en-US", ["/feeds list"])
 )]

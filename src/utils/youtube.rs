@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use reqwest::Client as HttpClient;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+use singlefile_formats::data::json_serde::original as serde_json;
 use songbird::input::{AuxMetadata, AudioStream, AudioStreamError, Compose, HttpRequest, Input};
 use songbird::input::core::io::MediaSource;
 use tokio::process::Command;

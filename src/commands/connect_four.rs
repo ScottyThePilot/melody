@@ -2,7 +2,7 @@ use crate::prelude::*;
 use crate::data::*;
 use crate::feature::connect_four::*;
 use crate::utils::{Timestamp, TimestampFormat};
-use super::{MelodyContext, CommandState};
+use super::{MelodyContext, CommandMetaData};
 
 use serenity::model::id::UserId;
 
@@ -24,7 +24,7 @@ use serenity::model::id::UserId;
   rename = "connect-four",
   name_localized("en-US", "connect-four"),
   description_localized("en-US", "Play connect-four"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .info_localized_concat("en-US", [
       "To begin a game, one of the players will need to challenge another via the `/connect-four challenge` subcommand.",
       "That player will then need to accept the challenge via the `/connect-four accept` subcommand.",
@@ -61,7 +61,7 @@ pub async fn connect_four(_ctx: MelodyContext<'_>) -> MelodyResult {
   rename = "challenge",
   name_localized("en-US", "challenge"),
   description_localized("en-US", "Challenge another user to a game of connect-four"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/connect-four challenge <user>"])
     .examples_localized("en-US", ["/connect-four challenge @Nanachi"])
 )]
@@ -99,7 +99,7 @@ async fn connect_four_challenge(
   rename = "accept",
   name_localized("en-US", "accept"),
   description_localized("en-US", "Accept another user's game challenge"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/connect-four accept <user>"])
     .examples_localized("en-US", ["/connect-four accept @Reg"])
 )]
@@ -142,7 +142,7 @@ async fn connect_four_accept(
   rename = "decline",
   name_localized("en-US", "decline"),
   description_localized("en-US", "Decline another user's game challenge"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/connect-four decline <user>"])
     .examples_localized("en-US", ["/connect-four decline @Riko"])
 )]
@@ -175,7 +175,7 @@ async fn connect_four_decline(
   rename = "play",
   name_localized("en-US", "play"),
   description_localized("en-US", "Place a piece on the board"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/connect-four play <column>"])
     .examples_localized("en-US", [
       "/connect-four play 1",
@@ -235,7 +235,7 @@ async fn connect_four_play(
   rename = "board",
   name_localized("en-US", "board"),
   description_localized("en-US", "Display the board of your current game"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/connect-four board"])
     .examples_localized("en-US", ["/connect-four board"])
 )]
@@ -265,7 +265,7 @@ async fn connect_four_board(ctx: MelodyContext<'_>) -> MelodyResult {
   rename = "resign",
   name_localized("en-US", "resign"),
   description_localized("en-US", "Resign your current game"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/connect-four resign"])
     .examples_localized("en-US", ["/connect-four resign"])
 )]
@@ -294,7 +294,7 @@ async fn connect_four_resign(ctx: MelodyContext<'_>) -> MelodyResult {
   rename = "claim-win",
   name_localized("en-US", "claim-win"),
   description_localized("en-US", "Claim a win from your opponent if they have taken more than 3 hours on their turn"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/connect-four claim-win"])
     .examples_localized("en-US", ["/connect-four claim-win"])
 )]
@@ -332,7 +332,7 @@ async fn connect_four_claim_win(ctx: MelodyContext<'_>) -> MelodyResult {
   rename = "stats",
   name_localized("en-US", "stats"),
   description_localized("en-US", "See your wins and losses for this server"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/connect-four stats"])
     .examples_localized("en-US", ["/connect-four stats"])
 )]

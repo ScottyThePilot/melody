@@ -2,7 +2,7 @@ use crate::prelude::*;
 use crate::data::Core;
 use crate::feature::dice_roll::Roll;
 use crate::utils::Blockify;
-use super::{MelodyContext, CommandState};
+use super::{MelodyContext, CommandMetaData};
 
 use chrono::{Utc, Duration};
 use log::Level;
@@ -19,7 +19,7 @@ const FUNNY_CHANCE: f64 = 0.01;
   slash_command,
   name_localized("en-US", "ping"),
   description_localized("en-US", "Gets a basic response from the bot"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/ping"])
     .examples_localized("en-US", ["/ping"])
 )]
@@ -33,7 +33,7 @@ pub async fn ping(ctx: MelodyContext<'_>) -> MelodyResult {
   slash_command,
   name_localized("en-US", "echo"),
   description_localized("en-US", "Makes the bot repeat something"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/echo <text>"])
     .examples_localized("en-US", ["/echo 'hello world'"])
 )]
@@ -56,7 +56,7 @@ pub async fn echo(
   guild_only,
   name_localized("en-US", "troll"),
   description_localized("en-US", "Conducts epic trollage"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/troll"])
     .examples_localized("en-US", ["/troll"])
 )]
@@ -115,7 +115,7 @@ pub async fn troll(
   guild_only,
   name_localized("en-US", "avatar"),
   description_localized("en-US", "Gets another user's avatar"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/avatar [user] [get-global-avatar]"])
     .examples_localized("en-US", ["/avatar @Nanachi", "/avatar @Nanachi false"])
 )]
@@ -146,7 +146,7 @@ pub async fn avatar(
   guild_only,
   name_localized("en-US", "banner"),
   description_localized("en-US", "Gets another user's banner"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/banner [user]"])
     .examples_localized("en-US", ["/banner @Nanachi"])
 )]
@@ -174,7 +174,7 @@ pub async fn banner(
   rename = "emoji-stats",
   name_localized("en-US", "emoji-stats"),
   description_localized("en-US", "Gets usage statistics of emojis for this server"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/emoji-stats [page]"])
     .examples_localized("en-US", ["/emoji-stats 3"])
 )]
@@ -219,7 +219,7 @@ pub async fn emoji_stats(
   owners_only, dm_only,
   name_localized("en-US", "console"),
   description_localized("en-US", "Execute an internal command"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .info_localized("en-US", "This command is only usable by the bot owner.")
 )]
 pub async fn console(
@@ -282,7 +282,7 @@ pub async fn console(
 #[poise::command(
   slash_command,
   description_localized("en-US", "Rolls a configurable dice"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/roll <dice notation>"])
     .examples_localized("en-US", [
       "/roll '3d20'",

@@ -2,7 +2,7 @@ use crate::prelude::*;
 use crate::feature::roles::{Granter, JoinRoleFilter};
 use crate::data::{Core, PersistGuild};
 use crate::utils::RoleOrUser;
-use super::{MelodyContext, CommandState};
+use super::{MelodyContext, CommandMetaData};
 
 use serenity::model::id::{UserId, GuildId, RoleId};
 use serenity::model::guild::{Member, Role};
@@ -25,7 +25,7 @@ const MANAGED_ROLE: &str = "The role you have specified is a managed role and ma
   ),
   name_localized("en-US", "role"),
   description_localized("en-US", "Allows a grantable role to be granted or revoked"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", [
       "/role grant <role> <user>",
       "/role revoke <role> <user>"
@@ -45,7 +45,7 @@ pub async fn role(_ctx: MelodyContext<'_>) -> MelodyResult {
   rename = "grant",
   name_localized("en-US", "grant"),
   description_localized("en-US", "Grants a grantable role to a user, as long as you are a valid granter"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/role grant <role> <user>"])
     .examples_localized("en-US", ["/role grant @Helper @Nanachi"])
 )]
@@ -94,7 +94,7 @@ async fn role_grant(
   rename = "revoke",
   name_localized("en-US", "revoke"),
   description_localized("en-US", "Revokes a grantable role from a user, as long as you are a valid granter"),
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/role revoke <role> <user>"])
     .examples_localized("en-US", ["/role revoke @Helper @Reg"])
 )]
@@ -164,7 +164,7 @@ fn is_granter(persist_guild: &PersistGuild, member: &Member, role_id: RoleId) ->
   default_member_permissions = "MANAGE_ROLES",
   required_bot_permissions = "MANAGE_ROLES",
   required_permissions = "MANAGE_ROLES",
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .info_localized_concat("en-US", [
       "To create a grantable role, you must first register it with the `/grant-roles add` subcommand,",
       "and then add granters to it with the `/grant-roles add-granter` subcommand.",
@@ -204,7 +204,7 @@ pub async fn grant_roles(_ctx: MelodyContext<'_>) -> MelodyResult {
   default_member_permissions = "MANAGE_ROLES",
   required_bot_permissions = "MANAGE_ROLES",
   required_permissions = "MANAGE_ROLES",
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/grant-roles add <role>"])
     .examples_localized("en-US", ["/grant-roles add @Helper"])
 )]
@@ -231,7 +231,7 @@ async fn grant_roles_add(
   default_member_permissions = "MANAGE_ROLES",
   required_bot_permissions = "MANAGE_ROLES",
   required_permissions = "MANAGE_ROLES",
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/grant-roles remove <role>"])
     .examples_localized("en-US", ["/grant-roles remove @SuperAdmin"])
 )]
@@ -258,7 +258,7 @@ async fn grant_roles_remove(
   default_member_permissions = "MANAGE_ROLES",
   required_bot_permissions = "MANAGE_ROLES",
   required_permissions = "MANAGE_ROLES",
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", [
       "/grant-roles add-granter <role> <role|user>"
     ])
@@ -303,7 +303,7 @@ async fn grant_roles_add_granter(
   default_member_permissions = "MANAGE_ROLES",
   required_bot_permissions = "MANAGE_ROLES",
   required_permissions = "MANAGE_ROLES",
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", [
       "/grant-roles remove-granter <role> <role|user>"
     ])
@@ -348,7 +348,7 @@ async fn grant_roles_remove_granter(
   default_member_permissions = "MANAGE_ROLES",
   required_bot_permissions = "MANAGE_ROLES",
   required_permissions = "MANAGE_ROLES",
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", [
       "/grant-roles list [role]"
     ])
@@ -439,7 +439,7 @@ fn user_description(core: &Core, user_id: UserId) -> String {
   default_member_permissions = "MANAGE_ROLES",
   required_bot_permissions = "MANAGE_ROLES",
   required_permissions = "MANAGE_ROLES",
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .info_localized_concat("en-US", [
       "Users will not be able to modify a join role if that role is above their highest role."
     ])
@@ -468,7 +468,7 @@ pub async fn join_roles(_ctx: MelodyContext<'_>) -> MelodyResult {
   default_member_permissions = "MANAGE_ROLES",
   required_bot_permissions = "MANAGE_ROLES",
   required_permissions = "MANAGE_ROLES",
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", [
       "/join-roles add <role> ['all'|'bots'|'humans']"
     ])
@@ -507,7 +507,7 @@ async fn join_roles_add(
   default_member_permissions = "MANAGE_ROLES",
   required_bot_permissions = "MANAGE_ROLES",
   required_permissions = "MANAGE_ROLES",
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", [
       "/join-roles remove <role> ['all'|'bots'|'humans']"
     ])
@@ -538,7 +538,7 @@ async fn join_roles_remove(
   default_member_permissions = "MANAGE_ROLES",
   required_bot_permissions = "MANAGE_ROLES",
   required_permissions = "MANAGE_ROLES",
-  custom_data = CommandState::new()
+  custom_data = CommandMetaData::new()
     .usage_localized("en-US", [
       "/join-roles list"
     ])

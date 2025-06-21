@@ -14,6 +14,8 @@ extern crate itertools;
 extern crate log;
 extern crate melody_commander;
 extern crate melody_flag;
+extern crate melody_framework;
+extern crate melody_ratelimiter;
 extern crate melody_rss_feed;
 extern crate rand;
 extern crate regex;
@@ -22,9 +24,12 @@ extern crate serde;
 extern crate serenity;
 extern crate singlefile;
 extern crate singlefile_formats;
+extern crate songbird;
+extern crate symphonia;
 #[macro_use]
 extern crate thiserror;
 extern crate tokio;
+extern crate tracing;
 extern crate uord;
 extern crate url;
 extern crate yggdrasil;
@@ -80,6 +85,11 @@ fn setup_logger(sender: SyncSender<String>) -> Result<(), fern::InitError> {
     })
     .level(log::LevelFilter::Warn)
     .level_for(me, log::LevelFilter::Trace)
+    .level_for("melody_commander", log::LevelFilter::Info)
+    .level_for("melody_flag", log::LevelFilter::Info)
+    .level_for("melody_framework", log::LevelFilter::Trace)
+    .level_for("melody_ratelimiter", log::LevelFilter::Info)
+    .level_for("melody_rss_feed", log::LevelFilter::Info)
     .chain(sender)
     .chain({
       fs_err::create_dir_all("./data/")?;
