@@ -13,14 +13,14 @@ impl Flag {
   }
 
   pub fn get(&self) -> bool {
-    self.0.load(Ordering::Relaxed)
+    self.0.load(Ordering::Acquire)
   }
 
   pub fn set(&self, state: bool) {
-    self.0.store(state, Ordering::Relaxed);
+    self.0.store(state, Ordering::Release);
   }
 
   pub fn swap(&self, state: bool) -> bool {
-    self.0.swap(state, Ordering::Relaxed)
+    self.0.swap(state, Ordering::AcqRel)
   }
 }

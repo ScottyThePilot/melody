@@ -428,7 +428,7 @@ dependencies = [
  "md5",
  "percent-encoding",
  "reqwest 0.12.15",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -440,7 +440,7 @@ dependencies = [
  "ciborium",
  "fs-err",
  "serde",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -1828,7 +1828,7 @@ dependencies = [
  "songbird",
  "symphonia",
  "term-stratum",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
  "tokio",
  "uord",
  "url",
@@ -1839,12 +1839,24 @@ dependencies = [
 name = "melody-commander"
 version = "0.1.0"
 dependencies = [
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
 name = "melody-flag"
 version = "0.1.0"
+
+[[package]]
+name = "melody-framework"
+version = "0.1.0"
+dependencies = [
+ "itertools",
+ "poise",
+ "serenity",
+ "thiserror 2.0.12",
+ "tokio",
+ "tracing",
+]
 
 [[package]]
 name = "melody-ratelimiter"
@@ -1862,7 +1874,7 @@ dependencies = [
  "mime",
  "reqwest 0.12.15",
  "serde",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
  "url",
 ]
 

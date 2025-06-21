@@ -31,7 +31,7 @@ singlefile-formats = { version = "0.3.1", features = ["cbor-serde", "json-serde"
 songbird = { version = "0.5" }
 symphonia = { version = "0.5.4", features = ["aac", "alac", "mp3"] }
 term-stratum = { path = "./libs/term-stratum" }
-thiserror = { version = "1.0" }
+thiserror = { version = "2.0" }
 tokio = { version = "1.35", features = ["full", "parking_lot"] }
 url = { version = "2.4", features = ["serde"] }
 
@@ -72,6 +72,7 @@ members = [
   "libs/cleverbot-logs",
   "libs/melody-commander",
   "libs/melody-flag",
+  "libs/melody-framework",
   "libs/melody-ratelimiter",
   "libs/melody-rss-feed",
   "libs/melody-timer",
