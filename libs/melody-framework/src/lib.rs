@@ -41,13 +41,24 @@ use std::sync::Arc;
 
 
 
+macro_rules! builder_field {
+  ($vis:vis $field:ident $function:ident(): $Type:ty) => (
+    $vis fn $function(mut self, $field: $Type) -> Self {
+      self.$field = $field;
+      self
+    }
+  );
+}
+
+pub type ReplyCallback<S, E> = fn(MelodyContext<'_, S, E>, CreateReply) -> CreateReply;
+
 pub struct MelodyFrameworkOptions<S, E> {
   pub state: Arc<S>,
   pub owners: HashSet<UserId>,
   pub commands: Vec<MelodyCommand<S, E>>,
   pub handler: Arc<dyn MelodyHandler<S, E>>,
   pub allowed_mentions: Option<CreateAllowedMentions>,
-  pub reply_callback: Option<fn(MelodyContext<'_, S, E>, CreateReply) -> CreateReply>,
+  pub reply_callback: Option<ReplyCallback<S, E>>,
   pub manual_cooldowns: bool,
   pub require_cache_for_guild_check: bool,
   pub initialize_owners: bool
@@ -58,6 +69,34 @@ where
   S: Send + Sync + 'static,
   E: Send + Sync + fmt::Debug + fmt::Display + 'static,
 {
+  pub fn new(state: Arc<S>, handler: Arc<dyn MelodyHandler<S, E>>) -> Self {
+    let allowed_mentions = CreateAllowedMentions::default()
+      .all_users(true).replied_user(true);
+    MelodyFrameworkOptions {
+      state,
+      owners: HashSet::new(),
+      commands: Vec::new(),
+      handler,
+      allowed_mentions: Some(allowed_mentions),
+      reply_callback: None,
+      manual_cooldowns: false,
+      require_cache_for_guild_check: false,
+      initialize_owners: true
+    }
+  }
+
+  builder_field!(pub owners with_owners(): HashSet<UserId>);
+  builder_field!(pub commands with_commands(): Vec<MelodyCommand<S, E>>);
+  builder_field!(pub allowed_mentions with_allowed_mentions(): Option<CreateAllowedMentions>);
+  builder_field!(pub reply_callback with_reply_callback(): Option<ReplyCallback<S, E>>);
+  builder_field!(pub manual_cooldowns with_manual_cooldowns(): bool);
+  builder_field!(pub require_cache_for_guild_check with_require_cache_for_guild_check(): bool);
+  builder_field!(pub initialize_owners with_initialize_owners(): bool);
+
+  pub fn build(self) -> MelodyFramework<S, E> {
+    MelodyFramework::new(self)
+  }
+
   fn build_inner(self) -> MelodyFrameworkInner<S, E> {
     let data = MelodyFrameworkData {
       state: self.state.clone(),

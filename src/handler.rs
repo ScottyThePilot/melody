@@ -12,7 +12,6 @@ use melody_rss_feed::{TwitterPost, YouTubeVideo};
 use melody_rss_feed::url::Url;
 use rand::seq::SliceRandom;
 use reqwest::Client as HttpClient;
-use serenity::builder::CreateAllowedMentions;
 use serenity::client::Client;
 use serenity::gateway::ShardManager;
 use serenity::model::channel::{Reaction, ReactionType};
@@ -46,8 +45,8 @@ pub async fn launch(event_receiver: MpscReceiver<StratumEvent>) -> MelodyResult 
   let persist_guilds = PersistGuildsWrapper::from(PersistGuilds::create().await?);
   let activities = Activities::create().await?;
 
-  let (token, intents, owner_id) = config.operate(|config| {
-    (config.token.clone(), config.intents, config.owner_id)
+  let (token, intents) = config.operate(|config| {
+    (config.token.clone(), config.intents)
   }).await;
 
   let http_client = HttpClient::new();
@@ -56,30 +55,18 @@ pub async fn launch(event_receiver: MpscReceiver<StratumEvent>) -> MelodyResult 
     activities, http_client, FeedHandler
   ).await?);
 
-  let allowed_mentions = CreateAllowedMentions::default()
-    .all_users(true).replied_user(true);
-
-  let framework = MelodyFramework::new(MelodyFrameworkOptions {
-    state: state.clone(),
-    commands: crate::commands::create_commands_list(),
-    handler: Arc::new(Handler { setup_done: Flag::new(false) }),
-    allowed_mentions: Some(allowed_mentions),
-    reply_callback: None,
-    manual_cooldowns: false,
-    require_cache_for_guild_check: false,
-    owners: HashSet::from_iter([owner_id]),
-    initialize_owners: true
-  });
+  let handler = Arc::new(Handler { setup_done: Flag::new(false) });
+  let framework = MelodyFrameworkOptions::new(state.clone(), handler)
+    .with_commands(crate::commands::create_commands_list())
+    .build();
 
   let mut client = Client::builder(&token, intents)
     .framework(framework.clone())
+    .type_map_insert::<MelodyFrameworkKey>(framework)
     .register_songbird_from_config(SongbirdConfig::default())
     .await.context("failed to init client")?;
-
-  operate_write(Arc::clone(&client.data), |data| {
-    data.insert::<MelodyFrameworkKey>(framework);
-    data.insert::<ShardManagerKey>(client.shard_manager.clone());
-  }).await;
+  client.data.write().await
+    .insert::<ShardManagerKey>(client.shard_manager.clone());
 
   let core = Core::new(&client, state);
   let events_task = tokio::spawn(events_task(
