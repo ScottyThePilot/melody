@@ -1,11 +1,22 @@
+extern crate futures;
 #[macro_use]
 extern crate thiserror;
+
+use futures::future::BoxFuture;
 
 use std::collections::VecDeque;
 use std::str::FromStr;
 use std::any::type_name;
 
+pub type FnCommand<R> = Command<fn(Box<[String]>) -> R>;
+pub type FnCommands<R> = Commands<fn(Box<[String]>) -> R>;
+pub type FnFalibleCommand<R, E> = FnCommand<Result<R, E>>;
+pub type FnFalibleCommands<R, E> = FnCommands<Result<R, E>>;
 
+pub type AsyncFnCommand<R> = FnCommand<BoxFuture<'static, R>>;
+pub type AsyncFnCommands<R> = FnCommands<BoxFuture<'static, R>>;
+pub type AsyncFnFallibleCommand<R, E> = AsyncFnCommand<Result<R, E>>;
+pub type AsyncFnFallibleCommands<R, E> = AsyncFnCommands<Result<R, E>>;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Command<T: 'static> {
@@ -14,7 +25,7 @@ pub struct Command<T: 'static> {
 }
 
 impl<T: 'static> Command<T> {
-  pub const fn new_group(name: &'static str, commands: &'static [Command<T>]) -> Self {
+  pub const fn new_group(name: &'static str, commands: Commands<T>) -> Self {
     Command { name, body: CommandBody::Group { commands } }
   }
 
@@ -23,10 +34,12 @@ impl<T: 'static> Command<T> {
   }
 }
 
+pub type Commands<T> = &'static [Command<T>];
+
 #[derive(Debug, Clone, Copy)]
 pub enum CommandBody<T: 'static> {
   Group {
-    commands: &'static [Command<T>]
+    commands: Commands<T>
   },
   Target {
     target: T
@@ -65,7 +78,7 @@ pub enum CommandError {
 
 type GenericError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
-pub fn apply<T: 'static>(input: &str, commands: &'static [Command<T>]) -> Result<CommandOutput<T>, CommandError> {
+pub fn apply<T: 'static>(input: &str, commands: Commands<T>) -> Result<CommandOutput<T>, CommandError> {
   split_args(input).and_then(|args| {
     let mut args = VecDeque::from(args);
     let target = find_target_args(&mut args, commands)?;
@@ -74,9 +87,62 @@ pub fn apply<T: 'static>(input: &str, commands: &'static [Command<T>]) -> Result
   })
 }
 
+pub fn apply_fn<R>(input: &str, commands: FnCommands<R>) -> Result<R, CommandError> {
+  apply(input, commands).map(|CommandOutput { target, remaining_args }| target(remaining_args))
+}
+
+#[inline]
+pub fn apply_fn_try<R>(input: &str, commands: FnCommands<Result<R, CommandError>>) -> Result<R, CommandError> {
+  apply_fn(input, commands).and_then(std::convert::identity)
+}
+
+pub fn apply_fn_merge<R, E>(input: &str, commands: FnFalibleCommands<R, E>) -> Result<R, E>
+where CommandError: Into<E> {
+  apply_fn(input, commands)
+    .map_err(CommandError::into)
+    .and_then(std::convert::identity)
+}
+
+pub async fn apply_fn_async<R>(input: &str, commands: AsyncFnCommands<R>) -> Result<R, CommandError> {
+  crate::private::result_apply_future_ok(apply_fn(input, commands)).await
+}
+
+#[inline]
+pub async fn apply_fn_try_async<R>(input: &str, commands: AsyncFnCommands<Result<R, CommandError>>) -> Result<R, CommandError> {
+  apply_fn_async(input, commands).await.and_then(std::convert::identity)
+}
+
+#[inline]
+pub async fn apply_fn_try_merge<R, E>(input: &str, commands: AsyncFnFallibleCommands<R, E>) -> Result<R, E>
+where CommandError: Into<E> {
+  apply_fn_async(input, commands).await
+    .map_err(CommandError::into)
+    .and_then(std::convert::identity)
+}
+
+#[doc(hidden)]
+pub mod private {
+  use std::future::Future;
+
+  #[inline]
+  pub async fn result_map_async<T, U, E, F, Fut>(result: Result<T, E>, f: F) -> Result<U, E>
+  where F: FnOnce(T) -> Fut, Fut: Future<Output = U> {
+    result_apply_future_ok(result.map(f)).await
+  }
+
+  #[inline]
+  pub async fn result_apply_future_ok<T: Future, E>(result: Result<T, E>) -> Result<T::Output, E>
+  where T: std::future::Future {
+    match result {
+      Ok(value) => Ok(value.await),
+      Err(error) => Err(error)
+    }
+  }
+}
+
 fn find_target_args<T: 'static>(
   args: &mut VecDeque<String>,
-  commands: &'static [Command<T>]
+  commands: Commands<T>
 ) -> Result<&'static T, CommandError> {
   let first_arg = args.pop_front()
     .ok_or_else(|| CommandError::InsufficientArgsCommand(command_names(commands)))?;
@@ -90,7 +156,7 @@ fn find_target_args<T: 'static>(
   }
 }
 
-fn command_names<T>(commands: &'static [Command<T>]) -> Vec<&'static str> {
+fn command_names<T>(commands: Commands<T>) -> Vec<&'static str> {
   commands.iter().map(|command| command.name).collect()
 }
 
@@ -104,6 +170,13 @@ pub fn resolve_args<R: ResolveArgs>(args: &[String]) -> Result<R, CommandError> 
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Parsed<T>(pub T);
+
+impl<T> Parsed<T> {
+  pub fn into_inner(self) -> T {
+    let Parsed(inner) = self;
+    inner
+  }
+}
 
 pub trait ResolveArg: Sized {
   fn resolve_arg(arg: Option<&str>) -> Result<Self, CommandError>;
@@ -148,6 +221,7 @@ macro_rules! impl_resolve_args {
   };
 }
 
+impl_resolve_args!(A);
 impl_resolve_args!(A, B);
 impl_resolve_args!(A, B, C);
 impl_resolve_args!(A, B, C, D);
@@ -155,6 +229,14 @@ impl_resolve_args!(A, B, C, D, E);
 impl_resolve_args!(A, B, C, D, E, F);
 impl_resolve_args!(A, B, C, D, E, F, G);
 impl_resolve_args!(A, B, C, D, E, F, G, H);
+impl_resolve_args!(A, B, C, D, E, F, G, H, I);
+impl_resolve_args!(A, B, C, D, E, F, G, H, I, J);
+impl_resolve_args!(A, B, C, D, E, F, G, H, I, J, K);
+impl_resolve_args!(A, B, C, D, E, F, G, H, I, J, K, L);
+impl_resolve_args!(A, B, C, D, E, F, G, H, I, J, K, L, M);
+impl_resolve_args!(A, B, C, D, E, F, G, H, I, J, K, L, M, N);
+impl_resolve_args!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O);
+impl_resolve_args!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);
 
 impl<T: ResolveArg> ResolveArgs for T {
   fn resolve_args(args: &[String]) -> Result<Self, CommandError> {
