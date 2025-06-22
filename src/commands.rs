@@ -14,6 +14,7 @@ pub use self::feed::{
 use crate::prelude::*;
 use crate::data::*;
 use crate::handler::{MelodyCommand, MelodyContext};
+use crate::utils::{Timestamp, TimestampFormat};
 
 pub use melody_framework::commands::{CommandMetaData, HelpLocalization, build_help_reply};
 use serenity::model::colour::Color;
@@ -75,9 +76,21 @@ async fn help(
     HashSet::new()
   };
 
+  let footer_text = format!(
+    "Melody v{version} - Deployed {deployed} - Rev {rev}",
+    version = env!("CARGO_PKG_VERSION"),
+    deployed = crate::BUILD_DATE,
+    rev = crate::BUILD_GIT_HASH
+  );
+
+  let help_localization = HelpLocalization {
+    footer: Some(footer_text.as_str()),
+    ..HelpLocalization::default()
+  };
+
   let reply = build_help_reply(
     argument.as_deref(), &commands, &categories, permissions,
-    locale, HelpLocalization::default(), embed_color
+    locale, help_localization, embed_color
   ).expect("unable to create help message");
 
   ctx.send(reply).await.context("failed to send reply")?;

@@ -49,6 +49,10 @@ features = [
 [dependencies.poise]
 version = "0.6.1"
 
+[dependencies.build-info]
+git = "https://github.com/ScottyThePilot/misc-crates"
+features = ["git", "chrono"]
+
 [dependencies.defy]
 git = "https://github.com/ScottyThePilot/misc-crates"
 features = ["log"]

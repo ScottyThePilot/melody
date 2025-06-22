@@ -48,6 +48,8 @@ use tokio::sync::mpsc::UnboundedReceiver as AsyncReceiver;
 use std::sync::mpsc::Sender as SyncSender;
 
 pub const BUILD_ID: u64 = const_random::const_random!(u64);
+pub const BUILD_DATE: &str = build_info::build_datetime_local_fixed_format!("%-d %b %Y %-H:%M:%S %z");
+pub const BUILD_GIT_HASH: &str = build_info::git_hash_short!();
 
 fn main() {
   yggdrasil::reroot().expect("unable to set root dir");

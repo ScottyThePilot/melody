@@ -234,6 +234,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "build-info"
+version = "0.1.0"
+source = "git+https://github.com/ScottyThePilot/misc-crates#09fc36d8cc9f117a6bb877ffddf3d86a03a5981b"
+dependencies = [
+ "build-info-macros",
+ "chrono",
+]
+
+[[package]]
+name = "build-info-macros"
+version = "0.1.0"
+source = "git+https://github.com/ScottyThePilot/misc-crates#09fc36d8cc9f117a6bb877ffddf3d86a03a5981b"
+dependencies = [
+ "chrono",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.101",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -682,7 +702,7 @@ checksum = "2a2330da5de22e8a3cb63252ce2abb30116bf5265e89c0e01bc17015ce30a476"
 [[package]]
 name = "defy"
 version = "0.1.0"
-source = "git+https://github.com/ScottyThePilot/misc-crates#737437040e4659091812455d1f7dd8de3c5261ed"
+source = "git+https://github.com/ScottyThePilot/misc-crates#09fc36d8cc9f117a6bb877ffddf3d86a03a5981b"
 dependencies = [
  "log",
 ]
@@ -1628,7 +1648,7 @@ dependencies = [
 [[package]]
 name = "ids"
 version = "0.1.0"
-source = "git+https://github.com/ScottyThePilot/misc-crates#737437040e4659091812455d1f7dd8de3c5261ed"
+source = "git+https://github.com/ScottyThePilot/misc-crates#09fc36d8cc9f117a6bb877ffddf3d86a03a5981b"
 dependencies = [
  "nohash-hasher",
  "serde",
@@ -1799,6 +1819,7 @@ name = "melody"
 version = "0.1.0"
 dependencies = [
  "ahash",
+ "build-info",
  "chrono",
  "chumsky",
  "cleverbot",
@@ -4460,7 +4481,7 @@ checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 [[package]]
 name = "uord"
 version = "0.1.0"
-source = "git+https://github.com/ScottyThePilot/misc-crates#737437040e4659091812455d1f7dd8de3c5261ed"
+source = "git+https://github.com/ScottyThePilot/misc-crates#09fc36d8cc9f117a6bb877ffddf3d86a03a5981b"
 dependencies = [
  "serde",
 ]
@@ -5052,7 +5073,7 @@ checksum = "ea2f10b9bb0928dfb1b42b65e1f9e36f7f54dbdf08457afefb38afcdec4fa2bb"
 [[package]]
 name = "yggdrasil"
 version = "0.1.0"
-source = "git+https://github.com/ScottyThePilot/misc-crates#737437040e4659091812455d1f7dd8de3c5261ed"
+source = "git+https://github.com/ScottyThePilot/misc-crates#09fc36d8cc9f117a6bb877ffddf3d86a03a5981b"
 dependencies = [
  "dunce",
 ]
