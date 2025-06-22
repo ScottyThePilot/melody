@@ -1,9 +1,9 @@
 use crate::prelude::*;
 use crate::data::*;
-use crate::feature::connect_four::*;
 use crate::utils::{Timestamp, TimestampFormat};
 use super::{MelodyContext, CommandMetaData};
 
+use melody_connect_four::*;
 use serenity::model::id::UserId;
 
 
@@ -199,7 +199,7 @@ async fn connect_four_play(
     Ok(match persist_guild.connect_four.find_user_game_mut(player) {
       Some((game, player_color)) => {
         let &opponent = game.players().other(&player).unwrap();
-        let column = crate::feature::connect_four::validate_column(column)
+        let column = melody_connect_four::validate_column(column)
           .ok_or(MelodyError::COMMAND_PRECONDITION_VIOLATION_ARGUMENTS)?;
 
         match game.play_move(player_color, column) {

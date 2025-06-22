@@ -114,7 +114,7 @@ pub type PersistGuildContainer = ContainerSharedAsyncWritableLocked<PersistGuild
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PersistGuild {
-  pub connect_four: crate::feature::connect_four::Manager,
+  pub connect_four: melody_connect_four::Manager<UserId>,
   #[serde(alias = "emoji_statistics")]
   pub emoji_stats: crate::feature::emoji_stats::EmojiStats,
   pub join_roles: HashMap<RoleId, JoinRoleFilter>,

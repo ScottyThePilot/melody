@@ -14,7 +14,6 @@ pub use self::feed::{
 use crate::prelude::*;
 use crate::data::*;
 use crate::handler::{MelodyCommand, MelodyContext};
-use crate::utils::{Timestamp, TimestampFormat};
 
 pub use melody_framework::commands::{CommandMetaData, HelpLocalization, build_help_reply};
 use serenity::model::colour::Color;

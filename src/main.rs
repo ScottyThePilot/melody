@@ -13,6 +13,7 @@ extern crate itertools;
 #[macro_use]
 extern crate log;
 extern crate melody_commander;
+extern crate melody_connect_four;
 extern crate melody_flag;
 extern crate melody_framework;
 extern crate melody_ratelimiter;

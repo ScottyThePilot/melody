@@ -1,52 +1,57 @@
+extern crate chrono;
+extern crate serde;
+extern crate uord;
+
 use chrono::{DateTime, Duration, Utc};
-use serenity::model::id::UserId;
+use serde::{Deserialize, Serialize};
 use uord::UOrd;
 
 use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::Entry;
+use std::hash::Hash;
 use std::ops::Deref;
 use std::fmt;
 
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Manager {
-  challenges: HashMap<UserId, HashSet<UserId>>,
-  stats: HashMap<UserId, Stats>,
+pub struct Manager<I: Copy + Eq + Ord + Hash> {
+  challenges: HashMap<I, HashSet<I>>,
+  stats: HashMap<I, Stats>,
   #[serde(default)]
-  user_games: HashMap<UOrd<UserId>, UserGame>
+  user_games: HashMap<UOrd<I>, UserGame<I>>
 }
 
-impl Manager {
-  pub fn get_stats(&self, player: UserId) -> Stats {
+impl<I: Copy + Eq + Ord + Hash> Manager<I> {
+  pub fn get_stats(&self, player: I) -> Stats {
     self.stats.get(&player).copied().unwrap_or_default()
   }
 
-  pub fn is_playing(&self, player: UserId) -> bool {
+  pub fn is_playing(&self, player: I) -> bool {
     self.is_playing_user(player)
   }
 
   /// Whether the player has a game in progress currently.
-  pub fn is_playing_user(&self, player: UserId) -> bool {
+  pub fn is_playing_user(&self, player: I) -> bool {
     self.user_games.keys().any(|players| players.contains(&player))
   }
 
   /// Whether or not a given player is challenging a given opponent.
-  pub fn is_challenging(&self, challenger: UserId, opponent: UserId) -> bool {
+  pub fn is_challenging(&self, challenger: I, opponent: I) -> bool {
     self.challenges.get(&challenger).map_or(false, |challenges| {
       challenges.contains(&opponent)
     })
   }
 
   /// Attempts to delete the given challenge, returning whether or not the challenge existed.
-  pub fn remove_challenge(&mut self, challenger: UserId, opponent: UserId) -> bool {
+  pub fn remove_challenge(&mut self, challenger: I, opponent: I) -> bool {
     self.challenges.get_mut(&challenger).map_or(false, |challenges| {
       challenges.remove(&opponent)
     })
   }
 
   /// Creates a challenge.
-  pub fn create_challenge(&mut self, challenger: UserId, opponent: UserId) -> bool {
+  pub fn create_challenge(&mut self, challenger: I, opponent: I) -> bool {
     // Cannot challenge self and cannot challenge while playing
     if challenger != opponent && !self.is_playing_user(challenger) {
       self.challenges.entry(challenger).or_default().insert(opponent)
@@ -56,7 +61,7 @@ impl Manager {
   }
 
   /// Accepts a challenge from the given challenger.
-  pub fn accept_challenge(&mut self, challenger: UserId, opponent: UserId) -> Option<&mut UserGame> {
+  pub fn accept_challenge(&mut self, challenger: I, opponent: I) -> Option<&mut UserGame<I>> {
     // Cannot accept against self, cannot accept against a playing user, cannot accept while playing
     let valid = challenger != opponent && !self.is_playing(challenger) && !self.is_playing(opponent);
     // Challenge must also exist
@@ -71,21 +76,21 @@ impl Manager {
     }
   }
 
-  pub fn get_user_game(&self, players: impl Into<UOrd<UserId>>) -> Option<&UserGame> {
+  pub fn get_user_game(&self, players: impl Into<UOrd<I>>) -> Option<&UserGame<I>> {
     self.user_games.get(&players.into().map(|v| v))
   }
 
-  pub fn get_user_game_mut(&mut self, players: impl Into<UOrd<UserId>>) -> Option<&mut UserGame> {
+  pub fn get_user_game_mut(&mut self, players: impl Into<UOrd<I>>) -> Option<&mut UserGame<I>> {
     self.user_games.get_mut(&players.into().map(|v| v))
   }
 
-  pub fn find_user_game(&self, player: UserId) -> Option<(&UserGame, Color)> {
+  pub fn find_user_game(&self, player: I) -> Option<(&UserGame<I>, Color)> {
     self.user_games.values().find_map(|game| {
       game.player_color(player).map(|color| (game, color))
     })
   }
 
-  pub fn find_user_game_mut(&mut self, player: UserId) -> Option<(&mut UserGame, Color)> {
+  pub fn find_user_game_mut(&mut self, player: I) -> Option<(&mut UserGame<I>, Color)> {
     self.user_games.values_mut().find_map(|game| {
       game.player_color(player).map(|color| (game, color))
     })
@@ -93,14 +98,14 @@ impl Manager {
 
   /// Resigns this player's current game, if any.
   /// Counts as a loss for the resigning player and a win for their opponent.
-  pub fn resign_user_game(&mut self, player: UserId) -> Option<UserGame> {
+  pub fn resign_user_game(&mut self, player: I) -> Option<UserGame<I>> {
     self.user_games.keys()
       .find_map(|players| players.other(&player).copied())
       .map(|opponent| self.end_user_game(opponent, player).unwrap())
   }
 
   /// Concludes a game with a winner and a loser, applying win and loss stats.
-  pub fn end_user_game(&mut self, winner: UserId, loser: UserId) -> Option<UserGame> {
+  pub fn end_user_game(&mut self, winner: I, loser: I) -> Option<UserGame<I>> {
     if let Some(game) = self.end_user_game_draw(UOrd::new(winner, loser)) {
       self.stats.entry(winner).or_default().wins += 1;
       self.stats.entry(loser).or_default().losses += 1;
@@ -111,12 +116,12 @@ impl Manager {
   }
 
   /// Ends the game without a winner or a loser.
-  pub fn end_user_game_draw(&mut self, players: impl Into<UOrd<UserId>>) -> Option<UserGame> {
+  pub fn end_user_game_draw(&mut self, players: impl Into<UOrd<I>>) -> Option<UserGame<I>> {
     self.user_games.remove(&players.into().map(|v| v))
   }
 }
 
-impl Default for Manager {
+impl<I: Copy + Eq + Ord + Hash> Default for Manager<I> {
   fn default() -> Self {
     Manager {
       challenges: HashMap::new(),
@@ -127,16 +132,16 @@ impl Default for Manager {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct UserGame {
+pub struct UserGame<I: Copy + Eq + Ord + Hash> {
   board: Board,
   #[serde(default = "Utc::now")]
   last_played: DateTime<Utc>,
-  player1: UserId,
-  player2: UserId
+  player1: I,
+  player2: I
 }
 
-impl UserGame {
-  pub fn new(player1: UserId, player2: UserId) -> Self {
+impl<I: Copy + Eq + Ord + Hash> UserGame<I> {
+  pub fn new(player1: I, player2: I) -> Self {
     UserGame {
       board: Board::new(Color::Player2),
       last_played: Utc::now(),
@@ -172,7 +177,7 @@ impl UserGame {
     self.last_played
   }
 
-  pub fn current_turn_user(&self) -> UserId {
+  pub fn current_turn_user(&self) -> I {
     match self.board.turn {
       Color::Player1 => self.player1,
       Color::Player2 => self.player2
@@ -180,11 +185,11 @@ impl UserGame {
   }
 
   /// The unordered pair of players participating in this game.
-  pub fn players(&self) -> UOrd<UserId> {
+  pub fn players(&self) -> UOrd<I> {
     UOrd::new(self.player1, self.player2)
   }
 
-  pub fn player_color(&self, player: UserId) -> Option<Color> {
+  pub fn player_color(&self, player: I) -> Option<Color> {
     match () {
       () if self.player1 == player => Some(Color::Player1),
       () if self.player2 == player => Some(Color::Player2),
@@ -193,7 +198,7 @@ impl UserGame {
   }
 }
 
-impl Deref for UserGame {
+impl<I: Copy + Eq + Ord + Hash> Deref for UserGame<I> {
   type Target = Board;
 
   fn deref(&self) -> &Self::Target {

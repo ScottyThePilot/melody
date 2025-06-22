@@ -1834,6 +1834,7 @@ dependencies = [
  "itertools",
  "log",
  "melody-commander",
+ "melody-connect-four",
  "melody-flag",
  "melody-framework",
  "melody-ratelimiter",
@@ -1863,6 +1864,15 @@ version = "0.1.0"
 dependencies = [
  "futures",
  "thiserror 2.0.12",
+]
+
+[[package]]
+name = "melody-connect-four"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "uord",
 ]
 
 [[package]]
