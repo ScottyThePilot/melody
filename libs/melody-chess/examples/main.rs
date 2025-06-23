@@ -1,6 +1,6 @@
 extern crate melody_chess;
 
-use melody_chess::render::shakmaty::*;
+use melody_chess::shakmaty::*;
 
 use std::fs::File;
 use std::io::BufWriter;
@@ -42,10 +42,12 @@ fn main() {
 
   let color = game.turn().other();
 
+  let assets = melody_chess::render::Assets::load();
   let img = melody_chess::render::render_board(
     &game, color,
     &[Square::D8, Square::H4],
-    ["White", "Black"]
+    ["White", "Black"],
+    &assets
   );
 
   let writer = BufWriter::new(File::create("board.png").unwrap());

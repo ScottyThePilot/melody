@@ -1,6 +1,3 @@
-pub extern crate shakmaty;
-pub extern crate image;
-
 use fontdue::{Font, FontSettings};
 use fontdue::layout::{Layout, LayoutSettings, CoordinateSystem, TextStyle, HorizontalAlign, VerticalAlign};
 use glam::{Vec2, UVec2};
@@ -8,7 +5,8 @@ use shakmaty::{Color, Piece, Role, Square, File, Rank, Position};
 use image::{DynamicImage, GenericImageView, ImageResult, Pixel, Rgb, Rgba, RgbImage, RgbaImage};
 
 use std::io::{Read, Write};
-use std::sync::OnceLock;
+
+
 
 type RgbaSubImage<'a> = image::SubImage<&'a RgbaImage>;
 
@@ -48,11 +46,6 @@ fn should_show_check(position: &impl Position, square: Square) -> bool {
   })
 }
 
-/// Pre-initializes all static resources for chessboard rendering
-pub fn init() {
-  Assets::instance();
-}
-
 /// Renders the given chessboard to a image buffer.
 /// The chessboard will be oriented from the perspective specified by `side`.
 /// Squares included in `highlighted` will be highlighted in green.
@@ -60,9 +53,9 @@ pub fn render_board(
   position: &impl Position,
   side: Color,
   highlighted: &[Square],
-  players: [&str; 2]
+  players: [&str; 2],
+  assets: &Assets
 ) -> RgbImage {
-  let assets = Assets::instance();
   let mut img = RgbImage::from_pixel(BOARD_SIZE_FULL.x, BOARD_SIZE_FULL.y, NEUTRAL);
 
   let (top_player, bottom_player) = match side {
@@ -73,6 +66,7 @@ pub fn render_board(
   fill_text(&mut img, BLACK, top_player, TextOptions {
     pos: NAME_POS_TOP,
     size: 24.0,
+    font: &assets.font,
     horizontal_align: HorizontalAlign::Center,
     vertical_align: VerticalAlign::Middle,
     window: UVec2::splat(1024)
@@ -81,6 +75,7 @@ pub fn render_board(
   fill_text(&mut img, BLACK, bottom_player, TextOptions {
     pos: NAME_POS_BOTTOM,
     size: 24.0,
+    font: &assets.font,
     horizontal_align: HorizontalAlign::Center,
     vertical_align: VerticalAlign::Middle,
     window: UVec2::splat(1024)
@@ -117,6 +112,7 @@ pub fn render_board(
         fill_text(&mut img, color_inverted, text, TextOptions {
           pos: pos + TILE_SIZE - UVec2::new(2, 0),
           size: 12.0,
+          font: &assets.font,
           horizontal_align: HorizontalAlign::Right,
           vertical_align: VerticalAlign::Bottom,
           window: UVec2::splat(256)
@@ -132,6 +128,7 @@ pub fn render_board(
         fill_text(&mut img, color_inverted, text, TextOptions {
           pos: pos + UVec2::new(2, 0),
           size: 12.0,
+          font: &assets.font,
           horizontal_align: HorizontalAlign::Left,
           vertical_align: VerticalAlign::Top,
           window: UVec2::splat(256)
@@ -159,7 +156,8 @@ fn get_color(is_dark: bool, is_highlighted: bool) -> Rgb<u8> {
   }
 }
 
-struct Assets {
+#[derive(Debug)]
+pub struct Assets {
   font: Font,
   pieces: RgbaImage,
   check: RgbaImage
@@ -184,19 +182,13 @@ impl Assets {
     self.pieces.view(column * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE)
   }
 
-  fn instance() -> &'static Self {
-    static INSTANCE: OnceLock<Assets> = OnceLock::new();
-    INSTANCE.get_or_init(Self::load)
-  }
-
-  fn load() -> Self {
+  pub fn load() -> Self {
     let font_settings = FontSettings::default();
-
-    Assets {
-      font: Font::from_bytes(include_bytes!("../assets/Roboto-Bold.ttf").as_slice(), font_settings).unwrap(),
-      pieces: decode_static_image(include_bytes!("../assets/Pieces.png")).into_rgba8(),
-      check: generate_image_check()
-    }
+    let font = Font::from_bytes(include_bytes!("../assets/Roboto-Bold.ttf").as_slice(), font_settings)
+      .expect("failed to construct static font");
+    let pieces = decode_image(include_bytes!("../assets/Pieces.png").as_slice())
+      .expect("failed to decode static image").into_rgba8();
+    Assets { font, pieces, check: generate_image_check() }
   }
 }
 
@@ -220,17 +212,16 @@ fn fill_square(destination: &mut RgbImage, pixel: Rgb<u8>, pos: UVec2, size: u32
   };
 }
 
-struct TextOptions {
+struct TextOptions<'f> {
   pos: UVec2,
   size: f32,
+  font: &'f Font,
   horizontal_align: HorizontalAlign,
   vertical_align: VerticalAlign,
   window: UVec2
 }
 
 fn fill_text(destination: &mut RgbImage, pixel: Rgb<u8>, text: &str, text_options: TextOptions) {
-  let font = &Assets::instance().font;
-
   let mut layout = Layout::new(CoordinateSystem::PositiveYDown);
   layout.reset(&LayoutSettings {
     x: text_options.pos.x as f32,
@@ -255,6 +246,7 @@ fn fill_text(destination: &mut RgbImage, pixel: Rgb<u8>, text: &str, text_option
     }
   );
 
+  let font = text_options.font;
   layout.append(&[font], &TextStyle::new(text, text_options.size, 0));
   for glyph in layout.glyphs() {
     let glyph_offset = Vec2::new(glyph.x, glyph.y).round().as_ivec2()
@@ -315,8 +307,4 @@ pub fn encode_image_rgba<W: Write>(img: &RgbaImage, writer: W) -> ImageResult<()
 
 pub fn decode_image<R: Read>(reader: R) -> ImageResult<DynamicImage> {
   image::codecs::png::PngDecoder::new(reader).and_then(DynamicImage::from_decoder)
-}
-
-fn decode_static_image(data: &'static [u8]) -> DynamicImage {
-  decode_image(data).expect("failed to decode static image")
 }
