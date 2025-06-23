@@ -61,9 +61,9 @@ version = "0.6.1"
 resolver = "3"
 members = [
   "libs/cacheable",
-  "libs/chessboard-render",
   "libs/cleverbot",
   "libs/cleverbot-logs",
+  "libs/melody-chess",
   "libs/melody-commander",
   "libs/melody-connect-four",
   "libs/melody-flag",

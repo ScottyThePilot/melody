@@ -1,0 +1,13 @@
+[package]
+name = "melody-chess"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+fontdue = { version = "0.9.3" }
+glam = { version = "0.30" }
+image = { version = "0.24", default-features = false, features = ["png"] }
+serde = { version = "1.0", features = ["derive"] }
+shakmaty = { version = "0.28" }
+uord = { git = "https://github.com/ScottyThePilot/misc-crates", features = ["serde"] }

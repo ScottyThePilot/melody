@@ -226,9 +226,9 @@ dependencies = [
 
 [[package]]
 name = "btoi"
-version = "0.4.3"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9dd6407f73a9b8b6162d8a2ef999fe6afd7cc15902ebf42c5cd296addf17e0ad"
+checksum = "3b5ab9db53bcda568284df0fd39f6eac24ad6f7ba7ff1168b9e76eba6576b976"
 dependencies = [
  "num-traits",
 ]
@@ -364,16 +364,6 @@ dependencies = [
  "cipher",
  "poly1305",
  "zeroize",
-]
-
-[[package]]
-name = "chessboard-render"
-version = "0.1.0"
-dependencies = [
- "fontdue",
- "glam",
- "image",
- "shakmaty",
 ]
 
 [[package]]
@@ -1830,6 +1820,7 @@ dependencies = [
  "fern",
  "float-ord",
  "fs-err",
+ "futures",
  "ids",
  "itertools",
  "log",
@@ -1859,10 +1850,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "melody-chess"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "fontdue",
+ "glam",
+ "image",
+ "serde",
+ "shakmaty",
+ "uord",
+]
+
+[[package]]
 name = "melody-commander"
 version = "0.1.0"
 dependencies = [
- "futures",
  "thiserror 2.0.12",
 ]
 
@@ -3297,13 +3300,15 @@ checksum = "bbfa15b3dddfee50a0fff136974b3e1bde555604ba463834a7eb7deb6417705d"
 
 [[package]]
 name = "shakmaty"
-version = "0.26.0"
+version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7da274d26b6aac011b0af8ec3514eb1d598cf51fb47944d1d2142338f210cfb3"
+checksum = "3065bdba026d0a3a6eb452ff174dbbd258452643a71383153abb91a8a4fc1abc"
 dependencies = [
  "arrayvec 0.7.6",
  "bitflags 2.9.1",
  "btoi",
+ "nohash-hasher",
+ "serde",
 ]
 
 [[package]]

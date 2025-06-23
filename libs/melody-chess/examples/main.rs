@@ -1,6 +1,6 @@
-extern crate chessboard_render;
+extern crate melody_chess;
 
-use chessboard_render::shakmaty::*;
+use melody_chess::render::shakmaty::*;
 
 use std::fs::File;
 use std::io::BufWriter;
@@ -8,7 +8,7 @@ use std::io::BufWriter;
 fn main() {
   let game = Chess::new();
 
-  let game = game.play(&Move::Normal {
+  let game = game.play(Move::Normal {
     role: Role::Pawn,
     from: Square::F2,
     to: Square::F3,
@@ -16,7 +16,7 @@ fn main() {
     promotion: None
   }).unwrap();
 
-  let game = game.play(&Move::Normal {
+  let game = game.play(Move::Normal {
     role: Role::Pawn,
     from: Square::E7,
     to: Square::E6,
@@ -24,7 +24,7 @@ fn main() {
     promotion: None
   }).unwrap();
 
-  let game = game.play(&Move::Normal {
+  let game = game.play(Move::Normal {
     role: Role::Pawn,
     from: Square::E2,
     to: Square::E3,
@@ -32,7 +32,7 @@ fn main() {
     promotion: None
   }).unwrap();
 
-  let game = game.play(&Move::Normal {
+  let game = game.play(Move::Normal {
     role: Role::Queen,
     from: Square::D8,
     to: Square::H4,
@@ -42,12 +42,12 @@ fn main() {
 
   let color = game.turn().other();
 
-  let img = chessboard_render::render_board(
+  let img = melody_chess::render::render_board(
     &game, color,
     &[Square::D8, Square::H4],
     ["White", "Black"]
   );
 
   let writer = BufWriter::new(File::create("board.png").unwrap());
-  chessboard_render::encode_image_rgb(&img, writer).unwrap();
+  melody_chess::render::encode_image_rgb(&img, writer).unwrap();
 }
