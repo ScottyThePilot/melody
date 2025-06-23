@@ -1,22 +1,9 @@
-extern crate futures;
 #[macro_use]
 extern crate thiserror;
-
-use futures::future::BoxFuture;
 
 use std::collections::VecDeque;
 use std::str::FromStr;
 use std::any::type_name;
-
-pub type FnCommand<R> = Command<fn(Box<[String]>) -> R>;
-pub type FnCommands<R> = Commands<fn(Box<[String]>) -> R>;
-pub type FnFalibleCommand<R, E> = FnCommand<Result<R, E>>;
-pub type FnFalibleCommands<R, E> = FnCommands<Result<R, E>>;
-
-pub type AsyncFnCommand<R> = FnCommand<BoxFuture<'static, R>>;
-pub type AsyncFnCommands<R> = FnCommands<BoxFuture<'static, R>>;
-pub type AsyncFnFallibleCommand<R, E> = AsyncFnCommand<Result<R, E>>;
-pub type AsyncFnFallibleCommands<R, E> = AsyncFnCommands<Result<R, E>>;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Command<T: 'static> {
@@ -87,59 +74,6 @@ pub fn apply<T: 'static>(input: &str, commands: Commands<T>) -> Result<CommandOu
   })
 }
 
-pub fn apply_fn<R>(input: &str, commands: FnCommands<R>) -> Result<R, CommandError> {
-  apply(input, commands).map(|CommandOutput { target, remaining_args }| target(remaining_args))
-}
-
-#[inline]
-pub fn apply_fn_try<R>(input: &str, commands: FnCommands<Result<R, CommandError>>) -> Result<R, CommandError> {
-  apply_fn(input, commands).and_then(std::convert::identity)
-}
-
-pub fn apply_fn_merge<R, E>(input: &str, commands: FnFalibleCommands<R, E>) -> Result<R, E>
-where CommandError: Into<E> {
-  apply_fn(input, commands)
-    .map_err(CommandError::into)
-    .and_then(std::convert::identity)
-}
-
-pub async fn apply_fn_async<R>(input: &str, commands: AsyncFnCommands<R>) -> Result<R, CommandError> {
-  crate::private::result_apply_future_ok(apply_fn(input, commands)).await
-}
-
-#[inline]
-pub async fn apply_fn_try_async<R>(input: &str, commands: AsyncFnCommands<Result<R, CommandError>>) -> Result<R, CommandError> {
-  apply_fn_async(input, commands).await.and_then(std::convert::identity)
-}
-
-#[inline]
-pub async fn apply_fn_try_merge<R, E>(input: &str, commands: AsyncFnFallibleCommands<R, E>) -> Result<R, E>
-where CommandError: Into<E> {
-  apply_fn_async(input, commands).await
-    .map_err(CommandError::into)
-    .and_then(std::convert::identity)
-}
-
-#[doc(hidden)]
-pub mod private {
-  use std::future::Future;
-
-  #[inline]
-  pub async fn result_map_async<T, U, E, F, Fut>(result: Result<T, E>, f: F) -> Result<U, E>
-  where F: FnOnce(T) -> Fut, Fut: Future<Output = U> {
-    result_apply_future_ok(result.map(f)).await
-  }
-
-  #[inline]
-  pub async fn result_apply_future_ok<T: Future, E>(result: Result<T, E>) -> Result<T::Output, E>
-  where T: std::future::Future {
-    match result {
-      Ok(value) => Ok(value.await),
-      Err(error) => Err(error)
-    }
-  }
-}
-
 fn find_target_args<T: 'static>(
   args: &mut VecDeque<String>,
   commands: Commands<T>
@@ -161,7 +95,7 @@ fn command_names<T>(commands: Commands<T>) -> Vec<&'static str> {
 }
 
 #[inline]
-pub fn resolve_args<R: ResolveArgs>(args: &[String]) -> Result<R, CommandError> {
+pub fn resolve_args<R: ResolveArgs>(args: &[String]) -> Result<R::Resolved, CommandError> {
   R::resolve_args(args)
 }
 
@@ -179,14 +113,18 @@ impl<T> Parsed<T> {
 }
 
 pub trait ResolveArg: Sized {
-  fn resolve_arg(arg: Option<&str>) -> Result<Self, CommandError>;
+  type Resolved;
+
+  fn resolve_arg(arg: Option<&str>) -> Result<Self::Resolved, CommandError>;
 }
 
 impl<T> ResolveArg for Parsed<T>
 where T: FromStr, T::Err: std::error::Error + Send + Sync + 'static {
-  fn resolve_arg(arg: Option<&str>) -> Result<Self, CommandError> {
+  type Resolved = T;
+
+  fn resolve_arg(arg: Option<&str>) -> Result<Self::Resolved, CommandError> {
     match arg {
-      Some(arg) => arg.parse::<T>().map(Parsed)
+      Some(arg) => arg.parse::<T>()
         .map_err(|err| CommandError::ArgsFromStrError(err.into())),
       None => Err(CommandError::InsufficientArgs(type_name::<T>()))
     }
@@ -194,26 +132,35 @@ where T: FromStr, T::Err: std::error::Error + Send + Sync + 'static {
 }
 
 impl ResolveArg for String {
-  fn resolve_arg(arg: Option<&str>) -> Result<Self, CommandError> {
+  type Resolved = String;
+
+  fn resolve_arg(arg: Option<&str>) -> Result<Self::Resolved, CommandError> {
     arg.map(str::to_owned)
       .ok_or_else(|| CommandError::InsufficientArgs(type_name::<String>()))
   }
 }
 
 impl<T> ResolveArg for Option<T> where T: ResolveArg {
-  fn resolve_arg(arg: Option<&str>) -> Result<Self, CommandError> {
+  type Resolved = Option<T::Resolved>;
+
+  fn resolve_arg(arg: Option<&str>) -> Result<Self::Resolved, CommandError> {
     arg.map(|arg| T::resolve_arg(Some(arg))).transpose()
   }
 }
 
 pub trait ResolveArgs: Sized {
-  fn resolve_args(args: &[String]) -> Result<Self, CommandError>;
+  type Resolved;
+
+  fn resolve_args(args: &[String]) -> Result<Self::Resolved, CommandError>;
 }
 
 macro_rules! impl_resolve_args {
   ($($G:ident),* $(,)?) => {
+    #[allow(unused)]
     impl<$($G: ResolveArg),*> ResolveArgs for ($($G,)*) {
-      fn resolve_args(args: &[String]) -> Result<Self, CommandError> {
+      type Resolved = ($($G::Resolved,)*);
+
+      fn resolve_args(args: &[String]) -> Result<Self::Resolved, CommandError> {
         let mut args = args.into_iter();
         Ok(($($G::resolve_arg(args.next().map(String::as_str))?,)*))
       }
@@ -221,6 +168,7 @@ macro_rules! impl_resolve_args {
   };
 }
 
+impl_resolve_args!();
 impl_resolve_args!(A);
 impl_resolve_args!(A, B);
 impl_resolve_args!(A, B, C);
@@ -239,7 +187,9 @@ impl_resolve_args!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O);
 impl_resolve_args!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);
 
 impl<T: ResolveArg> ResolveArgs for T {
-  fn resolve_args(args: &[String]) -> Result<Self, CommandError> {
+  type Resolved = T::Resolved;
+
+  fn resolve_args(args: &[String]) -> Result<Self::Resolved, CommandError> {
     T::resolve_arg(args.first().map(String::as_str))
   }
 }

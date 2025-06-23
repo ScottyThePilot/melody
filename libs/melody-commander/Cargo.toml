@@ -4,5 +4,4 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-futures = { version = "0.3.31", features = ["std"], default-features = false}
 thiserror = { version = "2.0" }

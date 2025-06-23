@@ -3,18 +3,23 @@ name = "melody"
 version = "0.1.0"
 authors = ["ScottyThePilot <scotty.codes@gmail.com>"]
 edition = "2024"
+rust-version = "1.85.1"
 
 [dependencies]
 ahash = { version = "0.8" }
+build-info = { git = "https://github.com/ScottyThePilot/misc-crates", features = ["git", "chrono"] }
 chrono = { version = "0.4", features = ["serde"] }
 chumsky = { version = "0.9.2" }
 cleverbot = { path = "./libs/cleverbot" }
 cleverbot-logs = { path = "./libs/cleverbot-logs" }
 const-random = { version = "0.1.15" }
+defy = { git = "https://github.com/ScottyThePilot/misc-crates", features = ["log"] }
 dunce = { version = "1.0.4" }
 fern = { version = "0.6" }
 float-ord = { version = "0.3.2" }
 fs-err = { version = "3", features = ["tokio"] }
+futures = "0.3.31"
+ids = { git = "https://github.com/ScottyThePilot/misc-crates", features = ["serde"] }
 itertools = { version = "0.14" }
 log = { version = "0.4" }
 melody-commander = { path = "./libs/melody-commander" }
@@ -35,7 +40,9 @@ term-stratum = { path = "./libs/term-stratum" }
 thiserror = { version = "2.0" }
 tokio = { version = "1.35", features = ["full", "parking_lot"] }
 tracing = { version = "0.1.40", features = ["log-always"] }
+uord = { git = "https://github.com/ScottyThePilot/misc-crates", features = ["serde"] }
 url = { version = "2.4", features = ["serde"] }
+yggdrasil = { git = "https://github.com/ScottyThePilot/misc-crates" }
 
 [dependencies.serenity]
 version = "0.12.4"
@@ -49,25 +56,6 @@ features = [
 
 [dependencies.poise]
 version = "0.6.1"
-
-[dependencies.build-info]
-git = "https://github.com/ScottyThePilot/misc-crates"
-features = ["git", "chrono"]
-
-[dependencies.defy]
-git = "https://github.com/ScottyThePilot/misc-crates"
-features = ["log"]
-
-[dependencies.ids]
-git = "https://github.com/ScottyThePilot/misc-crates"
-features = ["serde"]
-
-[dependencies.uord]
-git = "https://github.com/ScottyThePilot/misc-crates"
-features = ["serde"]
-
-[dependencies.yggdrasil]
-git = "https://github.com/ScottyThePilot/misc-crates"
 
 [workspace]
 resolver = "3"

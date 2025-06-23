@@ -1,140 +1,45 @@
 use crate::prelude::*;
 use crate::data::Core;
 
+use futures::future::BoxFuture;
 use log::Level;
-use melody_commander::{Command, CommandError, CommandOutput, Parsed, resolve_args};
+use melody_commander::{Command, Commands, Parsed, resolve_args};
 use serenity::model::id::GuildId;
 
 use std::collections::HashSet;
 
+macro_rules! command {
+  ($name:literal: $function:ident($($arg:ident: $Arg:ty),*)) => (
+    <Command<CommandFunction>>::new_target($name, |agent, remaining_args| Box::pin(async move {
+      let ($($arg,)*) = resolve_args::<($($Arg,)*)>(&remaining_args)?;
+      agent.$function($($arg,)*).await
+    }))
+  );
+  ($name:literal: [$($command:expr),* $(,)?]) => (
+    <Command<CommandFunction>>::new_group($name, &[$($command),*])
+  );
+}
 
+type CommandFunction = for<'a> fn(&'a mut InputAgent, Box<[String]>) -> BoxFuture<'a, MelodyResult>;
 
-const COMMANDS: &[Command<Target>] = &[
-  Command::new_target("stop", Target::Stop),
+const COMMANDS2: Commands<CommandFunction> = &[
+  command!("stop": command_stop()),
   // a few months ago, i was using tmux, and typing `stop` did not immediately kill the tmux session,
   // now it does, and i can't find any resources on changing the magic words it uses, so i get to
   // pull out the thesaurus to work around this...
-  Command::new_target("halt", Target::Stop),
-  Command::new_group("plugin", &[
-    Command::new_target("list", Target::PluginList),
-    Command::new_target("enable", Target::PluginEnable),
-    Command::new_target("disable", Target::PluginDisable)
+  command!("halt": command_stop()),
+  command!("plugin": [
+    command!("list": command_plugin_list(guild_id: Parsed<GuildId>)),
+    command!("enable": command_plugin_enable(plugin: String, guild_id: Parsed<GuildId>)),
+    command!("disable": command_plugin_disable(plugin: String, guild_id: Parsed<GuildId>))
   ]),
-  Command::new_group("feeds", &[
-    Command::new_target("respawn-all", Target::FeedsRespawnAll),
-    Command::new_target("abort-all", Target::FeedsAbortAll),
-    Command::new_target("list-tasks", Target::FeedsListTasks),
+  command!("feeds": [
+    command!("respawn-all": command_feeds_respawn_all()),
+    command!("abort-all": command_feeds_abort_all()),
+    command!("list-tasks": command_feeds_list_tasks())
   ]),
-  Command::new_target("update-yt-dlp", Target::UpdateYtDlp)
+  command!("update-yt-dlp": command_update_yt_dlp(update_to: Option<String>))
 ];
-
-#[derive(Debug, Clone, Copy)]
-enum Target {
-  Stop,
-  PluginList,
-  PluginEnable,
-  PluginDisable,
-  FeedsRespawnAll,
-  FeedsAbortAll,
-  FeedsListTasks,
-  UpdateYtDlp
-}
-
-#[derive(Debug, Clone)]
-enum TargetArgs {
-  Stop,
-  PluginList(GuildId),
-  PluginEnable(String, GuildId),
-  PluginDisable(String, GuildId),
-  FeedsRespawnAll,
-  FeedsAbortAll,
-  FeedsListTasks,
-  UpdateYtDlp(Option<String>)
-}
-
-impl TryFrom<CommandOutput<Target>> for TargetArgs {
-  type Error = CommandError;
-
-  fn try_from(output: CommandOutput<Target>) -> Result<Self, Self::Error> {
-    match output.target.clone() {
-      Target::Stop => Ok(TargetArgs::Stop),
-      Target::PluginList => {
-        let Parsed(guild_id) = resolve_args::<Parsed<GuildId>>(&output.remaining_args)?;
-        Ok(TargetArgs::PluginList(guild_id))
-      },
-      Target::PluginEnable => {
-        let (plugin, Parsed(guild_id)) = resolve_args::<(String, Parsed<GuildId>)>(&output.remaining_args)?;
-        Ok(TargetArgs::PluginEnable(plugin, guild_id))
-      },
-      Target::PluginDisable => {
-        let (plugin, Parsed(guild_id)) = resolve_args::<(String, Parsed<GuildId>)>(&output.remaining_args)?;
-        Ok(TargetArgs::PluginDisable(plugin, guild_id))
-      },
-      Target::FeedsRespawnAll => Ok(TargetArgs::FeedsRespawnAll),
-      Target::FeedsAbortAll => Ok(TargetArgs::FeedsAbortAll),
-      Target::FeedsListTasks => Ok(TargetArgs::FeedsListTasks),
-      Target::UpdateYtDlp => {
-        let update_to = resolve_args::<Option<String>>(&output.remaining_args)?;
-        Ok(TargetArgs::UpdateYtDlp(update_to))
-      }
-    }
-  }
-}
-
-impl TargetArgs {
-  async fn execute(self, agent: &mut InputAgent) -> MelodyResult {
-    match self {
-      TargetArgs::Stop => {
-        agent.info("Shutdown triggered");
-        agent.core.trigger_shutdown().await;
-      },
-      TargetArgs::PluginList(guild_id) => {
-        let plugins = agent.plugin_list(guild_id).await;
-        agent.info(format!("Plugins for guild ({guild_id}): {}", plugins.iter().join(", ")));
-      },
-      TargetArgs::PluginEnable(plugin, guild_id) => {
-        agent.plugin_enable(&plugin, guild_id).await?;
-        agent.info(format!("Enabled plugin {plugin} for guild ({guild_id})"));
-      },
-      TargetArgs::PluginDisable(plugin, guild_id) => {
-        agent.plugin_disable(&plugin, guild_id).await?;
-        agent.info(format!("Disabled plugin {plugin} for guild ({guild_id})"));
-      },
-      TargetArgs::FeedsRespawnAll => {
-        let feed_wrapper = agent.core.state.feed.clone();
-        feed_wrapper.lock().await.respawn_all(&agent.core).await;
-      },
-      TargetArgs::FeedsAbortAll => {
-        let feed_wrapper = agent.core.state.feed.clone();
-        feed_wrapper.lock().await.abort_all();
-      },
-      TargetArgs::FeedsListTasks => {
-        let feed_wrapper = agent.core.state.feed.clone();
-        for (feed, running) in feed_wrapper.lock().await.tasks() {
-          agent.debug(format!("Feed task: {feed} ({})", if running { "running" } else { "stopped" }));
-        };
-      },
-      TargetArgs::UpdateYtDlp(update_to) => {
-        let yt_dlp_path = agent.core.operate_config(|config| {
-          config.music_player.as_ref().map(|music_player| music_player.ytdlp_path.clone())
-        }).await;
-
-        if let Some(yt_dlp_path) = yt_dlp_path {
-          let update_to = update_to.as_deref().unwrap_or("latest");
-          agent.info(format!("Updating yt-dlp..."));
-          let yt_dlp_output = crate::utils::youtube::update_yt_dlp(yt_dlp_path, update_to).await?;
-          for yt_dlp_output_line in yt_dlp_output.lines() {
-            agent.trace(format!("(yt-dlp): {yt_dlp_output_line:?}"));
-          };
-        } else {
-          agent.error(format!("Cannot update yt-dlp, no yt-dlp path in config"));
-        };
-      }
-    };
-
-    Ok(())
-  }
-}
 
 #[derive(Debug, Clone)]
 pub struct InputAgent {
@@ -150,10 +55,73 @@ impl InputAgent {
     }
   }
 
+  async fn command_stop(&mut self) -> MelodyResult {
+    self.info("Shutdown triggered");
+    self.core.trigger_shutdown().await;
+    Ok(())
+  }
+
+  async fn command_plugin_list(&mut self, guild_id: GuildId) -> MelodyResult {
+    let plugins = self.plugin_list(guild_id).await;
+    self.info(format!("Plugins for guild ({guild_id}): {}", plugins.iter().join(", ")));
+    Ok(())
+  }
+
+  async fn command_plugin_enable(&mut self, plugin: String, guild_id: GuildId) -> MelodyResult {
+    self.plugin_enable(&plugin, guild_id).await?;
+    self.info(format!("Enabled plugin {plugin} for guild ({guild_id})"));
+    Ok(())
+  }
+
+  async fn command_plugin_disable(&mut self, plugin: String, guild_id: GuildId) -> MelodyResult {
+    self.plugin_disable(&plugin, guild_id).await?;
+    self.info(format!("Disabled plugin {plugin} for guild ({guild_id})"));
+    Ok(())
+  }
+
+  async fn command_feeds_respawn_all(&mut self) -> MelodyResult {
+    let feed_wrapper = self.core.state.feed.clone();
+    feed_wrapper.lock().await.respawn_all(&self.core).await;
+    Ok(())
+  }
+
+  async fn command_feeds_abort_all(&mut self) -> MelodyResult {
+    let feed_wrapper = self.core.state.feed.clone();
+    feed_wrapper.lock().await.abort_all();
+    Ok(())
+  }
+
+  async fn command_feeds_list_tasks(&mut self) -> MelodyResult {
+    let feed_wrapper = self.core.state.feed.clone();
+    for (feed, running) in feed_wrapper.lock().await.tasks() {
+      self.debug(format!("Feed task: {feed} ({})", if running { "running" } else { "stopped" }));
+    };
+
+    Ok(())
+  }
+
+  async fn command_update_yt_dlp(&mut self, update_to: Option<String>) -> MelodyResult {
+    let yt_dlp_path = self.core.operate_config(|config| {
+      config.music_player.as_ref().map(|music_player| music_player.ytdlp_path.clone())
+    }).await;
+
+    if let Some(yt_dlp_path) = yt_dlp_path {
+      let update_to = update_to.as_deref().unwrap_or("latest");
+      self.info(format!("Updating yt-dlp..."));
+      let yt_dlp_output = crate::utils::youtube::update_yt_dlp(yt_dlp_path, update_to).await?;
+      for yt_dlp_output_line in yt_dlp_output.lines() {
+        self.trace(format!("(yt-dlp): {yt_dlp_output_line:?}"));
+      };
+    } else {
+      self.error(format!("Cannot update yt-dlp, no yt-dlp path in config"));
+    };
+
+    Ok(())
+  }
+
   pub async fn line(&mut self, line: String) -> MelodyResult {
-    melody_commander::apply(&line, COMMANDS)
-      .and_then(TargetArgs::try_from)?
-      .execute(self).await?;
+    let output = melody_commander::apply(&line, COMMANDS2)?;
+    (output.target)(self, output.remaining_args).await?;
     Ok(())
   }
 
