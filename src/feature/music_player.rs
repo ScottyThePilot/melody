@@ -1,5 +1,5 @@
 use crate::data::Core;
-use crate::utils::youtube::{self, YtDlpSource};
+use crate::utils::youtube::{self, YtDlpSource, YtDlp};
 
 use reqwest::Client as HttpClient;
 use serenity::model::id::{AttachmentId, ChannelId, GuildId};
@@ -15,20 +15,19 @@ use std::collections::vec_deque::VecDeque;
 use std::fmt;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
-use std::path::{Path, PathBuf};
 
 
 
 #[derive(Debug)]
 pub struct MusicPlayer {
-  ytdlp_path: PathBuf,
+  yt_dlp: YtDlp,
   http_client: HttpClient,
   guilds: Mutex<HashMap<GuildId, Arc<Mutex<QueueBundle>>>>
 }
 
 impl MusicPlayer {
-  pub fn new(ytdlp_path: PathBuf, http_client: HttpClient) -> Self {
-    MusicPlayer { ytdlp_path, http_client, guilds: Mutex::new(HashMap::new()) }
+  pub fn new(yt_dlp: YtDlp, http_client: HttpClient) -> Self {
+    MusicPlayer { yt_dlp, http_client, guilds: Mutex::new(HashMap::new()) }
   }
 
   pub async fn join(&self, core: &Core, guild_id: GuildId, channel_id: ChannelId) -> Result<(), JoinError> {
@@ -127,8 +126,8 @@ impl MusicPlayer {
     let call = songbird.get(guild_id)?;
     let queue_bundle = self.get_guild_queue_bundle(guild_id).await;
     Some(Session {
+      yt_dlp: self.yt_dlp.clone(),
       http_client: self.http_client.clone(),
-      ytdlp_path: self.ytdlp_path.clone(),
       call, queue_bundle
     })
   }
@@ -137,8 +136,8 @@ impl MusicPlayer {
     let call = join_and_deafen(&songbird, guild_id, channel_id).await?;
     let queue_bundle = self.get_guild_queue_bundle(guild_id).await;
     Ok(Session {
+      yt_dlp: self.yt_dlp.clone(),
       http_client: self.http_client.clone(),
-      ytdlp_path: self.ytdlp_path.clone(),
       call, queue_bundle
     })
   }
@@ -151,8 +150,8 @@ impl MusicPlayer {
     self.guilds.lock().await.remove(&guild_id)
   }
 
-  pub fn ytdlp_path(&self) -> &Path {
-    &self.ytdlp_path
+  pub fn yt_dlp(&self) -> &YtDlp {
+    &self.yt_dlp
   }
 }
 
@@ -171,7 +170,7 @@ async fn join_and_deafen(
 
 #[derive(Debug, Clone)]
 struct Session {
-  ytdlp_path: PathBuf,
+  yt_dlp: YtDlp,
   http_client: HttpClient,
   queue_bundle: Arc<Mutex<QueueBundle>>,
   call: Arc<Mutex<Call>>
@@ -190,7 +189,7 @@ impl Session {
     let mut queue_bundle = self.queue_bundle.lock().await;
     let mut call = self.call.lock().await;
     if let Some(current_item) = queue_bundle.queue.get_current() {
-      let input = current_item.to_input(self.http_client.clone(), self.ytdlp_path.clone());
+      let input = current_item.to_input(self.http_client.clone(), self.yt_dlp.clone());
       let track_handle = self.play(&mut call, input);
       queue_bundle.track = Some(track_handle);
     } else {
@@ -204,7 +203,7 @@ impl Session {
     let mut call = self.call.lock().await;
     queue_bundle.queue.append(items);
     if let (None, Some(current_item)) = (&queue_bundle.track, queue_bundle.queue.get_current()) {
-      let input = current_item.to_input(self.http_client.clone(), self.ytdlp_path.clone());
+      let input = current_item.to_input(self.http_client.clone(), self.yt_dlp.clone());
       let track_handle = self.play(&mut call, input);
       queue_bundle.track = Some(track_handle);
     };
@@ -324,9 +323,9 @@ pub enum QueueItem {
 }
 
 impl QueueItem {
-  fn to_input(&self, http_client: HttpClient, ytdlp_path: PathBuf) -> Input {
+  fn to_input(&self, http_client: HttpClient, yt_dlp: YtDlp) -> Input {
     match self {
-      QueueItem::YouTube(item) => item.to_input(http_client, ytdlp_path).into(),
+      QueueItem::YouTube(item) => item.to_input(http_client, yt_dlp).into(),
       QueueItem::Attachment(item) => item.to_input(http_client).into()
     }
   }
@@ -347,8 +346,8 @@ pub struct YouTubeItem {
 }
 
 impl YouTubeItem {
-  fn to_input(&self, http_client: HttpClient, ytdlp_path: PathBuf) -> YtDlpSource {
-    YtDlpSource::new(ytdlp_path, self.id.clone(), http_client)
+  fn to_input(&self, http_client: HttpClient, yt_dlp: YtDlp) -> YtDlpSource {
+    YtDlpSource::new(yt_dlp, self.id.clone(), http_client)
   }
 }
 

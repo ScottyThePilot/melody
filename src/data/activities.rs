@@ -7,7 +7,7 @@ use rand::seq::SliceRandom;
 use serenity::model::id::GuildId;
 use serenity::model::gateway::ActivityType;
 use serenity::gateway::ActivityData;
-use singlefile::container_shared_async::ContainerSharedAsyncReadonly;
+use singlefile::container_shared_async::ContainerSharedAsyncAtomic;
 use singlefile_formats::data::json_serde::Json;
 
 use std::collections::{HashSet, HashMap};
@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use std::fmt::{self, Write};
 use std::num::NonZeroU32 as zu32;
 
-pub type ActivitiesContainer = ContainerSharedAsyncReadonly<Activities, Json>;
+pub type ActivitiesContainer = ContainerSharedAsyncAtomic<Activities, Json>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(transparent)]

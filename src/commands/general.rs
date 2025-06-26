@@ -57,6 +57,7 @@ pub async fn echo(
   guild_only,
   name_localized("en-US", "troll"),
   description_localized("en-US", "Conducts epic trollage"),
+  required_bot_permissions = "MODERATE_MEMBERS",
   custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/troll"])
     .examples_localized("en-US", ["/troll"])

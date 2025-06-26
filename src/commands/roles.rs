@@ -25,6 +25,7 @@ const MANAGED_ROLE: &str = "The role you have specified is a managed role and ma
   ),
   name_localized("en-US", "role"),
   description_localized("en-US", "Allows a grantable role to be granted or revoked"),
+  required_bot_permissions = "MANAGE_ROLES",
   custom_data = CommandMetaData::new()
     .usage_localized("en-US", [
       "/role grant <role> <user>",
@@ -45,6 +46,7 @@ pub async fn role(_ctx: MelodyContext<'_>) -> MelodyResult {
   rename = "grant",
   name_localized("en-US", "grant"),
   description_localized("en-US", "Grants a grantable role to a user, as long as you are a valid granter"),
+  required_bot_permissions = "MANAGE_ROLES",
   custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/role grant <role> <user>"])
     .examples_localized("en-US", ["/role grant @Helper @Nanachi"])
@@ -94,6 +96,7 @@ async fn role_grant(
   rename = "revoke",
   name_localized("en-US", "revoke"),
   description_localized("en-US", "Revokes a grantable role from a user, as long as you are a valid granter"),
+  required_bot_permissions = "MANAGE_ROLES",
   custom_data = CommandMetaData::new()
     .usage_localized("en-US", ["/role revoke <role> <user>"])
     .examples_localized("en-US", ["/role revoke @Helper @Reg"])

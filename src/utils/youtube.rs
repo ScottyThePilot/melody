@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use reqwest::Client as HttpClient;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+use serde::de::DeserializeOwned;
 use singlefile_formats::data::json_serde::original as serde_json;
 use songbird::input::{AuxMetadata, AudioStream, AudioStreamError, Compose, HttpRequest, Input};
 use songbird::input::core::io::MediaSource;
@@ -10,14 +11,60 @@ use url::Url;
 use std::collections::HashMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
 
 
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct YtDlp {
+  program: Arc<Path>
+}
+
+impl YtDlp {
+  pub fn new(program: impl Into<Arc<Path>>) -> Self {
+    YtDlp { program: program.into() }
+  }
+
+  async fn run(&self, args: impl IntoIterator<Item = &str>) -> Result<Vec<u8>, YtDlpError> {
+    Command::new(self.program.as_ref()).args(args).output().await
+      .map_err(|err| YtDlpError::Io(err, self.program.to_path_buf()))
+      .and_then(|output| match output.status.success() {
+        true => Ok(output.stdout),
+        false => Err(YtDlpError::Program(String::from_utf8_lossy(&output.stderr).into_owned()))
+      })
+  }
+
+  async fn run_json<T: DeserializeOwned>(&self, args: impl IntoIterator<Item = &str>) -> Result<T, YtDlpError> {
+    self.run(std::iter::once("-J").chain(args)).await.and_then(|output_json| {
+      serde_json::from_slice::<T>(&output_json).map_err(YtDlpError::Json)
+    })
+  }
+
+  pub async fn update(&self, update_to: &str) -> Result<String, YtDlpError> {
+    self.run(["--update-to", update_to]).await
+      .map(|output| String::from_utf8_lossy(&output).into_owned())
+  }
+
+  pub async fn get_video_info(&self, video_id: &str) -> Result<VideoInfo, YtDlpError> {
+    assert!(is_id_str(video_id, 16), "video id {video_id:?} was invalid");
+    let url = display_video_url(video_id).to_string();
+    self.run_json([url.as_str(), "-f", "ba[abr>0][vcodec=none]/best", "--no-playlist"]).await
+  }
+
+  pub async fn get_playlist_info(&self, playlist_id: &str) -> Result<PlaylistInfo, YtDlpError> {
+    assert!(is_id_str(playlist_id, 40), "playlist id {playlist_id:?} was invalid");
+    let url = display_playlist_url(playlist_id).to_string();
+    self.run_json([url.as_str(), "--compat-options", "no-youtube-unavailable-videos", "--yes-playlist"]).await
+  }
+}
 
 #[derive(Debug, Error)]
 pub enum YtDlpError {
   #[error("{0}: {1}")]
   Io(std::io::Error, PathBuf),
+  #[error("program error: {0}")]
+  Program(String),
   #[error(transparent)]
   Json(serde_json::Error)
 }
@@ -80,55 +127,19 @@ impl VideoInfo {
   }
 }
 
-pub async fn update_yt_dlp(yt_dlp: impl AsRef<Path>, update_to: &str) -> Result<String, YtDlpError> {
-  let yt_dlp = yt_dlp.as_ref();
-  let args = ["--update-to", update_to];
-  let output = Command::new(yt_dlp).args(args).output().await
-    .map_err(|err| YtDlpError::Io(err, yt_dlp.to_owned()))?;
-  let info = String::from_utf8_lossy(&output.stdout).into_owned();
-
-  Ok(info)
-}
-
-pub async fn get_video_info(yt_dlp: impl AsRef<Path>, video_id: &str) -> Result<VideoInfo, YtDlpError> {
-  assert!(is_id_str(video_id, 16), "video id {video_id:?} was invalid");
-  let yt_dlp = yt_dlp.as_ref();
-  let url = display_video_url(video_id).to_string();
-  let args = ["-j", url.as_str(), "-f", "ba[abr>0][vcodec=none]/best", "--no-playlist"];
-  let output = Command::new(yt_dlp).args(args).output().await
-    .map_err(|err| YtDlpError::Io(err, yt_dlp.to_owned()))?;
-  let info = serde_json::from_slice(&output.stdout)
-    .map_err(YtDlpError::Json)?;
-
-  Ok(info)
-}
-
-pub async fn get_playlist_info(yt_dlp: impl AsRef<Path>, playlist_id: &str) -> Result<PlaylistInfo, YtDlpError> {
-  assert!(is_id_str(playlist_id, 40), "playlist id {playlist_id:?} was invalid");
-  let yt_dlp = yt_dlp.as_ref();
-  let url = display_playlist_url(playlist_id).to_string();
-  let args = ["-J", url.as_str(), "--compat-options", "no-youtube-unavailable-videos", "--yes-playlist"];
-  let output = Command::new(yt_dlp).args(args).output().await
-    .map_err(|err| YtDlpError::Io(err, yt_dlp.to_owned()))?;
-  let info = serde_json::from_slice(&output.stdout)
-    .map_err(YtDlpError::Json)?;
-
-  Ok(info)
-}
-
 #[derive(Debug, Clone)]
 pub struct YtDlpSource {
+  yt_dlp: YtDlp,
   video_id: String,
-  program: PathBuf,
   http_client: HttpClient,
   metadata_cache: Option<AuxMetadata>
 }
 
 impl YtDlpSource {
-  pub fn new(program: impl Into<PathBuf>, video_id: impl Into<String>, http_client: HttpClient) -> Self {
+  pub fn new(yt_dlp: YtDlp, video_id: impl Into<String>, http_client: HttpClient) -> Self {
     YtDlpSource {
+      yt_dlp,
       video_id: video_id.into(),
-      program: program.into(),
       http_client,
       metadata_cache: None
     }
@@ -148,7 +159,7 @@ impl Compose for YtDlpSource {
   }
 
   async fn create_async(&mut self) -> Result<AudioStream<Box<dyn MediaSource>>, AudioStreamError> {
-    let video_info = get_video_info(&self.program, &self.video_id).await
+    let video_info = self.yt_dlp.get_video_info(&self.video_id).await
       .map_err(|err| AudioStreamError::Fail(Box::new(err)))?;
     self.metadata_cache = Some(video_info.clone().into_aux_metadata());
 
@@ -179,7 +190,7 @@ impl Compose for YtDlpSource {
     Ok(match &mut self.metadata_cache {
       Some(metadata) => metadata.clone(),
       slot @ None => slot.insert({
-        get_video_info(&self.program, &self.video_id).await
+        self.yt_dlp.get_video_info(&self.video_id).await
           .map_err(|err| AudioStreamError::Fail(Box::new(err)))?
           .into_aux_metadata()
       }).clone()

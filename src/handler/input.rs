@@ -22,7 +22,7 @@ macro_rules! command {
 
 type CommandFunction = for<'a> fn(&'a mut InputAgent, Box<[String]>) -> BoxFuture<'a, MelodyResult>;
 
-const COMMANDS2: Commands<CommandFunction> = &[
+const COMMANDS: Commands<CommandFunction> = &[
   command!("stop": command_stop()),
   // a few months ago, i was using tmux, and typing `stop` did not immediately kill the tmux session,
   // now it does, and i can't find any resources on changing the magic words it uses, so i get to
@@ -38,7 +38,10 @@ const COMMANDS2: Commands<CommandFunction> = &[
     command!("abort-all": command_feeds_abort_all()),
     command!("list-tasks": command_feeds_list_tasks())
   ]),
-  command!("update-yt-dlp": command_update_yt_dlp(update_to: Option<String>))
+  command!("update-yt-dlp": command_update_yt_dlp(update_to: Option<String>)),
+  command!("reload": [
+    command!("activities": command_reload_activities())
+  ])
 ];
 
 #[derive(Debug, Clone)]
@@ -101,14 +104,10 @@ impl InputAgent {
   }
 
   async fn command_update_yt_dlp(&mut self, update_to: Option<String>) -> MelodyResult {
-    let yt_dlp_path = self.core.operate_config(|config| {
-      config.music_player.as_ref().map(|music_player| music_player.ytdlp_path.clone())
-    }).await;
-
-    if let Some(yt_dlp_path) = yt_dlp_path {
+    if let Some(yt_dlp) = self.core.state.yt_dlp.clone() {
       let update_to = update_to.as_deref().unwrap_or("latest");
       self.info(format!("Updating yt-dlp..."));
-      let yt_dlp_output = crate::utils::youtube::update_yt_dlp(yt_dlp_path, update_to).await?;
+      let yt_dlp_output = yt_dlp.update(update_to).await?;
       for yt_dlp_output_line in yt_dlp_output.lines() {
         self.trace(format!("(yt-dlp): {yt_dlp_output_line:?}"));
       };
@@ -119,8 +118,15 @@ impl InputAgent {
     Ok(())
   }
 
+  async fn command_reload_activities(&mut self) -> MelodyResult {
+    self.core.reload_activities().await?;
+    self.info("Reloaded data/activities.json");
+
+    Ok(())
+  }
+
   pub async fn line(&mut self, line: String) -> MelodyResult {
-    let output = melody_commander::apply(&line, COMMANDS2)?;
+    let output = melody_commander::apply(&line, COMMANDS)?;
     (output.target)(self, output.remaining_args).await?;
     Ok(())
   }

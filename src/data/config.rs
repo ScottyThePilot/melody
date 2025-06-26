@@ -55,7 +55,8 @@ fn default_cleverbot_ratelimit() -> f64 {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigMusicPlayer {
   /// The path to the `yt-dlp` executable.
-  pub ytdlp_path: PathBuf
+  #[serde(alias = "ytdlp_path")]
+  pub yt_dlp_path: PathBuf
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

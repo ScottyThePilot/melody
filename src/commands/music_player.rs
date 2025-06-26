@@ -190,7 +190,7 @@ async fn music_player_play_youtube_playlist(
         Some(playlist_id) => Ok({
           ctx.defer().await.context("failed to defer response")?;
 
-          match youtube::get_playlist_info(music_player.ytdlp_path(), &playlist_id).await {
+          match music_player.yt_dlp().get_playlist_info(&playlist_id).await {
             Ok(playlist_info) => {
               let mut items = playlist_info.entries.into_iter()
                 .map(|video_info| QueueItem::YouTube(YouTubeItem { id: video_info.id }))

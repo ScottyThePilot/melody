@@ -8,6 +8,7 @@ use crate::feature::cleverbot::{CleverBotLoggerWrapper, CleverBotWrapper};
 use crate::feature::feed::{FeedManager, FeedWrapper, FeedEventHandler};
 use crate::feature::message_chains::{MessageChains, MessageChainsWrapper};
 use crate::feature::music_player::MusicPlayer;
+use crate::utils::youtube::YtDlp;
 pub use self::activities::{ActivitiesContainer, Activities};
 pub use self::config::*;
 pub use self::persist::*;
@@ -59,6 +60,7 @@ pub struct State {
   pub feed: FeedWrapper,
   pub message_chains: MessageChainsWrapper,
   pub music_player: Option<Arc<MusicPlayer>>,
+  pub yt_dlp: Option<YtDlp>,
   pub tasks: Mutex<Tasks>
 }
 
@@ -71,12 +73,12 @@ impl State {
     http_client: HttpClient,
     feed_event_handler: impl FeedEventHandler
   ) -> MelodyResult<State> {
-    let (cleverbot_delay, ytdlp_path) = config.operate(|config| {
+    let (cleverbot_delay, yt_dlp_path) = config.operate(|config| {
       let cleverbot_delay = Duration::from_secs_f64(config.cleverbot_ratelimit);
       info!("YouTube RSS feeds are {}", if config.rss.youtube.is_some() { "enabled" } else { "disabled" });
       info!("Twitter RSS feeds are {}", if config.rss.twitter.is_some() { "enabled" } else { "disabled" });
-      let ytdlp_path = config.music_player.as_ref().map(|mp| mp.ytdlp_path.clone());
-      (cleverbot_delay, ytdlp_path)
+      let yt_dlp_path = config.music_player.as_ref().map(|mp| mp.yt_dlp_path.clone());
+      (cleverbot_delay, yt_dlp_path)
     }).await;
 
     let previous_build_id = persist.operate_mut_commit(|persist| Ok(persist.swap_build_id()))
@@ -90,8 +92,10 @@ impl State {
 
     let message_chains = MessageChains::new().into();
 
-    let music_player = ytdlp_path.map(|ytdlp_path| {
-      Arc::new(MusicPlayer::new(ytdlp_path, http_client.clone()))
+    let yt_dlp = yt_dlp_path.map(YtDlp::new);
+
+    let music_player = yt_dlp.clone().map(|yt_dlp| {
+      Arc::new(MusicPlayer::new(yt_dlp, http_client.clone()))
     });
 
     let tasks = Mutex::new(Tasks::default());
@@ -107,6 +111,7 @@ impl State {
       feed,
       message_chains,
       music_player,
+      yt_dlp,
       tasks
     })
   }
@@ -227,6 +232,11 @@ impl Core {
         shard_runner.runner_tx.set_activity(activitiy);
       };
     }).await;
+  }
+
+  pub async fn reload_activities(&self) -> MelodyResult {
+    self.state.activities.refresh().await.context("failed to refresh activities state")?;
+    Ok(())
   }
 
   pub async fn operate_config<R>(&self, operation: impl FnOnce(&Config) -> R) -> R {
