@@ -218,7 +218,7 @@ pub async fn emoji_stats(
 
 #[poise::command(
   slash_command,
-  owners_only, dm_only,
+  owners_only,
   name_localized("en-US", "console"),
   description_localized("en-US", "Execute an internal command"),
   custom_data = CommandMetaData::new()
