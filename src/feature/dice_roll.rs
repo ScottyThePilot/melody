@@ -8,7 +8,12 @@ use std::str::FromStr;
 use std::ops::Range;
 
 /*
-ROLL: ('coin' | SYNTAX1 | SYNTAX2)
+ROLL: (ROLL_COIN | ROLL_DICE)
+ROLL_COIN: 'coin' (','? TARGET_COIN)?
+TARGET_COIN: ('heads' | 'tails' | '1' | '2')
+ROLL_DICE: (SYNTAX1 | SYNTAX2) (','? TARGET_DICE)?
+TARGET_DICE: COMPARISON INT
+COMPARISON: ('>=' | '>' | '<=' | '<' | '==' | '!=')
 MODIFIER: ('-' | '+') INT
 MODE1: ('min' | 'minimum' | 'max' | 'maximum') INT?
 MODE2: ('adv' | 'advantage' | 'dis' | 'disadvantage')
@@ -20,27 +25,29 @@ DIGIT: (ascii digits)
 
 #[derive(Debug, Clone)]
 pub struct ExecutedRoll {
-  pub dice_results: Vec<u32>,
+  pub roll_results: Vec<u32>,
   pub roll: Roll
 }
 
 impl fmt::Display for ExecutedRoll {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    if let Ok([dice_result]) = <[u32; 1]>::try_from(&self.dice_results[..]) {
-      let value = dice_result as i64 + self.roll.modifier as i64;
+    let roll_results_total;
+
+    if let Ok([roll_result]) = <[u32; 1]>::try_from(&self.roll_results[..]) {
+      roll_results_total = roll_result as i64 + self.roll.modifier as i64;
       match self.roll.modifier {
-        0 => write!(f, "**{dice_result}**")?,
-        m => write!(f, "({dice_result}){} = **{value}**", DisplayModifier(m))?
+        0 => write!(f, "**{roll_result}**")?,
+        m => write!(f, "({roll_result}){} = **{roll_results_total}**", DisplayModifier(m))?
       };
     } else {
       write!(f, "[")?;
-      let mut values = Vec::with_capacity(self.dice_results.len());
-      for (i, &dice_result) in self.dice_results.iter().enumerate() {
+      let mut values = Vec::with_capacity(self.roll_results.len());
+      for (i, &roll_result) in self.roll_results.iter().enumerate() {
         if i != 0 { write!(f, ", ")? };
-        let value = dice_result as i64 + self.roll.modifier as i64;
+        let value = roll_result as i64 + self.roll.modifier as i64;
         match self.roll.modifier {
-          0 => write!(f, "{dice_result}")?,
-          m => write!(f, "({dice_result}){} = {value}", DisplayModifier(m))?
+          0 => write!(f, "{roll_result}")?,
+          m => write!(f, "({roll_result}){} = {value}", DisplayModifier(m))?
         };
 
         values.push(value);
@@ -55,12 +62,17 @@ impl fmt::Display for ExecutedRoll {
         };
 
         let values = &values[0..(n as usize)];
-        let total = values.into_iter().sum::<i64>();
-        write!(f, " {mode} = **{total}**")?;
+        roll_results_total = values.into_iter().sum::<i64>();
+        write!(f, " {mode} = **{roll_results_total}**")?;
       } else {
-        let total = values.into_iter().sum::<i64>();
-        write!(f, " = **{total}**")?;
+        roll_results_total = values.into_iter().sum::<i64>();
+        write!(f, " = **{roll_results_total}**")?;
       };
+    };
+
+    if let Some(RollTarget { total, comparison }) = self.roll.target {
+      let outcome = if comparison.exec(roll_results_total, total) { "SUCCESS" } else { "FAILURE" };
+      write!(f, " {comparison} {total}, **{outcome}**")?;
     };
 
     Ok(())
@@ -68,20 +80,40 @@ impl fmt::Display for ExecutedRoll {
 }
 
 #[derive(Debug, Clone, Copy)]
+pub struct RollTarget {
+  pub total: i64,
+  pub comparison: Comparison
+}
+
+impl RollTarget {
+  pub const COIN_HEADS: RollTarget = RollTarget { total: 1, comparison: Comparison::EqualTo };
+  pub const COIN_TAILS: RollTarget = RollTarget { total: 2, comparison: Comparison::EqualTo };
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct Roll {
   pub dice: u8,
   pub sides: u32,
   pub modifier: i16,
-  pub mode: Option<Mode>
+  pub mode: Option<Mode>,
+  pub target: Option<RollTarget>
 }
 
 impl Roll {
-  pub const COIN: Self = Roll { dice: 1, sides: 2, modifier: 0, mode: None };
+  pub const fn new_coin(target: Option<bool>) -> Self {
+    let target = match target {
+      Some(true) => Some(RollTarget::COIN_HEADS),
+      Some(false) => Some(RollTarget::COIN_TAILS),
+      None => None
+    };
+
+    Roll { dice: 1, sides: 2, modifier: 0, mode: None, target }
+  }
 
   pub fn execute(self) -> ExecutedRoll {
     let mut rng = rand::thread_rng();
-    let dice_results = (0..self.dice).map(|_| rng.gen_range(1..=self.sides)).collect();
-    ExecutedRoll { dice_results, roll: self.normalize() }
+    let roll_results = (0..self.dice).map(|_| rng.gen_range(1..=self.sides)).collect();
+    ExecutedRoll { roll_results, roll: self.normalize() }
   }
 
   fn normalize(mut self) -> Self {
@@ -112,19 +144,19 @@ impl fmt::Display for Roll {
   }
 }
 
-type Roll1 = (((u8, u32), i16), Option<Mode>);
-type Roll2 = ((u32, i16), ModeType);
+type Roll1 = ((((u8, u32), i16), Option<Mode>), Option<RollTarget>);
+type Roll2 = (((u32, i16), ModeType), Option<RollTarget>);
 
 impl From<Roll1> for Roll {
-  fn from((((dice, sides), modifier), mode): Roll1) -> Roll {
-    Roll { dice, sides, modifier, mode }
+  fn from(((((dice, sides), modifier), mode), target): Roll1) -> Roll {
+    Roll { dice, sides, modifier, mode, target }
   }
 }
 
 impl From<Roll2> for Roll {
-  fn from(((sides, modifier), mode_type): Roll2) -> Roll {
+  fn from((((sides, modifier), mode_type), target): Roll2) -> Roll {
     let mode = Mode(mode_type, 1);
-    Roll { dice: 2, sides, modifier, mode: Some(mode) }
+    Roll { dice: 2, sides, modifier, mode: Some(mode), target }
   }
 }
 
@@ -166,7 +198,7 @@ impl From<(ModeType, u8)> for Mode {
   }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ModeType {
   Min,
   Max
@@ -197,6 +229,52 @@ impl fmt::Display for ParseRollError {
 
 impl std::error::Error for ParseRollError {}
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Comparison {
+  GreaterThanEqualTo,
+  GreaterThan,
+  LessThanEqualTo,
+  LessThan,
+  EqualTo,
+  NotEqualTo
+}
+
+impl Comparison {
+  pub const fn exec(self, lhs: i64, rhs: i64) -> bool {
+    match self {
+      Self::GreaterThanEqualTo => lhs >= rhs,
+      Self::GreaterThan => lhs > rhs,
+      Self::LessThanEqualTo => lhs <= rhs,
+      Self::LessThan => lhs < rhs,
+      Self::EqualTo => lhs == rhs,
+      Self::NotEqualTo => lhs != rhs
+    }
+  }
+
+  pub const fn to_str(self) -> &'static str {
+    match self {
+      Self::GreaterThanEqualTo => "\u{2265}",
+      Self::GreaterThan => ">",
+      Self::LessThanEqualTo => "\u{2264}",
+      Self::LessThan => "<",
+      Self::EqualTo => "=",
+      Self::NotEqualTo => "\u{2260}"
+    }
+  }
+}
+
+impl AsRef<str> for Comparison {
+  fn as_ref(&self) -> &str {
+    self.to_str()
+  }
+}
+
+impl fmt::Display for Comparison {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.write_str(self.to_str())
+  }
+}
+
 macro_rules! spaced {
   ($expr:expr $(,$exprn:expr)*) => {
     $expr$(.then_ignore(whitespace()).then($exprn))*
@@ -209,17 +287,58 @@ where P: Parser<char, T, Error = Simple<char>> + Copy, T: Copy {
 }
 
 fn roll() -> impl Parser<char, Roll, Error = Simple<char>> {
+  roll_coin().or(roll_dice()).padded().then_ignore(end())
+}
+
+fn roll_coin() -> impl Parser<char, Roll, Error = Simple<char>> {
+  let target = just(',').then(whitespace()).or_not()
+    .ignore_then(target_coin()).or_not();
+
+  just("coin").then(whitespace()).ignore_then(target)
+    .map(Roll::new_coin).labelled("coin syntax")
+}
+
+fn target_coin() -> impl Parser<char, bool, Error = Simple<char>> {
+  choice([
+    just("heads").to(true),
+    just("tails").to(false),
+    just("1").to(true),
+    just("2").to(false)
+  ])
+}
+
+fn roll_dice() -> impl Parser<char, Roll, Error = Simple<char>> {
   let dice = or_not_with(dice(), 1);
   let sides = just('d').then(whitespace()).ignore_then(sides());
   let modifier = or_not_with(modifier(), 0);
+  let target = just(',').then(whitespace()).or_not()
+    .ignore_then(target_dice()).or_not()
+    .boxed();
 
-  let syntax0 = just("coin").to(Roll::COIN)
-    .padded().then_ignore(end()).labelled("coin flip syntax");
-  let syntax1 = spaced!(dice, sides, modifier, mode1().or_not())
-    .map(Roll::from).padded().then_ignore(end()).labelled("syntax 1");
-  let syntax2 = spaced!(sides, modifier, mode2())
-    .map(Roll::from).padded().then_ignore(end()).labelled("syntax 2");
-  choice((syntax0, syntax2, syntax1))
+  let syntax1 = spaced!(dice, sides, modifier, mode1().or_not(), target.clone())
+    .map(Roll::from).labelled("dice syntax 1");
+  let syntax2 = spaced!(sides, modifier, mode2(), target)
+    .map(Roll::from).labelled("dice syntax 2");
+  choice((syntax2, syntax1))
+}
+
+fn target_dice() -> impl Parser<char, RollTarget, Error = Simple<char>> {
+  spaced!(comparison(), int::<i64>()).map(|(comparison, total)| RollTarget { total, comparison })
+}
+
+fn comparison() -> impl Parser<char, Comparison, Error = Simple<char>> {
+  choice([
+    just("\u{2265}").to(Comparison::GreaterThanEqualTo),
+    just(">=").to(Comparison::GreaterThanEqualTo),
+    just(">").to(Comparison::GreaterThan),
+    just("\u{2264}").to(Comparison::LessThanEqualTo),
+    just("<=").to(Comparison::LessThanEqualTo),
+    just("<").to(Comparison::LessThan),
+    just("\u{2260}").to(Comparison::NotEqualTo),
+    just("!=").to(Comparison::NotEqualTo),
+    just("==").to(Comparison::EqualTo),
+    just("=").to(Comparison::EqualTo),
+  ])
 }
 
 fn mode1() -> impl Parser<char, Mode, Error = Simple<char>> {
