@@ -6,7 +6,7 @@ extern crate reqwest;
 #[macro_use]
 extern crate thiserror;
 
-use cacheable::{Cache, CacheableAsync, async_trait};
+use cacheable::{CacheAsync, CacheableAsync, async_trait};
 use chrono::{DateTime, Utc};
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, percent_encode};
 use reqwest::{Client, Proxy, Error as ReqwestError, StatusCode};
@@ -21,7 +21,7 @@ const USER_AGENT: &str = "Opera/9.48 (Windows NT 6.0; sl-SI) Presto/2.11.249 Ver
 /// Facilitates communication with CleverBot by imitating the website's functionality.
 /// A single instance of this should be treated as if it were a single instance of your browser.
 pub struct CleverBotAgent {
-  data: Cache<CleverBotData>,
+  data: CacheAsync<CleverBotData>,
   client: Client
 }
 
@@ -42,11 +42,11 @@ impl CleverBotAgent {
   }
 
   pub const fn with_client(client: Client) -> Self {
-    CleverBotAgent { data: Cache::new(), client }
+    CleverBotAgent { data: CacheAsync::new(), client }
   }
 
   async fn get(&mut self) -> Result<(&mut CleverBotData, &Client), Error> {
-    self.data.try_get_async((&self.client, Utc::now()))
+    self.data.try_get_or_init((&self.client, Utc::now()))
       .await.map(|data| (data, &self.client))
   }
 }

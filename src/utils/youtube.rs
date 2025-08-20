@@ -1,4 +1,5 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, TimeDelta};
+use cacheable::{CacheAsync, CacheableAsync};
 use reqwest::Client as HttpClient;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde::de::DeserializeOwned;
@@ -128,11 +129,33 @@ impl VideoInfo {
 }
 
 #[derive(Debug, Clone)]
+struct VideoInfoExtended {
+  video_info: VideoInfo,
+  timestamp: DateTime<Utc>
+}
+
+#[serenity::async_trait]
+impl CacheableAsync for VideoInfoExtended {
+  type Args<'a> = (&'a YtDlp, &'a str);
+  type Error = YtDlpError;
+
+  async fn operation((yt_dlp, video_id): Self::Args<'_>) -> Result<Self, Self::Error> {
+    let video_info = yt_dlp.get_video_info(video_id).await?;
+    let timestamp = Utc::now();
+    Ok(VideoInfoExtended { video_info, timestamp })
+  }
+
+  fn is_invalid(&self, _args: &Self::Args<'_>) -> bool {
+    Utc::now().signed_duration_since(self.timestamp) > TimeDelta::seconds(3)
+  }
+}
+
+#[derive(Debug, Clone)]
 pub struct YtDlpSource {
   yt_dlp: YtDlp,
   video_id: String,
   http_client: HttpClient,
-  metadata_cache: Option<AuxMetadata>
+  video_info_cache: CacheAsync<VideoInfoExtended>
 }
 
 impl YtDlpSource {
@@ -141,8 +164,19 @@ impl YtDlpSource {
       yt_dlp,
       video_id: video_id.into(),
       http_client,
-      metadata_cache: None
+      video_info_cache: CacheAsync::new()
     }
+  }
+
+  pub async fn get_video_info(&mut self) -> Result<&VideoInfo, YtDlpError> {
+    self.video_info_cache.try_get_or_init((&self.yt_dlp, &self.video_id)).await
+      .map(|video_info_extended| &video_info_extended.video_info)
+  }
+
+  pub async fn get_metadata(&mut self) -> Result<AuxMetadata, AudioStreamError> {
+    self.get_video_info().await
+      .map(|video_info| video_info.clone().into_aux_metadata())
+      .map_err(|err| AudioStreamError::Fail(Box::new(err)))
   }
 }
 
@@ -159,12 +193,12 @@ impl Compose for YtDlpSource {
   }
 
   async fn create_async(&mut self) -> Result<AudioStream<Box<dyn MediaSource>>, AudioStreamError> {
-    let video_info = self.yt_dlp.get_video_info(&self.video_id).await
+    let http_client = self.http_client.clone();
+    let video_info = self.get_video_info().await
       .map_err(|err| AudioStreamError::Fail(Box::new(err)))?;
-    self.metadata_cache = Some(video_info.clone().into_aux_metadata());
 
     let mut headers = HeaderMap::default();
-    if let Some(video_headers) = video_info.http_headers {
+    if let Some(video_headers) = &video_info.http_headers {
       headers.extend(video_headers.iter().filter_map(|(k, v)| {
         let header_name = HeaderName::from_bytes(k.as_bytes()).ok()?;
         let header_value = HeaderValue::from_str(v).ok()?;
@@ -173,8 +207,8 @@ impl Compose for YtDlpSource {
     };
 
     let mut req = HttpRequest {
-      client: self.http_client.clone(),
-      request: video_info.url,
+      client: http_client,
+      request: video_info.url.clone(),
       content_length: video_info.filesize,
       headers
     };
@@ -187,14 +221,7 @@ impl Compose for YtDlpSource {
   }
 
   async fn aux_metadata(&mut self) -> Result<AuxMetadata, AudioStreamError> {
-    Ok(match &mut self.metadata_cache {
-      Some(metadata) => metadata.clone(),
-      slot @ None => slot.insert({
-        self.yt_dlp.get_video_info(&self.video_id).await
-          .map_err(|err| AudioStreamError::Fail(Box::new(err)))?
-          .into_aux_metadata()
-      }).clone()
-    })
+    self.get_metadata().await
   }
 }
 
