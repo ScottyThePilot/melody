@@ -10,7 +10,7 @@ use melody_flag::Flag;
 use melody_framework::MelodyHandler;
 use melody_rss_feed::{TwitterPost, YouTubeVideo};
 use melody_rss_feed::url::Url;
-use rand::seq::SliceRandom;
+use rand::seq::IndexedRandom;
 use reqwest::Client as HttpClient;
 use serenity::client::Client;
 use serenity::gateway::ShardManager;
@@ -165,7 +165,7 @@ impl MelodyHandler<State, MelodyError> for Handler {
         let emojis = crate::utils::parse_emojis(&message.content);
         core.operate_persist_guild_commit(guild_id, |persist_guild| {
           // don't be greedy
-          let mut rng = rand::thread_rng();
+          let mut rng = rand::rng();
           if let Some(&emoji) = emojis.choose(&mut rng) {
             persist_guild.emoji_stats.increment_emoji_uses(emoji, message.author.id);
           };

@@ -4,7 +4,6 @@ use crate::data::{Core, ConfigRssTwitter, ConfigRssYouTube};
 use chrono::{DateTime, Utc};
 use melody_rss_feed::{FeedError, TwitterPost, YouTubeVideo};
 use melody_rss_feed::reqwest::Client;
-use rand::Rng;
 use serenity::model::id::{ChannelId, GuildId};
 use tokio::sync::Mutex;
 use tokio::time::{sleep, sleep_until, Instant};
@@ -311,8 +310,7 @@ async fn twitter_task(
 }
 
 fn random_delay(interval: Duration) -> Duration {
-  let mut rng = rand::thread_rng();
-  interval.mul_f64(rng.gen_range(0.0..1.0))
+  interval.mul_f64(rand::random_range(0.0..1.0))
 }
 
 async fn get_last_update(core: &Core, feed: &Feed) -> Option<DateTime<Utc>> {

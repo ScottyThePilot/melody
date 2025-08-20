@@ -6,7 +6,6 @@ use super::{MelodyContext, CommandMetaData};
 
 use chrono::{Utc, Duration};
 use log::Level;
-use rand::Rng;
 use poise::reply::CreateReply;
 use serenity::model::guild::Member;
 use serenity::model::timestamp::Timestamp;
@@ -25,7 +24,7 @@ const FUNNY_CHANCE: f64 = 0.01;
     .examples_localized("en-US", ["/ping"])
 )]
 pub async fn ping(ctx: MelodyContext<'_>) -> MelodyResult {
-  let response = if rand::thread_rng().gen_bool(FUNNY_CHANCE) { "Pog" } else { "Pong" };
+  let response = if rand::random_bool(FUNNY_CHANCE) { "Pog" } else { "Pong" };
   ctx.reply(response).await.context("failed to send reply")?;
   Ok(())
 }
@@ -87,7 +86,7 @@ pub async fn troll(
           None => "Sorry, I don't have permission to do that.".to_owned()
         }
       } else {
-        if rand::thread_rng().gen_bool(FUNNY_CHANCE) {
+        if rand::random_bool(FUNNY_CHANCE) {
           match victim.disable_communication_until_datetime(&ctx, time).await.log_error() {
             Some(()) => format!("{} has successfully trolled {}.", perpetrator.mention(), victim.mention()),
             None => "Sorry, even though you succeeded, I don't have permission to do that.".to_owned()

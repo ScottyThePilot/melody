@@ -2,8 +2,8 @@ use crate::prelude::*;
 use crate::data::Core;
 
 use rand::Rng;
-use rand::distributions::WeightedError;
-use rand::seq::SliceRandom;
+use rand::distr::weighted::Error;
+use rand::seq::IndexedRandom;
 use serenity::model::id::GuildId;
 use serenity::model::gateway::ActivityType;
 use serenity::gateway::ActivityData;
@@ -34,7 +34,7 @@ impl Activities {
   }
 
   pub fn select(&self, core: &Core) -> Result<ActivityData, ActivityError> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let activity_data = self.activities.choose_weighted(&mut rng, |v| v.variant.weight.get())
       .map_err(ActivityError::CannotSelectRandomActivity)?
       .to_activity_data(&mut rng, core)?;
@@ -191,10 +191,10 @@ impl ActivityVariant {
         buf.push_str(&game);
       },
       Self::RandomInt { min, max } => {
-        write!(buf, "{}", rng.gen_range(min..=max))?;
+        write!(buf, "{}", rng.random_range(min..=max))?;
       },
       Self::RandomFloat { min, max, digits } => {
-        let value = rng.gen_range(min..=max);
+        let value = rng.random_range(min..=max);
         if let Some(digits) = digits {
           write!(buf, "{value:.n$}", n = digits)?;
         } else {
@@ -221,9 +221,9 @@ pub enum ActivityError {
   #[error("failed to assemble template")]
   CannotAssembleTemplate,
   #[error("failed to select random activity: {0}")]
-  CannotSelectRandomActivity(WeightedError),
+  CannotSelectRandomActivity(Error),
   #[error("failed to select random value")]
-  CannotSelectRandomValue(rand::distributions::weighted::WeightedError),
+  CannotSelectRandomValue(Error),
   #[error("failed to select random game")]
   CannotSelectRandomGame
 }
@@ -241,7 +241,7 @@ fn list_games(core: &Core, guild_id: GuildId) -> HashSet<String> {
 }
 
 fn random_game(core: &Core) -> Option<String> {
-  let mut rng = rand::thread_rng();
+  let mut rng = rand::rng();
   let games = core.cache.guilds().into_iter()
     .flat_map(|guild_id| list_games(core, guild_id))
     .collect::<Vec<String>>();

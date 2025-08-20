@@ -69,7 +69,7 @@ impl SlashArgument for RoleOrUser {
 }
 
 pub fn shuffle<T>(list: &mut [T]) {
-  list.shuffle(&mut rand::thread_rng());
+  list.shuffle(&mut rand::rng());
 }
 
 pub fn parse_emojis(message: &str) -> Vec<EmojiId> {

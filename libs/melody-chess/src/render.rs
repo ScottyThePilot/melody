@@ -4,7 +4,8 @@ use glam::{Vec2, UVec2};
 use shakmaty::{Color, Piece, Role, Square, File, Rank, Position};
 use image::{DynamicImage, GenericImageView, ImageResult, Pixel, Rgb, Rgba, RgbImage, RgbaImage};
 
-use std::io::{Read, Write};
+use std::io::prelude::*;
+use std::io::Cursor;
 
 
 
@@ -186,7 +187,7 @@ impl Assets {
     let font_settings = FontSettings::default();
     let font = Font::from_bytes(include_bytes!("../assets/Roboto-Bold.ttf").as_slice(), font_settings)
       .expect("failed to construct static font");
-    let pieces = decode_image(include_bytes!("../assets/Pieces.png").as_slice())
+    let pieces = decode_image(Cursor::new(include_bytes!("../assets/Pieces.png").as_slice()))
       .expect("failed to decode static image").into_rgba8();
     Assets { font, pieces, check: generate_image_check() }
   }
@@ -292,19 +293,19 @@ fn blend(p1: Rgb<u8>, p2: Rgba<u8>) -> Rgb<u8> {
 }
 
 pub fn encode_image_rgb<W: Write>(img: &RgbImage, writer: W) -> ImageResult<()> {
-  use image::{ColorType, ImageEncoder};
+  use image::{ExtendedColorType, ImageEncoder};
   use image::codecs::png::{CompressionType, FilterType, PngEncoder};
   PngEncoder::new_with_quality(writer, CompressionType::Best, FilterType::Adaptive)
-    .write_image(img.as_raw(), img.width(), img.height(), ColorType::Rgb8)
+    .write_image(img.as_raw(), img.width(), img.height(), ExtendedColorType::Rgb8)
 }
 
 pub fn encode_image_rgba<W: Write>(img: &RgbaImage, writer: W) -> ImageResult<()> {
-  use image::{ColorType, ImageEncoder};
+  use image::{ExtendedColorType, ImageEncoder};
   use image::codecs::png::{CompressionType, FilterType, PngEncoder};
   PngEncoder::new_with_quality(writer, CompressionType::Best, FilterType::Adaptive)
-    .write_image(img.as_raw(), img.width(), img.height(), ColorType::Rgba8)
+    .write_image(img.as_raw(), img.width(), img.height(), ExtendedColorType::Rgba8)
 }
 
-pub fn decode_image<R: Read>(reader: R) -> ImageResult<DynamicImage> {
+pub fn decode_image<R: BufRead + Seek>(reader: R) -> ImageResult<DynamicImage> {
   image::codecs::png::PngDecoder::new(reader).and_then(DynamicImage::from_decoder)
 }

@@ -4,7 +4,7 @@ extern crate uord;
 
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
-use uord::UOrd;
+use uord::UOrd2;
 
 use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::Entry;
@@ -19,7 +19,7 @@ pub struct Manager<I: Copy + Eq + Ord + Hash> {
   challenges: HashMap<I, HashSet<I>>,
   stats: HashMap<I, Stats>,
   #[serde(default)]
-  user_games: HashMap<UOrd<I>, UserGame<I>>
+  user_games: HashMap<UOrd2<I>, UserGame<I>>
 }
 
 impl<I: Copy + Eq + Ord + Hash> Manager<I> {
@@ -66,7 +66,7 @@ impl<I: Copy + Eq + Ord + Hash> Manager<I> {
     let valid = challenger != opponent && !self.is_playing(challenger) && !self.is_playing(opponent);
     // Challenge must also exist
     if valid && self.remove_challenge(challenger, opponent) {
-      match self.user_games.entry(UOrd::new(opponent, challenger)) {
+      match self.user_games.entry(UOrd2::new([opponent, challenger])) {
         Entry::Vacant(entry) => Some(entry.insert(UserGame::new(challenger, opponent))),
         // Previous clauses should have eliminated the possibility of this branch's existence
         Entry::Occupied(..) => unreachable!("tried to create a game that already exists")
@@ -76,11 +76,11 @@ impl<I: Copy + Eq + Ord + Hash> Manager<I> {
     }
   }
 
-  pub fn get_user_game(&self, players: impl Into<UOrd<I>>) -> Option<&UserGame<I>> {
+  pub fn get_user_game(&self, players: impl Into<UOrd2<I>>) -> Option<&UserGame<I>> {
     self.user_games.get(&players.into().map(|v| v))
   }
 
-  pub fn get_user_game_mut(&mut self, players: impl Into<UOrd<I>>) -> Option<&mut UserGame<I>> {
+  pub fn get_user_game_mut(&mut self, players: impl Into<UOrd2<I>>) -> Option<&mut UserGame<I>> {
     self.user_games.get_mut(&players.into().map(|v| v))
   }
 
@@ -106,7 +106,7 @@ impl<I: Copy + Eq + Ord + Hash> Manager<I> {
 
   /// Concludes a game with a winner and a loser, applying win and loss stats.
   pub fn end_user_game(&mut self, winner: I, loser: I) -> Option<UserGame<I>> {
-    if let Some(game) = self.end_user_game_draw(UOrd::new(winner, loser)) {
+    if let Some(game) = self.end_user_game_draw(UOrd2::new([winner, loser])) {
       self.stats.entry(winner).or_default().wins += 1;
       self.stats.entry(loser).or_default().losses += 1;
       Some(game)
@@ -116,7 +116,7 @@ impl<I: Copy + Eq + Ord + Hash> Manager<I> {
   }
 
   /// Ends the game without a winner or a loser.
-  pub fn end_user_game_draw(&mut self, players: impl Into<UOrd<I>>) -> Option<UserGame<I>> {
+  pub fn end_user_game_draw(&mut self, players: impl Into<UOrd2<I>>) -> Option<UserGame<I>> {
     self.user_games.remove(&players.into().map(|v| v))
   }
 }
@@ -185,8 +185,8 @@ impl<I: Copy + Eq + Ord + Hash> UserGame<I> {
   }
 
   /// The unordered pair of players participating in this game.
-  pub fn players(&self) -> UOrd<I> {
-    UOrd::new(self.player1, self.player2)
+  pub fn players(&self) -> UOrd2<I> {
+    UOrd2::new([self.player1, self.player2])
   }
 
   pub fn player_color(&self, player: I) -> Option<Color> {

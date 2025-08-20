@@ -1,5 +1,4 @@
 use ahash::AHasher;
-use rand::Rng;
 use serenity::model::id::{ChannelId, UserId};
 use serenity::model::channel::Message;
 use tokio::sync::Mutex;
@@ -33,7 +32,7 @@ impl MessageChains {
 
   pub fn should_contribute(&mut self, message: &Message) -> bool {
     let chain_len = self.observe_message(message);
-    if chain_len >= Self::ACTIVATION_THRESHOLD && rand::thread_rng().gen_bool(Self::ACTIVATION_CHANCE) {
+    if chain_len >= Self::ACTIVATION_THRESHOLD && rand::random_bool(Self::ACTIVATION_CHANCE) {
       self.reset_message_chain(message.channel_id);
       true
     } else {

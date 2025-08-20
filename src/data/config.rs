@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-use rand::seq::SliceRandom;
+use rand::seq::IndexedRandom;
 use serde::de::{Deserialize, Deserializer, Unexpected};
 use serenity::model::id::UserId;
 use serenity::model::gateway::GatewayIntents;
@@ -118,7 +118,7 @@ pub struct ConfigRssTwitter {
 
 impl ConfigRssTwitter {
   pub fn get_url(&self, handle: &str) -> String {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     self.nitter_instances.choose(&mut rng).map(|domain| {
       let domain = domain.trim_start_matches("https://").trim_end_matches('/');
       format!("https://{domain}/{handle}/rss")
