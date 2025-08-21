@@ -7,7 +7,7 @@ use crate::feature::feed::{Feed, FeedEventHandler};
 pub use self::input::InputAgent;
 
 use melody_flag::Flag;
-use melody_framework::MelodyHandler;
+use melody_framework::handler::{MelodyHandler, MelodyHandlerFull};
 use melody_rss_feed::{TwitterPost, YouTubeVideo};
 use melody_rss_feed::url::Url;
 use rand::seq::IndexedRandom;
@@ -228,7 +228,10 @@ impl MelodyHandler<State, MelodyError> for Handler {
       }).await.log_error();
     };
   }
+}
 
+#[serenity::async_trait]
+impl MelodyHandlerFull<State, MelodyError> for Handler {
   async fn command_error(&self, ctx: MelodyContext<'_>, error: MelodyFrameworkError) {
     error!("command error ({}): {error}", ctx.command().name);
 

@@ -4,8 +4,20 @@ use serenity::http::RatelimitInfo;
 use serenity::model::prelude::*;
 
 use std::collections::HashMap;
+use std::fmt;
 
 
+
+pub struct AdvancedHandler<S, E> {
+  pub primary_handler: Box<dyn MelodyHandlerFull<S, E>>,
+  pub secondary_handlers: Box<[Box<dyn MelodyHandler<S, E>>]>
+}
+
+impl<S, E> fmt::Debug for AdvancedHandler<S, E> {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct("AdvancedHandler").finish_non_exhaustive()
+  }
+}
 
 // https://docs.rs/serenity/0.12.4/src/serenity/client/event_handler.rs.html
 
@@ -16,8 +28,32 @@ macro_rules! handler {
     pub trait MelodyHandler<S, E>: Send + Sync
     where S: Send + Sync, E: Send + Sync {
       $(async fn $method(&self, ctx: $crate::MelodyHandlerContext<'_, S, E>, $($arg: $Arg),*) {})*
+    }
 
+    #[allow(unused_variables)]
+    #[serenity::async_trait]
+    pub trait MelodyHandlerFull<S, E>: MelodyHandler<S, E>
+    where S: Send + Sync, E: Send + Sync {
       async fn command_error(&self, ctx: $crate::MelodyContext<'_, S, E>, error: $crate::MelodyFrameworkError<E>);
+    }
+
+    #[serenity::async_trait]
+    impl<S, E> MelodyHandler<S, E> for AdvancedHandler<S, E>
+    where S: Send + Sync, E: Send + Sync {
+      $(async fn $method(&self, ctx: $crate::MelodyHandlerContext<'_, S, E>, $($arg: $Arg),*) {
+        self.primary_handler.$method(ctx.clone(), $($arg.clone()),*).await;
+        for secondary_handler in self.secondary_handlers.iter() {
+          secondary_handler.$method(ctx.clone(), $($arg.clone()),*).await;
+        };
+      })*
+    }
+
+    #[serenity::async_trait]
+    impl<S, E> MelodyHandlerFull<S, E> for AdvancedHandler<S, E>
+    where S: Send + Sync, E: Send + Sync {
+      async fn command_error(&self, ctx: $crate::MelodyContext<'_, S, E>, error: $crate::MelodyFrameworkError<E>) {
+        self.primary_handler.command_error(ctx, error).await;
+      }
     }
 
     pub(crate) async fn dispatch<'a, S, E>(

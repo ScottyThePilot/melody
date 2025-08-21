@@ -1,6 +1,6 @@
 #![warn(missing_debug_implementations)]
 pub mod commands;
-mod handler;
+pub mod handler;
 
 extern crate itertools;
 extern crate poise;
@@ -10,7 +10,7 @@ extern crate tokio;
 #[macro_use]
 extern crate tracing;
 
-pub use crate::handler::MelodyHandler;
+use crate::handler::{MelodyHandler, MelodyHandlerFull};
 
 pub use poise::BoxFuture;
 
@@ -56,7 +56,7 @@ pub struct MelodyFrameworkOptions<S, E> {
   pub state: Arc<S>,
   pub owners: HashSet<UserId>,
   pub commands: Vec<MelodyCommand<S, E>>,
-  pub handler: Arc<dyn MelodyHandler<S, E>>,
+  pub handler: Arc<dyn MelodyHandlerFull<S, E>>,
   pub allowed_mentions: Option<CreateAllowedMentions>,
   pub reply_callback: Option<ReplyCallback<S, E>>,
   pub manual_cooldowns: bool,
@@ -69,7 +69,7 @@ where
   S: Send + Sync + 'static,
   E: Send + Sync + fmt::Debug + fmt::Display + 'static,
 {
-  pub fn new(state: Arc<S>, handler: Arc<dyn MelodyHandler<S, E>>) -> Self {
+  pub fn new(state: Arc<S>, handler: Arc<dyn MelodyHandlerFull<S, E>>) -> Self {
     let allowed_mentions = CreateAllowedMentions::default()
       .all_users(true).replied_user(true);
     MelodyFrameworkOptions {
@@ -147,7 +147,7 @@ impl<S: fmt::Debug, E> fmt::Debug for MelodyFrameworkOptions<S, E> {
 
 pub struct MelodyFrameworkData<S, E> {
   state: Arc<S>,
-  handler: Arc<dyn MelodyHandler<S, E>>
+  handler: Arc<dyn MelodyHandlerFull<S, E>>
 }
 
 impl<S, E> Deref for MelodyFrameworkData<S, E> {
