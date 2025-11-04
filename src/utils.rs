@@ -4,14 +4,16 @@ use crate::prelude::*;
 
 use chrono::{DateTime, Utc};
 use defy::ContextualError;
+use melody_ratelimiter::RateLimiter;
+use poise::slash_argument::{SlashArgument, SlashArgError};
 use rand::seq::SliceRandom;
 use regex::Regex;
 use serenity::model::id::{EmojiId, RoleId, UserId};
-use poise::slash_argument::{SlashArgument, SlashArgError};
+use tokio::sync::{Mutex, RwLock};
 
 use std::fmt;
 use std::ops::Deref;
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
 
 
@@ -200,9 +202,69 @@ impl<T> Contextualize for Result<T, serenity::Error> {
   }
 }
 
-#[macro_export]
-macro_rules! operate {
-  ($core:expr, $function:ident::<$Key:ty>, $operation:expr) => {
-    $crate::data::$function($core.get::<$Key>().await, $operation).await
-  };
+
+
+pub trait Operate<T> {
+  async fn operate<F, R>(&self, operation: F) -> R
+  where F: FnOnce(&T) -> R;
+}
+
+pub trait OperateMut<T> {
+  async fn operate_mut<F, R>(&self, operation: F) -> R
+  where F: FnOnce(&mut T) -> R;
+}
+
+macro_rules! impl_operate_deref {
+  ($O:ident, $T:ident, $Type:ty) => (
+    impl<$O, $T> Operate<T> for $Type where $O: Operate<T> {
+      async fn operate<F, R>(&self, operation: F) -> R
+      where F: FnOnce(&T) -> R {
+        $O::operate(self, operation).await
+      }
+    }
+
+    impl<$O, $T> OperateMut<T> for $Type where $O: OperateMut<T> {
+      async fn operate_mut<F, R>(&self, operation: F) -> R
+      where F: FnOnce(&mut T) -> R {
+        $O::operate_mut(self, operation).await
+      }
+    }
+  );
+}
+
+impl_operate_deref!(O, T, &O);
+impl_operate_deref!(O, T, &mut O);
+impl_operate_deref!(O, T, Box<O>);
+impl_operate_deref!(O, T, Arc<O>);
+
+impl<T> OperateMut<T> for Mutex<T> {
+  async fn operate_mut<F, R>(&self, operation: F) -> R
+  where F: FnOnce(&mut T) -> R {
+    let mut guard = self.lock().await;
+    operation(&mut *guard)
+  }
+}
+
+impl<T> Operate<T> for RwLock<T> {
+  async fn operate<F, R>(&self, operation: F) -> R
+  where F: FnOnce(&T) -> R {
+    let guard = self.read().await;
+    operation(&*guard)
+  }
+}
+
+impl<T> OperateMut<T> for RwLock<T> {
+  async fn operate_mut<F, R>(&self, operation: F) -> R
+  where F: FnOnce(&mut T) -> R {
+    let mut guard = self.write().await;
+    operation(&mut *guard)
+  }
+}
+
+impl<T> OperateMut<T> for RateLimiter<T> {
+  async fn operate_mut<F, R>(&self, operation: F) -> R
+  where F: FnOnce(&mut T) -> R {
+    let mut guard = self.get().await;
+    operation(&mut *guard)
+  }
 }

@@ -2,7 +2,6 @@ use crate::prelude::*;
 
 use rand::seq::IndexedRandom;
 use serde::de::{Deserialize, Deserializer, Unexpected};
-use serenity::model::id::UserId;
 use serenity::model::gateway::GatewayIntents;
 use serenity::model::colour::Color;
 use singlefile::container_shared_async::ContainerSharedAsyncReadonly;
@@ -10,6 +9,7 @@ use singlefile_formats::data::toml_serde::Toml;
 
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::str::FromStr;
 use std::time::Duration;
 
 pub type ConfigContainer = ContainerSharedAsyncReadonly<Config, Toml>;
@@ -18,18 +18,16 @@ pub type ConfigContainer = ContainerSharedAsyncReadonly<Config, Toml>;
 pub struct Config {
   /// Bot token (required)
   pub token: String,
-  /// Bot owner's Discord user ID (required)
-  pub owner_id: UserId,
   /// Accent color shown in help command embeds (optional)
   #[serde(default)]
   pub accent_color: Option<Color>,
   /// Messages will not be sent at a higher interval than this.
-  #[serde(default = "default_cleverbot_ratelimit")]
-  pub cleverbot_ratelimit: f64,
+  #[serde(default = "default_cleverbot_ratelimit", deserialize_with = "deserialize_duration")]
+  pub cleverbot_ratelimit: Duration,
   /// The list of gateway intents the bot should send to the Discord API.
   /// This can either be a list of intent names, or a number representing an intents bitfield.
   /// Defaults to [`GatewayIntents::non_privileged`].
-  #[serde(default, deserialize_with = "deserialize_intents")]
+  #[serde(default = "GatewayIntents::non_privileged", deserialize_with = "deserialize_intents")]
   pub intents: GatewayIntents,
   #[serde(default)]
   pub rss: ConfigRss,
@@ -48,8 +46,8 @@ impl Config {
   }
 }
 
-fn default_cleverbot_ratelimit() -> f64 {
-  5.0
+fn default_cleverbot_ratelimit() -> Duration {
+  Duration::from_secs_f64(5.0)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -142,15 +140,53 @@ where T: Deserialize<'de>, D: Deserializer<'de> {
   })
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(untagged)]
-enum ConfigGatewayIntents {
-  Name(ConfigGatewayIntentsIdentifier),
-  NameList(Vec<ConfigGatewayIntentsIdentifier>),
-  GatewayIntents(GatewayIntents)
-}
-
 fn deserialize_intents<'de, D: Deserializer<'de>>(deserializer: D) -> Result<GatewayIntents, D::Error> {
+  #[derive(Debug, Clone, Deserialize)]
+  #[serde(untagged)]
+  enum ConfigGatewayIntents {
+    Name(ConfigGatewayIntentsIdentifier),
+    NameList(Vec<ConfigGatewayIntentsIdentifier>),
+    GatewayIntents(GatewayIntents)
+  }
+
+  #[derive(Debug, Clone, Copy)]
+  struct ConfigGatewayIntentsIdentifier {
+    intents: GatewayIntents
+  }
+
+  impl FromStr for ConfigGatewayIntentsIdentifier {
+    type Err = ();
+
+    fn from_str(string: &str) -> Result<Self, Self::Err> {
+      GatewayIntents::from_name(&string)
+        .or_else(|| match string {
+          "NON_PRIVILEGED" => Some(GatewayIntents::non_privileged()),
+          "PRIVILEGED" => Some(GatewayIntents::privileged()),
+          "ALL" => Some(GatewayIntents::all()),
+          _ => None
+        })
+        .map(|intents| ConfigGatewayIntentsIdentifier { intents })
+        .ok_or(())
+    }
+  }
+
+  impl<'de> Deserialize<'de> for ConfigGatewayIntentsIdentifier {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where D: Deserializer<'de> {
+      let mut identifier = String::deserialize(deserializer)?;
+      identifier.make_ascii_uppercase();
+      identifier.parse::<ConfigGatewayIntentsIdentifier>()
+        .map_err(|()| serde::de::Error::invalid_value(
+          Unexpected::Str(identifier.as_str()),
+          &"gateway intents identifier"
+        ))
+    }
+  }
+
+  fn intents_from_list(list: Vec<ConfigGatewayIntentsIdentifier>) -> GatewayIntents {
+    list.into_iter().map(|identifier| identifier.intents).collect()
+  }
+
   ConfigGatewayIntents::deserialize(deserializer).map(|intents| match intents {
     ConfigGatewayIntents::Name(identifier) => identifier.intents,
     ConfigGatewayIntents::NameList(identifier_list) => intents_from_list(identifier_list),
@@ -158,51 +194,7 @@ fn deserialize_intents<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Gat
   })
 }
 
-fn intents_from_list(list: Vec<ConfigGatewayIntentsIdentifier>) -> GatewayIntents {
-  list.into_iter().map(|identifier| identifier.intents).collect()
-}
 
-#[derive(Debug, Clone, Copy)]
-struct ConfigGatewayIntentsIdentifier {
-  intents: GatewayIntents
-}
-
-impl<'de> Deserialize<'de> for ConfigGatewayIntentsIdentifier {
-  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-  where D: Deserializer<'de> {
-    let identifier = String::deserialize(deserializer)?.to_ascii_lowercase();
-    let intents = match identifier.as_str() {
-      "guilds" => GatewayIntents::GUILDS,
-      "guild_members" => GatewayIntents::GUILD_MEMBERS,
-      "guild_moderation" => GatewayIntents::GUILD_MODERATION,
-      "guild_bans" => GatewayIntents::GUILD_MODERATION,
-      "guild_emojis_and_stickers" => GatewayIntents::GUILD_EMOJIS_AND_STICKERS,
-      "guild_integrations" => GatewayIntents::GUILD_INTEGRATIONS,
-      "guild_webhooks" => GatewayIntents::GUILD_WEBHOOKS,
-      "guild_invites" => GatewayIntents::GUILD_INVITES,
-      "guild_voice_states" => GatewayIntents::GUILD_VOICE_STATES,
-      "guild_presences" => GatewayIntents::GUILD_PRESENCES,
-      "guild_messages" => GatewayIntents::GUILD_MESSAGES,
-      "guild_message_reactions" => GatewayIntents::GUILD_MESSAGE_REACTIONS,
-      "guild_message_typing" => GatewayIntents::GUILD_MESSAGE_TYPING,
-      "direct_messages" => GatewayIntents::DIRECT_MESSAGES,
-      "direct_message_reactions" => GatewayIntents::DIRECT_MESSAGE_REACTIONS,
-      "direct_message_typing" => GatewayIntents::DIRECT_MESSAGE_TYPING,
-      "message_content" => GatewayIntents::MESSAGE_CONTENT,
-      "guild_scheduled_events" => GatewayIntents::GUILD_SCHEDULED_EVENTS,
-      "auto_moderation_configuration" => GatewayIntents::AUTO_MODERATION_CONFIGURATION,
-      "auto_moderation_execution" => GatewayIntents::AUTO_MODERATION_EXECUTION,
-      "non_privileged" => GatewayIntents::non_privileged(),
-      "privileged" => GatewayIntents::privileged(),
-      "all" => GatewayIntents::all(),
-      identifier => return Err({
-        serde::de::Error::invalid_value(Unexpected::Str(identifier), &"gateway intents identifier")
-      })
-    };
-
-    Ok(ConfigGatewayIntentsIdentifier { intents })
-  }
-}
 
 // GUILDS
 // GUILD_MEMBERS

@@ -13,7 +13,6 @@ pub use self::activities::{ActivitiesContainer, Activities};
 pub use self::config::*;
 pub use self::persist::*;
 
-use melody_ratelimiter::RateLimiter;
 use reqwest::Client as HttpClient;
 use serenity::cache::Cache;
 use serenity::client::{Client, Context};
@@ -28,7 +27,6 @@ use tokio::task::JoinHandle;
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
-use std::time::Duration;
 
 
 
@@ -74,11 +72,10 @@ impl State {
     feed_event_handler: impl FeedEventHandler
   ) -> MelodyResult<State> {
     let (cleverbot_delay, yt_dlp_path) = config.operate(|config| {
-      let cleverbot_delay = Duration::from_secs_f64(config.cleverbot_ratelimit);
       info!("YouTube RSS feeds are {}", if config.rss.youtube.is_some() { "enabled" } else { "disabled" });
       info!("Twitter RSS feeds are {}", if config.rss.twitter.is_some() { "enabled" } else { "disabled" });
       let yt_dlp_path = config.music_player.as_ref().map(|mp| mp.yt_dlp_path.clone());
-      (cleverbot_delay, yt_dlp_path)
+      (config.cleverbot_ratelimit, yt_dlp_path)
     }).await;
 
     let previous_build_id = persist.operate_mut_commit(|persist| Ok(persist.swap_build_id()))
@@ -344,34 +341,4 @@ impl<'a> From<&crate::handler::MelodyHandlerContext<'a>> for Core {
   fn from(value: &crate::handler::MelodyHandlerContext<'a>) -> Self {
     Core::new(value.context.clone(), value.state.clone())
   }
-}
-
-
-
-#[allow(dead_code)]
-pub async fn operate_lock<T, F, R>(container: Arc<Mutex<T>>, operation: F) -> R
-where F: FnOnce(&mut T) -> R {
-  let mut guard = container.lock().await;
-  operation(&mut *guard)
-}
-
-#[allow(dead_code)]
-pub async fn operate_read<T, F, R>(container: Arc<RwLock<T>>, operation: F) -> R
-where F: FnOnce(&T) -> R {
-  let guard = container.read().await;
-  operation(&*guard)
-}
-
-#[allow(dead_code)]
-pub async fn operate_write<T, F, R>(container: Arc<RwLock<T>>, operation: F) -> R
-where F: FnOnce(&mut T) -> R {
-  let mut guard = container.write().await;
-  operation(&mut *guard)
-}
-
-#[allow(dead_code)]
-pub async fn operate_ratelimiter<T, F, R>(container: RateLimiter<T>, operation: F) -> R
-where F: FnOnce(&mut T) -> R {
-  let mut timeslice = container.get().await;
-  operation(&mut *timeslice)
 }
