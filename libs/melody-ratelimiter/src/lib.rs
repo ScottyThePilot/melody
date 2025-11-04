@@ -23,14 +23,14 @@ impl<T> RateLimiter<T> {
   }
 
   /// Gets a time-slice from this ratelimiter, when possible.
-  pub async fn get(&self) -> TimeSlice<T> {
+  pub async fn get(&self) -> TimeSlice<'_, T> {
     let guard = self.inner.resource.lock().await;
     tokio::time::sleep_until(guard.deadline).await;
     TimeSlice { guard, delay: self.inner.delay }
   }
 
   /// Gets a time-slice from the ratelimiter, only if possible immediately.
-  pub fn try_get(&self) -> Option<TimeSlice<T>> {
+  pub fn try_get(&self) -> Option<TimeSlice<'_, T>> {
     let guard = self.inner.resource.try_lock().ok()?;
     if guard.deadline.elapsed() <= Duration::ZERO {
       Some(TimeSlice { guard, delay: self.inner.delay })

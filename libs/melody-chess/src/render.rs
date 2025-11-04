@@ -2,14 +2,12 @@ use fontdue::{Font, FontSettings};
 use fontdue::layout::{Layout, LayoutSettings, CoordinateSystem, TextStyle, HorizontalAlign, VerticalAlign};
 use glam::{Vec2, UVec2};
 use shakmaty::{Color, Piece, Role, Square, File, Rank, Position};
-use image::{DynamicImage, GenericImageView, ImageResult, Pixel, Rgb, Rgba, RgbImage, RgbaImage};
+use image::{DynamicImage, GenericImageView, ImageResult, Pixel, Rgb, Rgba, RgbImage, RgbaImage, SubImage};
 
 use std::io::prelude::*;
 use std::io::Cursor;
 
 
-
-type RgbaSubImage<'a> = image::SubImage<&'a RgbaImage>;
 
 const TILE_SIZE: u32 = 64;
 const MARGIN_SIZE: UVec2 = UVec2::new(16, 32);
@@ -165,7 +163,7 @@ pub struct Assets {
 }
 
 impl Assets {
-  fn get_piece(&self, piece: Piece) -> RgbaSubImage {
+  fn get_piece(&self, piece: Piece) -> SubImage<&RgbaImage> {
     let column = match piece.role {
       Role::Queen => 0,
       Role::King => 1,

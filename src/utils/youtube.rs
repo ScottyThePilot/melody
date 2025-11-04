@@ -239,7 +239,7 @@ impl<'a> fmt::Display for DisplayVideoUrl<'a> {
 }
 
 #[inline]
-pub fn display_video_url(id: &str) -> DisplayVideoUrl {
+pub fn display_video_url(id: &str) -> DisplayVideoUrl<'_> {
   DisplayVideoUrl(id)
 }
 
@@ -253,7 +253,7 @@ impl<'a> fmt::Display for DisplayPlaylistUrl<'a> {
 }
 
 #[inline]
-pub fn display_playlist_url(id: &str) -> DisplayPlaylistUrl {
+pub fn display_playlist_url(id: &str) -> DisplayPlaylistUrl<'_> {
   DisplayPlaylistUrl(id)
 }
 

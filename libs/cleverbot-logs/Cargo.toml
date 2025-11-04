@@ -1,12 +1,12 @@
 [package]
 name = "cleverbot-logs"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 base64 = { version = "0.22.1" }
 chrono = { workspace = true }
-ciborium = { version = "0.2.1" }
+ciborium = { version = "0.2.2" }
 fs-err = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
