@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-cacheable = { path = "../cacheable" }
-chrono = "0.4"
-md5 = "0.8.0"
-percent-encoding = "2.2.0"
-reqwest = "0.12"
-thiserror = "2.0"
+cacheable = { workspace = true }
+chrono = { workspace = true }
+md5 = { version = "0.8.0" }
+percent-encoding = { version = "2.2.0" }
+reqwest = { workspace = true }
+thiserror = { workspace = true }

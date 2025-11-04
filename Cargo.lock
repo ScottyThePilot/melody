@@ -1844,7 +1844,6 @@ dependencies = [
  "cleverbot-logs",
  "const-random",
  "defy",
- "dunce",
  "fern",
  "float-ord",
  "fs-err",

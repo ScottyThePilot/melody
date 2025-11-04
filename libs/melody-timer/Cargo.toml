@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-chrono = { version = "0.4" }
-tokio = { version = "1", features = ["macros", "sync", "time"] }
+chrono = { workspace = true }
+tokio = { workspace = true, features = ["macros", "sync", "time"] }

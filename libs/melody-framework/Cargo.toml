@@ -4,19 +4,15 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-itertools = { version = "0.14" }
-thiserror = { version = "2.0" }
-tracing = { version = "0.1.40", features = ["log"] }
-
-[dependencies.tokio]
-default-features = false
-version = "1"
+itertools = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true, features = ["log"] }
 
 [dependencies.poise]
+workspace = true
 features = ["chrono", "cache", "handle_panics"]
-version = "0.6.1"
 
 [dependencies.serenity]
-default-features = false
+workspace = true
 features = ["builder", "client", "gateway", "model", "utils", "collector", "framework"]
-version = "0.12.4"

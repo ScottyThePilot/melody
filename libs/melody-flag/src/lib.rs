@@ -23,4 +23,16 @@ impl Flag {
   pub fn swap(&self, state: bool) -> bool {
     self.0.swap(state, Ordering::AcqRel)
   }
+
+  pub fn flip(&self) -> bool {
+    self.0.fetch_not(Ordering::AcqRel)
+  }
+
+  pub fn fetch_and(&self, state: bool) -> bool {
+    self.0.fetch_and(state, Ordering::AcqRel)
+  }
+
+  pub fn fetch_or(&self, state: bool) -> bool {
+    self.0.fetch_or(state, Ordering::AcqRel)
+  }
 }

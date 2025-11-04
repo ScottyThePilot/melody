@@ -1,11 +1,19 @@
-#![warn(missing_debug_implementations)]
+#![warn(
+  absolute_paths_not_starting_with_crate,
+  redundant_imports,
+  redundant_lifetimes,
+  future_incompatible,
+  deprecated_in_future,
+  missing_copy_implementations,
+  missing_debug_implementations
+)]
+
 extern crate ahash;
 extern crate chrono;
 extern crate chumsky;
 extern crate cleverbot;
 extern crate cleverbot_logs;
 extern crate const_random;
-extern crate dunce;
 extern crate fern;
 extern crate float_ord;
 extern crate ids;
