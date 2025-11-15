@@ -31,6 +31,7 @@ const COMMANDS: &[fn() -> MelodyCommand] = &[
   self::general::avatar,
   self::general::banner,
   self::general::emoji_stats,
+  self::general::ban_id,
   self::general::console,
   self::general::roll,
   self::feed::feeds,

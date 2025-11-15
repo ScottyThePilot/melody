@@ -7,7 +7,9 @@ use super::{MelodyContext, CommandMetaData};
 use chrono::{Utc, Duration};
 use log::Level;
 use poise::reply::CreateReply;
+use serenity::http::Http;
 use serenity::model::guild::Member;
+use serenity::model::id::{GuildId, UserId};
 use serenity::model::timestamp::Timestamp;
 use serenity::utils::{content_safe, ContentSafeOptions};
 
@@ -217,6 +219,46 @@ pub async fn emoji_stats(
 
 #[poise::command(
   slash_command,
+  guild_only,
+  name_localized("en-US", "ban-id"),
+  description_localized("en-US", "Ban a user by numeric ID"),
+  default_member_permissions = "BAN_MEMBERS",
+  required_bot_permissions = "BAN_MEMBERS",
+  required_permissions = "BAN_MEMBERS",
+  custom_data = CommandMetaData::new()
+    .usage_localized("en-US", ["/ban-id <user-id>"])
+    .examples_localized("en-US", ["/ban-id 235088799074484224"])
+)]
+pub async fn ban_id(
+  ctx: MelodyContext<'_>,
+  #[rename = "user-id"]
+  #[name_localized("en-US", "user-id")]
+  #[description_localized("en-US", "The numeric ID of the user to ban.")]
+  user_id: String,
+  #[name_localized("en-US", "reason")]
+  #[description_localized("en-US", "The page of results to display (results are grouped 20 at a time)")]
+  #[min_length = 1]
+  #[max_length = 512]
+  reason: Option<String>
+) -> MelodyResult {
+  let core = Core::from(ctx);
+
+  let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
+
+  let response = match user_id.parse::<u64>() {
+    Ok(user_id) => match ban_maybe_with_reason(guild_id, &core, user_id, reason).await.log_error() {
+      Some(()) => format!("Successfully banned user `{user_id}`"),
+      None => format!("Failed to ban user `{user_id}`")
+    },
+    Err(..) => format!("Not a valid numeric user ID")
+  };
+
+  ctx.reply(response).await.context("failed to send reply")?;
+  Ok(())
+}
+
+#[poise::command(
+  slash_command,
   owners_only,
   name_localized("en-US", "console"),
   description_localized("en-US", "Execute an internal command"),
@@ -318,4 +360,18 @@ pub async fn roll(
 
   ctx.reply(response).await.context("failed to send reply")?;
   Ok(())
+}
+
+
+
+async fn ban_maybe_with_reason(
+  guild_id: GuildId,
+  http: impl AsRef<Http>,
+  user_id: impl Into<UserId>,
+  reason: Option<impl AsRef<str>>
+) -> serenity::Result<()> {
+  match reason {
+    Some(reason) => guild_id.ban_with_reason(http, user_id, 0, reason).await,
+    None => guild_id.ban(http, user_id, 0).await
+  }
 }
