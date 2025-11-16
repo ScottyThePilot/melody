@@ -1,16 +1,31 @@
+use poise::reply::CreateReply;
 use serenity::client::FullEvent;
 use serenity::gateway::ShardStageUpdateEvent;
 use serenity::http::RatelimitInfo;
 use serenity::model::prelude::*;
+use tokio::task::JoinSet;
 
 use std::collections::HashMap;
 use std::fmt;
+use std::iter::once;
 
 
 
 pub struct AdvancedHandler<S, E> {
   pub primary_handler: Box<dyn MelodyHandlerFull<S, E>>,
   pub secondary_handlers: Box<[Box<dyn MelodyHandler<S, E>>]>
+}
+
+impl<S, E> AdvancedHandler<S, E> {
+  pub fn iter_handlers(&self) -> impl Iterator<Item = &dyn MelodyHandler<S, E>> {
+    once(&*self.primary_handler as &dyn MelodyHandler<S, E>)
+      .chain(self.secondary_handlers.iter().map(|x| &**x))
+  }
+
+  pub async fn join_all_handlers<F, R>(&self, task_builder: impl FnMut(&dyn MelodyHandler<S, E>) -> F) -> Vec<R>
+  where F: Future<Output = R> + Send + 'static, R: Send + 'static {
+    self.iter_handlers().map(task_builder).collect::<JoinSet<R>>().join_all().await
+  }
 }
 
 impl<S, E> fmt::Debug for AdvancedHandler<S, E> {
@@ -28,6 +43,10 @@ macro_rules! handler {
     pub trait MelodyHandler<S, E>: Send + Sync
     where S: Send + Sync, E: Send + Sync {
       $(async fn $method(&self, ctx: $crate::MelodyHandlerContext<'_, S, E>, $($arg: $Arg),*) {})*
+
+      fn outgoing_reply(&self, ctx: $crate::MelodyContext<'_, S, E>, create_reply: CreateReply) -> CreateReply {
+        create_reply
+      }
     }
 
     #[allow(unused_variables)]
@@ -41,11 +60,14 @@ macro_rules! handler {
     impl<S, E> MelodyHandler<S, E> for AdvancedHandler<S, E>
     where S: Send + Sync, E: Send + Sync {
       $(async fn $method(&self, ctx: $crate::MelodyHandlerContext<'_, S, E>, $($arg: $Arg),*) {
-        self.primary_handler.$method(ctx.clone(), $($arg.clone()),*).await;
-        for secondary_handler in self.secondary_handlers.iter() {
-          secondary_handler.$method(ctx.clone(), $($arg.clone()),*).await;
+        for handler in self.iter_handlers() {
+          handler.$method(ctx.clone(), $($arg.clone()),*).await;
         };
       })*
+
+      fn outgoing_reply(&self, ctx: $crate::MelodyContext<'_, S, E>, create_reply: CreateReply) -> CreateReply {
+        self.iter_handlers().fold(create_reply, |create_reply, handler| handler.outgoing_reply(ctx, create_reply))
+      }
     }
 
     #[serenity::async_trait]

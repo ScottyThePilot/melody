@@ -61,17 +61,28 @@ macro_rules! builder_field {
   );
 }
 
-pub type ReplyCallback<S, E> = fn(MelodyContext<'_, S, E>, CreateReply) -> CreateReply;
-
 pub struct MelodyFrameworkOptions<S, E> {
   pub state: Arc<S>,
+  /// User IDs which are allowed to use `owners_only`` commands.
   pub owners: HashSet<UserId>,
+  /// List of commands in the framework.
   pub commands: Vec<MelodyCommand<S, E>>,
+  /// Called on every Discord event. Can be used to react to non-command events, like message deletions or guild updates.
   pub handler: Arc<dyn MelodyHandlerFull<S, E>>,
+  /// Default set of allowed mentions to use for all responses.
+  ///
+  /// By default, user pings are allowed and role pings and everyone pings are filtered.
   pub allowed_mentions: Option<CreateAllowedMentions>,
-  pub reply_callback: Option<ReplyCallback<S, E>>,
+  /// If `true`, disables automatic cooldown handling before every command invocation.
+  ///
+  /// Useful for implementing custom cooldown behavior. See [`poise::Command::cooldowns`] and
+  /// the methods on [`poise::Cooldowns`] for how to do that.
   pub manual_cooldowns: bool,
+  /// If `true`, changes behavior of guild_only command check to abort execution if the guild is not in cache.
   pub require_cache_for_guild_check: bool,
+  /// If true, [`Self::owners`] is automatically initialized with the results of [`serenity::Http::get_current_application_info()`].
+  ///
+  /// True by default.
   pub initialize_owners: bool
 }
 
@@ -89,7 +100,6 @@ where
       commands: Vec::new(),
       handler,
       allowed_mentions: Some(allowed_mentions),
-      reply_callback: None,
       manual_cooldowns: false,
       require_cache_for_guild_check: false,
       initialize_owners: true
@@ -99,7 +109,6 @@ where
   builder_field!(pub owners with_owners(): HashSet<UserId>);
   builder_field!(pub commands with_commands(): Vec<MelodyCommand<S, E>>);
   builder_field!(pub allowed_mentions with_allowed_mentions(): Option<CreateAllowedMentions>);
-  builder_field!(pub reply_callback with_reply_callback(): Option<ReplyCallback<S, E>>);
   builder_field!(pub manual_cooldowns with_manual_cooldowns(): bool);
   builder_field!(pub require_cache_for_guild_check with_require_cache_for_guild_check(): bool);
   builder_field!(pub initialize_owners with_initialize_owners(): bool);
@@ -119,7 +128,7 @@ where
         commands: self.commands,
         on_error: crate::on_error,
         allowed_mentions: self.allowed_mentions,
-        reply_callback: self.reply_callback,
+        reply_callback: Some(crate::reply_callback),
         manual_cooldowns: self.manual_cooldowns,
         require_cache_for_guild_check: self.require_cache_for_guild_check,
         owners: self.owners,
@@ -148,7 +157,6 @@ impl<S: fmt::Debug, E> fmt::Debug for MelodyFrameworkOptions<S, E> {
       .field("commands", &self.commands)
       .field("handler", &format_args!(".."))
       .field("allowed_mentions", &self.allowed_mentions)
-      .field("reply_callback", &self.reply_callback)
       .field("manual_cooldowns", &self.manual_cooldowns)
       .field("require_cache_for_guild_check", &self.require_cache_for_guild_check)
       .field("initialize_owners", &self.initialize_owners)
@@ -334,6 +342,11 @@ where S: Send + Sync, E: Send + Sync {
 
     crate::handler::dispatch(event, &*self.handler, handler_context).await
   }
+}
+
+fn reply_callback<S, E>(ctx: MelodyContext<'_, S, E>, create_reply: CreateReply) -> CreateReply
+where S: Send + Sync, E: Send + Sync {
+  ctx.data().handler.outgoing_reply(ctx, create_reply)
 }
 
 fn on_error<S, E>(framework_error: PoiseFrameworkError<'_, MelodyFrameworkData<S, E>, E>) -> BoxFuture<'_, ()>

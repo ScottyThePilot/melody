@@ -40,7 +40,7 @@ songbird = { version = "0.5" }
 symphonia = { version = "0.5.4", features = ["aac", "alac", "mp3"] }
 term-stratum = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, features = ["full", "parking_lot"] }
+tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true, features = ["log-always"] }
 uord = { workspace = true }
 url = { workspace = true }
@@ -80,7 +80,7 @@ serde = { version = "1.0", features = ["derive", "rc"] }
 singlefile = { version = "0.3.1", features = ["shared-async", "fs-err"] }
 singlefile-formats = { version = "0.3.1" }
 thiserror = { version = "2" }
-tokio = { version = "1.35" }
+tokio = { version = "1.35", features = ["parking_lot"] }
 tracing = { version = "0.1.40" }
 url = { version = "2.4", features = ["serde"] }
 
