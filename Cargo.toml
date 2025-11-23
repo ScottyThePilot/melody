@@ -52,6 +52,7 @@ members = [
   "libs/cacheable",
   "libs/cleverbot",
   "libs/cleverbot-logs",
+  "libs/feed-machine",
   "libs/melody-chess",
   "libs/melody-commander",
   "libs/melody-connect-four",

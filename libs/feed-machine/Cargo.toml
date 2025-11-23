@@ -1,0 +1,17 @@
+[package]
+name = "feed-machine"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+async-trait = { workspace = true }
+chrono = { workspace = true }
+feed = { version = "2.3.1", package = "feed-rs" }
+itertools = { workspace = true }
+log = { workspace = true }
+mediatype = { version = "0.19.20" }
+reqwest = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["sync", "time"] }
+url = { workspace = true }
