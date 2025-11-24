@@ -29,7 +29,6 @@ const COMMANDS: &[fn() -> MelodyCommand] = &[
   self::general::echo,
   self::general::troll,
   self::general::avatar,
-  self::general::banner,
   self::general::emoji_stats,
   self::general::ban_id,
   self::general::console,

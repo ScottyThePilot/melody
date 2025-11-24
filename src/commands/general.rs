@@ -147,33 +147,6 @@ pub async fn avatar(
 #[poise::command(
   slash_command,
   guild_only,
-  name_localized("en-US", "banner"),
-  description_localized("en-US", "Gets another user's banner"),
-  custom_data = CommandMetaData::new()
-    .usage_localized("en-US", ["/banner [user]"])
-    .examples_localized("en-US", ["/banner @Nanachi"])
-)]
-pub async fn banner(
-  ctx: MelodyContext<'_>,
-  #[rename = "user"]
-  #[name_localized("en-US", "user")]
-  #[description_localized("en-US", "The user whose banner should be retrieved, defaults to the caller if not set")]
-  member: Option<Member>
-) -> MelodyResult {
-  let member = member
-    .map(std::borrow::Cow::Owned)
-    .or(ctx.author_member().await)
-    .ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-
-  let response = member.user.banner_url()
-    .unwrap_or_else(|| "Failed to get that user's banner".to_owned());
-  ctx.reply(response).await.context("failed to send reply")?;
-  Ok(())
-}
-
-#[poise::command(
-  slash_command,
-  guild_only,
   rename = "emoji-stats",
   name_localized("en-US", "emoji-stats"),
   description_localized("en-US", "Gets usage statistics of emojis for this server"),

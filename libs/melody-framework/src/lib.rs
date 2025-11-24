@@ -127,6 +127,9 @@ where
       .options(PoiseFrameworkOptions {
         commands: self.commands,
         on_error: crate::on_error,
+        pre_command: crate::pre_command,
+        post_command: crate::post_command,
+        command_check: Some(crate::command_check),
         allowed_mentions: self.allowed_mentions,
         reply_callback: Some(crate::reply_callback),
         manual_cooldowns: self.manual_cooldowns,
@@ -167,6 +170,21 @@ impl<S: fmt::Debug, E> fmt::Debug for MelodyFrameworkOptions<S, E> {
 pub struct MelodyFrameworkData<S, E> {
   state: Arc<S>,
   handler: Arc<dyn MelodyHandlerFull<S, E>>
+}
+
+impl<S, E> MelodyFrameworkData<S, E> {
+  pub fn into_state(self) -> Arc<S> {
+    self.state
+  }
+}
+
+impl<S, E> Clone for MelodyFrameworkData<S, E> {
+  fn clone(&self) -> Self {
+    MelodyFrameworkData {
+      state: self.state.clone(),
+      handler: self.handler.clone()
+    }
+  }
 }
 
 impl<S, E> Deref for MelodyFrameworkData<S, E> {
@@ -334,7 +352,7 @@ where S: Send + Sync, E: Send + Sync {
     };
 
     let handler_context = MelodyHandlerContext {
-      context: ctx.clone(),
+      context: ctx,
       state: self.state.clone(),
       commands: &self.framework.options().commands,
       shard_manager: &self.framework.shard_manager()
@@ -347,6 +365,21 @@ where S: Send + Sync, E: Send + Sync {
 fn reply_callback<S, E>(ctx: MelodyContext<'_, S, E>, create_reply: CreateReply) -> CreateReply
 where S: Send + Sync, E: Send + Sync {
   ctx.data().handler.outgoing_reply(ctx, create_reply)
+}
+
+fn pre_command<S, E>(ctx: MelodyContext<'_, S, E>) -> BoxFuture<'_, ()>
+where S: Send + Sync, E: Send + Sync {
+  ctx.data().handler.pre_command(ctx)
+}
+
+fn post_command<S, E>(ctx: MelodyContext<'_, S, E>) -> BoxFuture<'_, ()>
+where S: Send + Sync, E: Send + Sync {
+  ctx.data().handler.post_command(ctx)
+}
+
+fn command_check<S, E>(ctx: MelodyContext<'_, S, E>) -> BoxFuture<'_, Result<bool, E>>
+where S: Send + Sync, E: Send + Sync {
+  ctx.data().handler.command_predicate(ctx)
 }
 
 fn on_error<S, E>(framework_error: PoiseFrameworkError<'_, MelodyFrameworkData<S, E>, E>) -> BoxFuture<'_, ()>

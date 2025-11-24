@@ -44,6 +44,9 @@ macro_rules! handler {
     where S: Send + Sync, E: Send + Sync {
       $(async fn $method(&self, ctx: $crate::MelodyHandlerContext<'_, S, E>, $($arg: $Arg),*) {})*
 
+      async fn pre_command(&self, ctx: $crate::MelodyContext<'_, S, E>) {}
+      async fn post_command(&self, ctx: $crate::MelodyContext<'_, S, E>) {}
+
       fn outgoing_reply(&self, ctx: $crate::MelodyContext<'_, S, E>, create_reply: CreateReply) -> CreateReply {
         create_reply
       }
@@ -54,6 +57,10 @@ macro_rules! handler {
     pub trait MelodyHandlerFull<S, E>: MelodyHandler<S, E>
     where S: Send + Sync, E: Send + Sync {
       async fn command_error(&self, ctx: $crate::MelodyContext<'_, S, E>, error: $crate::MelodyFrameworkError<E>);
+
+      async fn command_predicate(&self, ctx: $crate::MelodyContext<'_, S, E>) -> Result<bool, E> {
+        Ok(true)
+      }
     }
 
     #[serenity::async_trait]
@@ -64,6 +71,18 @@ macro_rules! handler {
           handler.$method(ctx.clone(), $($arg.clone()),*).await;
         };
       })*
+
+      async fn pre_command(&self, ctx: $crate::MelodyContext<'_, S, E>) {
+        for handler in self.iter_handlers() {
+          handler.pre_command(ctx.clone()).await;
+        };
+      }
+
+      async fn post_command(&self, ctx: $crate::MelodyContext<'_, S, E>) {
+        for handler in self.iter_handlers() {
+          handler.post_command(ctx.clone()).await;
+        };
+      }
 
       fn outgoing_reply(&self, ctx: $crate::MelodyContext<'_, S, E>, create_reply: CreateReply) -> CreateReply {
         self.iter_handlers().fold(create_reply, |create_reply, handler| handler.outgoing_reply(ctx, create_reply))
@@ -76,11 +95,15 @@ macro_rules! handler {
       async fn command_error(&self, ctx: $crate::MelodyContext<'_, S, E>, error: $crate::MelodyFrameworkError<E>) {
         self.primary_handler.command_error(ctx, error).await;
       }
+
+      async fn command_predicate(&self, ctx: $crate::MelodyContext<'_, S, E>) -> Result<bool, E> {
+        self.primary_handler.command_predicate(ctx).await
+      }
     }
 
     pub(crate) async fn dispatch<'a, S, E>(
       full_event: FullEvent,
-      handler: &'a dyn MelodyHandler<S, E>,
+      handler: &'a (impl MelodyHandler<S, E> + ?Sized),
       handler_context: $crate::MelodyHandlerContext<'a, S, E>
     ) where S: Send + Sync, E: Send + Sync {
       match full_event {
