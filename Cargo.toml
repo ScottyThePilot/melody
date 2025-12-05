@@ -15,6 +15,7 @@ cleverbot = { workspace = true }
 cleverbot-logs = { workspace = true }
 const-random = { version = "0.1.15" }
 defy = { workspace = true }
+feed-machine = { workspace = true }
 fern = { version = "0.7.1" }
 float-ord = { workspace = true }
 fs-err = { workspace = true, features = ["tokio"] }
@@ -27,7 +28,6 @@ melody-connect-four = { workspace = true }
 melody-flag = { workspace = true }
 melody-framework = { workspace = true }
 melody-ratelimiter = { workspace = true }
-melody-rss-feed = { workspace = true }
 poise = { workspace = true }
 rand = { workspace = true }
 regex = { workspace = true }
@@ -65,7 +65,7 @@ members = [
 ]
 
 [workspace.dependencies]
-ahash = { version = "0.8" }
+ahash = { version = "0.8", features = ["serde"] }
 async-trait = { version = "0.1" }
 chrono = { version = "0.4", features = ["serde"] }
 float-ord = { version = "0.3.2" }
@@ -78,11 +78,12 @@ rand = { version = "0.9.2", features = ["small_rng"] }
 regex = { version = "1.8.4" }
 reqwest = { version = "0.12" }
 serde = { version = "1.0", features = ["derive", "rc"] }
-singlefile = { version = "0.3.1", features = ["shared-async", "fs-err"] }
-singlefile-formats = { version = "0.3.1" }
+singlefile = { version = "0.4.0-rc1", features = ["shared-async", "fs-err"] }
+singlefile-formats = { version = "0.4.0-rc1" }
 thiserror = { version = "2" }
 tokio = { version = "1.35", features = ["parking_lot"] }
 tracing = { version = "0.1.40" }
+typemap_rev = { version = "0.3.0" }
 url = { version = "2.4", features = ["serde"] }
 
 build-info = { git = "https://github.com/ScottyThePilot/misc-crates", features = ["git", "chrono"] }
@@ -94,6 +95,7 @@ yggdrasil = { git = "https://github.com/ScottyThePilot/misc-crates" }
 cacheable = { path = "./libs/cacheable" }
 cleverbot = { path = "./libs/cleverbot" }
 cleverbot-logs = { path = "./libs/cleverbot-logs" }
+feed-machine = { path = "./libs/feed-machine" }
 melody-chess = { path = "./libs/melody-chess" }
 melody-commander = { path = "./libs/melody-commander" }
 melody-connect-four = { path = "./libs/melody-connect-four" }

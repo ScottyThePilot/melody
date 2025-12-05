@@ -64,7 +64,7 @@ async fn role_grant(
   let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let member1 = ctx.author_member().await.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
 
-  let is_granter = core.operate_persist_guild(guild_id, |persist_guild| {
+  let is_granter = core.operate_persist_guild(guild_id, async |persist_guild| {
     Ok(is_granter(persist_guild, &member1, role.id))
   }).await?;
 
@@ -114,7 +114,7 @@ async fn role_revoke(
   let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let member1 = ctx.author_member().await.ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
 
-  let is_granter = core.operate_persist_guild(guild_id, |persist_guild| {
+  let is_granter = core.operate_persist_guild(guild_id, async |persist_guild| {
     Ok(is_granter(persist_guild, &member1, role.id))
   }).await?;
 
@@ -369,7 +369,7 @@ async fn grant_roles_list(
   let core = Core::from(ctx);
   let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
 
-  let response = core.operate_persist_guild(guild_id, |persist_guild| {
+  let response = core.operate_persist_guild(guild_id, async |persist_guild| {
     let content = if let Some(role) = role {
       if let Some(granters) = persist_guild.grant_roles.get(&role.id) {
         let granters_list = stringify_granters_list(&core, guild_id, granters);
@@ -552,7 +552,7 @@ async fn join_roles_remove(
 async fn join_roles_list(ctx: MelodyContext<'_>) -> MelodyResult {
   let core = Core::from(ctx);
   let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let response = core.operate_persist_guild(guild_id, |persist_guild| {
+  let response = core.operate_persist_guild(guild_id, async |persist_guild| {
     let content = stringify_join_roles(&core, guild_id, &persist_guild.join_roles);
     Ok(content_safe(&core, content, &ContentSafeOptions::new(), &[]))
   }).await?;
@@ -603,7 +603,7 @@ where F: FnOnce(&mut crate::data::PersistGuild, GuildId, &Role) -> MelodyResult<
     let my_role_position = member_role_position(&me, &core)
       .ok_or(MelodyError::command_cache_failure("guild"))?;
 
-    let response = core.operate_persist_guild_commit(guild_id, |persist_guild| {
+    let response = core.operate_persist_guild_commit(guild_id, async |persist_guild| {
       operation(persist_guild, guild_id, &role).map(|content| {
         content_safe(&core, content, &ContentSafeOptions::new(), &[])
       })

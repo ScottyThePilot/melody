@@ -77,7 +77,7 @@ async fn connect_four_challenge(
   let opponent = user;
   let challenger = ctx.author().id;
 
-  let response = core.operate_persist_guild_commit(guild_id, |persist_guild| {
+  let response = core.operate_persist_guild_commit(guild_id, async |persist_guild| {
     Ok(match persist_guild.connect_four.create_challenge(challenger, opponent) {
       true => {
         format!(
@@ -115,7 +115,7 @@ async fn connect_four_accept(
   let challenger = user;
   let player = ctx.author().id;
 
-  let response = core.operate_persist_guild_commit(guild_id, |persist_guild| {
+  let response = core.operate_persist_guild_commit(guild_id, async |persist_guild| {
     Ok(match persist_guild.connect_four.accept_challenge(challenger, player) {
       Some(game) => {
         let &player = game.players().other(&player).unwrap();
@@ -158,7 +158,7 @@ async fn connect_four_decline(
   let challenger = user;
   let player = ctx.author().id;
 
-  let response = core.operate_persist_guild_commit(guild_id, |persist_guild| {
+  let response = core.operate_persist_guild_commit(guild_id, async |persist_guild| {
     Ok(match persist_guild.connect_four.remove_challenge(challenger, player) {
       true => format!("You have declined a challenge from {}", challenger.mention()),
       false => "You do not have a pending challenge from this user".to_owned()
@@ -195,7 +195,7 @@ async fn connect_four_play(
   let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let player = ctx.author().id;
 
-  let response = core.operate_persist_guild_commit(guild_id, |persist_guild| {
+  let response = core.operate_persist_guild_commit(guild_id, async |persist_guild| {
     Ok(match persist_guild.connect_four.find_user_game_mut(player) {
       Some((game, player_color)) => {
         let &opponent = game.players().other(&player).unwrap();
@@ -244,7 +244,7 @@ async fn connect_four_board(ctx: MelodyContext<'_>) -> MelodyResult {
   let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let player = ctx.author().id;
 
-  let response = core.operate_persist_guild(guild_id, |persist_guild| {
+  let response = core.operate_persist_guild(guild_id, async |persist_guild| {
     Ok(match persist_guild.connect_four.find_user_game(player) {
       Some((game, _player_color)) => {
         let board = game.print(print_piece);
@@ -274,7 +274,7 @@ async fn connect_four_resign(ctx: MelodyContext<'_>) -> MelodyResult {
   let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let player = ctx.author().id;
 
-  let response = core.operate_persist_guild_commit(guild_id, |persist_guild| {
+  let response = core.operate_persist_guild_commit(guild_id, async |persist_guild| {
     Ok(match persist_guild.connect_four.resign_user_game(player) {
       Some(game) => {
         let &opponent = game.players().other(&player).unwrap();
@@ -303,7 +303,7 @@ async fn connect_four_claim_win(ctx: MelodyContext<'_>) -> MelodyResult {
   let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let player = ctx.author().id;
 
-  let response = core.operate_persist_guild_commit(guild_id, |persist_guild| {
+  let response = core.operate_persist_guild_commit(guild_id, async |persist_guild| {
     Ok(match persist_guild.connect_four.find_user_game_mut(player) {
       Some((game, player_color)) => if game.current_turn() == player_color {
         "You cannot claim a win when it is your turn!".to_owned()
@@ -341,7 +341,7 @@ async fn connect_four_stats(ctx: MelodyContext<'_>) -> MelodyResult {
   let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let player = ctx.author().id;
 
-  let response = core.operate_persist_guild(guild_id, |persist_guild| {
+  let response = core.operate_persist_guild(guild_id, async |persist_guild| {
     let stats = persist_guild.connect_four.get_stats(player);
     Ok(format!("You have won {} games\nYou have lost {} games", stats.wins, stats.losses))
   }).await?;

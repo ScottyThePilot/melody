@@ -4,13 +4,6 @@ mod general;
 mod music_player;
 mod roles;
 
-#[allow(unused_imports)]
-pub use self::feed::{
-  register_feed,
-  unregister_feed,
-  unregister_guild_feeds,
-  list_guild_feeds
-};
 use crate::prelude::*;
 use crate::data::*;
 use crate::handler::{MelodyCommand, MelodyContext};
@@ -70,7 +63,7 @@ async fn help(
   let commands = core.get::<MelodyFrameworkKey>().await.read_commands_owned().await;
 
   let categories = if let Some(guild_id) = ctx.guild_id() {
-    core.operate_persist(|persist| persist.get_guild_plugins(guild_id)).await
+    core.operate_persist(async |persist| persist.get_guild_plugins(guild_id)).await
   } else {
     HashSet::new()
   };
@@ -97,7 +90,7 @@ async fn help(
 }
 
 pub async fn get_bot_color(core: &Core) -> Color {
-  core.operate_config(|config| config.accent_color).await
+  core.operate_config(async |config| config.accent_color).await
     .or_else(|| core.cache.current_user().accent_colour)
     .unwrap_or(Color::BLURPLE)
 }

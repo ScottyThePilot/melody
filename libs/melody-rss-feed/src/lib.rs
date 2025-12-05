@@ -1,3 +1,5 @@
+#![deprecated = "use structures from `feed-machine` instead"]
+
 extern crate feed;
 extern crate mime;
 #[macro_use]

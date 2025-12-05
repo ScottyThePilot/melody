@@ -9,13 +9,19 @@
 )]
 
 extern crate ahash;
+extern crate build_info;
+extern crate cacheable;
 extern crate chrono;
 extern crate chumsky;
 extern crate cleverbot;
 extern crate cleverbot_logs;
 extern crate const_random;
+extern crate defy;
+extern crate feed_machine;
 extern crate fern;
 extern crate float_ord;
+extern crate fs_err;
+extern crate futures;
 extern crate ids;
 extern crate itertools;
 #[macro_use]
@@ -25,9 +31,10 @@ extern crate melody_connect_four;
 extern crate melody_flag;
 extern crate melody_framework;
 extern crate melody_ratelimiter;
-extern crate melody_rss_feed;
+extern crate poise;
 extern crate rand;
 extern crate regex;
+extern crate reqwest;
 #[macro_use]
 extern crate serde;
 extern crate serenity;
@@ -35,6 +42,7 @@ extern crate singlefile;
 extern crate singlefile_formats;
 extern crate songbird;
 extern crate symphonia;
+extern crate term_stratum;
 #[macro_use]
 extern crate thiserror;
 extern crate tokio;
@@ -96,6 +104,7 @@ fn setup_logger(sender: SyncSender<String>) -> Result<(), fern::InitError> {
     })
     .level(log::LevelFilter::Warn)
     .level_for(me, log::LevelFilter::Trace)
+    .level_for("feed_machine", log::LevelFilter::Trace)
     .level_for("melody_commander", log::LevelFilter::Info)
     .level_for("melody_flag", log::LevelFilter::Info)
     .level_for("melody_framework", log::LevelFilter::Trace)
@@ -124,7 +133,9 @@ pub enum MelodyError {
   #[error("Input Error: {0}")]
   InputError(#[from] crate::melody_commander::CommandError),
   #[error("YT-DLP Error: {0}")]
-  YtDlpError(#[from] crate::utils::youtube::YtDlpError)
+  YtDlpError(#[from] crate::utils::youtube::YtDlpError),
+  #[error("Feed Model Error: {0}")]
+  FeedModelError(#[from] feed_machine::model::ModelError<feed_machine::model::SchemaError>)
 }
 
 impl MelodyError {

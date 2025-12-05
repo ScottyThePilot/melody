@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::ops::{Deref, DerefMut};
 
-use crate::model::HasDateTime;
+use crate::model::{HasDateTime, ModelError};
 
 
 
@@ -21,9 +21,9 @@ pub trait Context<M: Model>: Send + Sync + 'static {
 
   fn client(&self) -> &Client;
   fn on_manager_error(&self, error: Self::Error);
-  async fn on_new_entries(&self, entries: Vec<M::Entry>);
-  async fn save_update_datetime(&self, update: DateTime<Utc>) -> Result<(), Self::Error>;
-  async fn load_update_datetime(&self) -> Result<Option<DateTime<Utc>>, Self::Error>;
+  async fn on_new_entries(&self, identifier: &M::Identifier, entries: Vec<M::Entry>);
+  async fn save_update_datetime(&self, identifier: &M::Identifier, update: DateTime<Utc>) -> Result<(), Self::Error>;
+  async fn load_update_datetime(&self, identifier: &M::Identifier) -> Result<Option<DateTime<Utc>>, Self::Error>;
 }
 
 #[async_trait::async_trait]
@@ -41,18 +41,18 @@ impl<T, M: Model> Context<M> for Arc<T> where T: Context<M> {
   }
 
   #[inline]
-  async fn on_new_entries(&self, entries: Vec<M::Entry>) {
-    T::on_new_entries(self, entries).await
+  async fn on_new_entries(&self, identifier: &M::Identifier, entries: Vec<M::Entry>) {
+    T::on_new_entries(self, identifier, entries).await
   }
 
   #[inline]
-  async fn save_update_datetime(&self, update: DateTime<Utc>) -> Result<(), Self::Error> {
-    T::save_update_datetime(self, update).await
+  async fn save_update_datetime(&self, identifier: &M::Identifier, update: DateTime<Utc>) -> Result<(), Self::Error> {
+    T::save_update_datetime(self, identifier, update).await
   }
 
   #[inline]
-  async fn load_update_datetime(&self) -> Result<Option<DateTime<Utc>>, Self::Error> {
-    T::load_update_datetime(self).await
+  async fn load_update_datetime(&self, identifier: &M::Identifier) -> Result<Option<DateTime<Utc>>, Self::Error> {
+    T::load_update_datetime(self, identifier).await
   }
 }
 
@@ -60,7 +60,7 @@ pub trait Model: Send + Sync + 'static {
   type Identifier: std::fmt::Debug + Clone + PartialEq + Send + Sync + 'static;
   type Entry: TryFrom<Entry> + HasDateTime + Send + Sync + 'static;
 
-  fn url(&self, identifier: &Self::Identifier) -> Url;
+  fn url(&self, identifier: &Self::Identifier) -> reqwest::Result<Url>;
   fn delay(&self, queue_len: usize) -> Duration;
 
   #[allow(unused)]
@@ -74,7 +74,7 @@ impl<T> Model for Arc<T> where T: Model {
   type Entry = T::Entry;
 
   #[inline]
-  fn url(&self, identifier: &Self::Identifier) -> Url {
+  fn url(&self, identifier: &Self::Identifier) -> reqwest::Result<Url> {
     T::url(self, identifier)
   }
 
@@ -95,11 +95,11 @@ impl<T> Model for Arc<T> where T: Model {
 #[derive(Debug)]
 pub struct HandleWithContext<M: Model, C: Context<M>> {
   pub handle: Handle<M>,
-  pub context: Arc<C>
+  pub context: C
 }
 
-impl<M: Model, C: Context<M>> HandleWithContext<M, C> {
-  pub fn new(model: M, context: Arc<C>) -> Self {
+impl<M: Model, C: Context<M> + Clone> HandleWithContext<M, C> {
+  pub fn new(model: M, context: C) -> Self {
     HandleWithContext { handle: Handle::new(model), context }
   }
 
@@ -113,6 +113,10 @@ impl<M: Model, C: Context<M>> HandleWithContext<M, C> {
 
   pub async fn extend_queue(&self, identifiers: impl IntoIterator<Item = M::Identifier>) {
     self.handle.extend_queue(&self.context, identifiers).await;
+  }
+
+  pub async fn replace_queue(&self, identifiers: impl IntoIterator<Item = M::Identifier>) {
+    self.handle.replace_queue(&self.context, identifiers).await;
   }
 
   pub async fn remove_queue(&self, identifier: &M::Identifier) {
@@ -145,7 +149,7 @@ impl<M: Model, C: Context<M>> HandleWithContext<M, C> {
   }
 }
 
-impl<M: Model, C: Context<M>> Clone for HandleWithContext<M, C> {
+impl<M: Model, C: Context<M> + Clone> Clone for HandleWithContext<M, C> {
   fn clone(&self) -> Self {
     HandleWithContext {
       handle: self.handle.clone(),
@@ -171,30 +175,37 @@ impl<M: Model> Handle<M> {
     VecDeque::clone(&*self.inner.read_queue().await)
   }
 
-  pub async fn push_queue<C: Context<M>>(&self, context: &Arc<C>, identifier: M::Identifier) {
+  pub async fn push_queue<C: Context<M> + Clone>(&self, context: &C, identifier: M::Identifier) {
     self.modify_queue(context, |queue| queue.push_back(identifier)).await;
   }
 
-  pub async fn extend_queue<C: Context<M>>(&self, context: &Arc<C>, identifiers: impl IntoIterator<Item = M::Identifier>) {
+  pub async fn extend_queue<C: Context<M> + Clone>(&self, context: &C, identifiers: impl IntoIterator<Item = M::Identifier>) {
     self.modify_queue(context, |queue| queue.extend(identifiers)).await;
   }
 
-  pub async fn remove_queue<C: Context<M>>(&self, context: &Arc<C>, identifier: &M::Identifier) {
+  pub async fn replace_queue<C: Context<M> + Clone>(&self, context: &C, identifiers: impl IntoIterator<Item = M::Identifier>) {
+    self.modify_queue(context, |queue| {
+      queue.clear();
+      queue.extend(identifiers);
+    }).await;
+  }
+
+  pub async fn remove_queue<C: Context<M> + Clone>(&self, context: &C, identifier: &M::Identifier) {
     self.modify_queue(context, |queue| {
       remove_by_in_queue(queue, identifier);
     }).await;
   }
 
-  pub async fn retain_queue<C: Context<M>>(&self, context: &Arc<C>, f: impl FnMut(&M::Identifier) -> bool) {
+  pub async fn retain_queue<C: Context<M> + Clone>(&self, context: &C, f: impl FnMut(&M::Identifier) -> bool) {
     self.modify_queue(context, |queue| queue.retain(f)).await;
   }
 
-  pub async fn clear_queue<C: Context<M>>(&self, context: &Arc<C>) {
+  pub async fn clear_queue<C: Context<M> + Clone>(&self, context: &C) {
     self.modify_queue(context, |queue| queue.clear()).await;
   }
 
-  pub async fn modify_queue<C, F>(&self, context: &Arc<C>, f: F)
-  where C: Context<M>, F: FnOnce(&mut VecDeque<M::Identifier>) {
+  pub async fn modify_queue<C, F>(&self, context: &C, f: F)
+  where C: Context<M> + Clone, F: FnOnce(&mut VecDeque<M::Identifier>) {
     let mut state_guard = self.inner.state.write().await;
     f(&mut state_guard.queue);
 
@@ -224,7 +235,7 @@ impl<M: Model> Handle<M> {
     self.inner.read_queue().await.len()
   }
 
-  async fn task_static<C: Context<M>>(self, context: Arc<C>) {
+  async fn task_static<C: Context<M>>(self, context: C) {
     self.inner.task(&context).await.unwrap_or_else(|error| context.on_manager_error(error));
     self.inner.write_join_handle().await.take();
   }
@@ -286,8 +297,8 @@ impl<M: Model> HandleInner<M> {
     while self.wait(last_advance).await && let Some(identifier) = self.rotate_queue().await {
       last_advance = Instant::now();
 
-      let url = self.model.url(&identifier);
-      let last_update = context.load_update_datetime().await?.unwrap_or(DateTime::UNIX_EPOCH);
+      let url = self.model.url(&identifier).map_err(ModelError::from)?;
+      let last_update = context.load_update_datetime(&identifier).await?.unwrap_or(DateTime::UNIX_EPOCH);
 
       trace!("requesting feed entries for model `{}` and feed identifier `{:?}`", std::any::type_name::<M>(), identifier);
       let mut entries = crate::model::get_feed_entries::<M::Entry>(context.client(), url).await?;
@@ -295,8 +306,8 @@ impl<M: Model> HandleInner<M> {
       entries.sort_unstable_by_key(|entry| entry.datetime());
 
       if let Some(last_update) = entries.iter().map(|entry| entry.datetime()).max() {
-        context.save_update_datetime(last_update).await?;
-        context.on_new_entries(entries).await;
+        context.save_update_datetime(&identifier, last_update).await?;
+        context.on_new_entries(&identifier, entries).await;
       };
     };
 

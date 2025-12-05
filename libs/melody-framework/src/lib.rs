@@ -11,8 +11,12 @@
 )]
 
 pub mod commands;
+#[cfg(feature = "feature")]
+pub mod feature;
 pub mod handler;
 
+#[cfg(feature = "feature")]
+extern crate indexmap;
 extern crate itertools;
 extern crate poise;
 extern crate serenity;
@@ -22,6 +26,8 @@ extern crate tokio;
 extern crate tracing;
 
 use crate::handler::{MelodyHandler, MelodyHandlerFull};
+#[cfg(feature = "feature")]
+use crate::feature::{MelodyFeature, MelodyFeatureKey, MelodyFeatureContainer};
 
 pub use poise::BoxFuture;
 
@@ -52,6 +58,16 @@ use std::sync::Arc;
 
 
 
+#[cfg(feature = "feature")]
+macro_rules! get_features {
+  ($value:expr) => (&$value);
+}
+
+#[cfg(not(feature = "feature"))]
+macro_rules! get_features {
+  ($value:expr) => (&format_args!(".."));
+}
+
 macro_rules! builder_field {
   ($vis:vis $field:ident $function:ident(): $Type:ty) => (
     $vis fn $function(mut self, $field: $Type) -> Self {
@@ -65,6 +81,9 @@ pub struct MelodyFrameworkOptions<S, E> {
   pub state: Arc<S>,
   /// User IDs which are allowed to use `owners_only`` commands.
   pub owners: HashSet<UserId>,
+  /// Contains the full set of [`MelodyFeature`]s registered.
+  #[cfg(feature = "feature")]
+  pub features: MelodyFeatureContainer<S, E>,
   /// List of commands in the framework.
   pub commands: Vec<MelodyCommand<S, E>>,
   /// Called on every Discord event. Can be used to react to non-command events, like message deletions or guild updates.
@@ -97,6 +116,8 @@ where
     MelodyFrameworkOptions {
       state,
       owners: HashSet::new(),
+      #[cfg(feature = "feature")]
+      features: MelodyFeatureContainer::new(),
       commands: Vec::new(),
       handler,
       allowed_mentions: Some(allowed_mentions),
@@ -113,13 +134,25 @@ where
   builder_field!(pub require_cache_for_guild_check with_require_cache_for_guild_check(): bool);
   builder_field!(pub initialize_owners with_initialize_owners(): bool);
 
+  #[cfg(feature = "feature")]
+  pub fn with_feature<T: MelodyFeatureKey<S, E>>(mut self, feature: T::Value) -> Self
+  where S: Send + Sync + 'static, E: Send + Sync + 'static {
+    self.features.insert::<T>(feature);
+    self
+  }
+
   pub fn build(self) -> MelodyFramework<S, E> {
     MelodyFramework::new(self)
   }
 
   fn build_inner(self) -> MelodyFrameworkInner<S, E> {
+    #[cfg(feature = "feature")]
+    let features = Arc::new(self.features);
+
     let data = MelodyFrameworkData {
       state: self.state.clone(),
+      #[cfg(feature = "feature")]
+      features: features.clone(),
       handler: self.handler.clone()
     };
 
@@ -146,6 +179,8 @@ where
 
     MelodyFrameworkInner {
       state: self.state,
+      #[cfg(feature = "feature")]
+      features: features.clone(),
       handler: self.handler,
       framework
     }
@@ -157,6 +192,7 @@ impl<S: fmt::Debug, E> fmt::Debug for MelodyFrameworkOptions<S, E> {
     f.debug_struct("MelodyFrameworkOptions")
       .field("state", &self.state)
       .field("owners", &self.owners)
+      .field("features", get_features!(self.features))
       .field("commands", &self.commands)
       .field("handler", &format_args!(".."))
       .field("allowed_mentions", &self.allowed_mentions)
@@ -169,12 +205,31 @@ impl<S: fmt::Debug, E> fmt::Debug for MelodyFrameworkOptions<S, E> {
 
 pub struct MelodyFrameworkData<S, E> {
   state: Arc<S>,
+  #[cfg(feature = "feature")]
+  features: Arc<MelodyFeatureContainer<S, E>>,
   handler: Arc<dyn MelodyHandlerFull<S, E>>
 }
 
 impl<S, E> MelodyFrameworkData<S, E> {
-  pub fn into_state(self) -> Arc<S> {
-    self.state
+  pub fn state(&self) -> &Arc<S> {
+    &self.state
+  }
+
+  #[cfg(feature = "feature")]
+  pub fn features(&self) -> &Arc<MelodyFeatureContainer<S, E>> {
+    &self.features
+  }
+
+  #[cfg(feature = "feature")]
+  pub fn get_feature<T: MelodyFeatureKey<S, E>>(&self) -> Option<&T::Value>
+  where S: Send + Sync + 'static, E: Send + Sync + 'static {
+    self.features.get::<T>()
+  }
+
+  #[cfg(feature = "feature")]
+  pub fn iter_features(&self) -> impl Iterator<Item = &dyn MelodyFeature<S, E>>
+  where S: Send + Sync, E: Send + Sync {
+    self.features.values()
   }
 }
 
@@ -182,6 +237,8 @@ impl<S, E> Clone for MelodyFrameworkData<S, E> {
   fn clone(&self) -> Self {
     MelodyFrameworkData {
       state: self.state.clone(),
+      #[cfg(feature = "feature")]
+      features: self.features.clone(),
       handler: self.handler.clone()
     }
   }
@@ -199,6 +256,7 @@ impl<S: fmt::Debug, E> fmt::Debug for MelodyFrameworkData<S, E> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     f.debug_struct("MelodyFrameworkData")
       .field("state", &self.state)
+      .field("features", get_features!(self.features))
       .field("handler", &format_args!(".."))
       .finish()
   }
@@ -211,6 +269,8 @@ pub type MelodyContext<'a, S, E> = PoiseContext<'a, MelodyFrameworkData<S, E>, E
 pub struct MelodyHandlerContext<'a, S, E> {
   pub context: Context,
   pub state: Arc<S>,
+  #[cfg(feature = "feature")]
+  pub features: Arc<MelodyFeatureContainer<S, E>>,
   pub commands: &'a Vec<MelodyCommand<S, E>>,
   pub shard_manager: &'a Arc<ShardManager>
 }
@@ -253,6 +313,8 @@ impl<'a, S, E> Clone for MelodyHandlerContext<'a, S, E> {
     MelodyHandlerContext {
       context: self.context.clone(),
       state: self.state.clone(),
+      #[cfg(feature = "feature")]
+      features: self.features.clone(),
       commands: self.commands,
       shard_manager: self.shard_manager
     }
@@ -326,6 +388,8 @@ impl<S, E> fmt::Debug for MelodyFramework<S, E> {
 
 struct MelodyFrameworkInner<S, E> {
   state: Arc<S>,
+  #[cfg(feature = "feature")]
+  features: Arc<MelodyFeatureContainer<S, E>>,
   handler: Arc<dyn MelodyHandler<S, E>>,
   framework: PoiseFramework<MelodyFrameworkData<S, E>, E>
 }
@@ -354,27 +418,47 @@ where S: Send + Sync, E: Send + Sync {
     let handler_context = MelodyHandlerContext {
       context: ctx,
       state: self.state.clone(),
+      #[cfg(feature = "feature")]
+      features: self.features.clone(),
       commands: &self.framework.options().commands,
       shard_manager: &self.framework.shard_manager()
     };
 
-    crate::handler::dispatch(event, &*self.handler, handler_context).await
+    crate::handler::dispatch(event.clone(), &*self.handler, handler_context.clone()).await;
+
+    #[cfg(feature = "feature")]
+    crate::handler::dispatch(event, &*self.features, handler_context).await;
   }
 }
 
 fn reply_callback<S, E>(ctx: MelodyContext<'_, S, E>, create_reply: CreateReply) -> CreateReply
 where S: Send + Sync, E: Send + Sync {
-  ctx.data().handler.outgoing_reply(ctx, create_reply)
+  let create_reply = ctx.data().handler.outgoing_reply(ctx, create_reply);
+
+  #[cfg(feature = "feature")]
+  let create_reply = ctx.data().features.outgoing_reply(ctx, create_reply);
+
+  create_reply
 }
 
 fn pre_command<S, E>(ctx: MelodyContext<'_, S, E>) -> BoxFuture<'_, ()>
 where S: Send + Sync, E: Send + Sync {
-  ctx.data().handler.pre_command(ctx)
+  Box::pin(async move {
+    ctx.data().handler.pre_command(ctx).await;
+
+    #[cfg(feature = "feature")]
+    ctx.data().features.pre_command(ctx).await;
+  })
 }
 
 fn post_command<S, E>(ctx: MelodyContext<'_, S, E>) -> BoxFuture<'_, ()>
 where S: Send + Sync, E: Send + Sync {
-  ctx.data().handler.post_command(ctx)
+  Box::pin(async move {
+    ctx.data().handler.post_command(ctx).await;
+
+    #[cfg(feature = "feature")]
+    ctx.data().features.post_command(ctx).await;
+  })
 }
 
 fn command_check<S, E>(ctx: MelodyContext<'_, S, E>) -> BoxFuture<'_, Result<bool, E>>

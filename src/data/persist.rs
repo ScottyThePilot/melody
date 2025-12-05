@@ -1,9 +1,10 @@
 use crate::prelude::*;
 use crate::feature::roles::{Granter, JoinRoleFilter};
-use crate::feature::feed::{Feed, FeedState};
+use crate::feature::feed::{FeedIdentifier, FeedState, FeedStates, RegisterFeedResult, UnregisterFeedResult};
 
-use serenity::model::id::{GuildId, UserId, RoleId};
-use singlefile::container_shared_async::ContainerSharedAsyncAtomicLocked;
+use serenity::model::id::{ChannelId, GuildId, UserId, RoleId};
+use singlefile::container_shared_async::StandardContainerSharedAsync;
+use singlefile::manager::StandardManagerOptions;
 use singlefile_formats::data::cbor_serde::Cbor;
 use tokio::sync::RwLock;
 
@@ -11,7 +12,9 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-pub type PersistContainer = ContainerSharedAsyncAtomicLocked<Persist, Cbor>;
+const OPTIONS: StandardManagerOptions = StandardManagerOptions::LOCKED_WRITABLE;
+
+pub type PersistContainer = StandardContainerSharedAsync<Persist, Cbor>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -21,7 +24,10 @@ pub struct Persist {
   /// List of users who have been notified that chatbot messages from Melody are from CleverBot.
   pub cleverbot_notified_users: HashSet<UserId>,
   /// List of RSS feeds and their current state.
-  pub feeds: HashMap<Feed, FeedState>
+  #[deprecated]
+  pub feeds: HashMap<FeedIdentifier, FeedState>,
+  /// List of RSS feeds and their current state.
+  pub feed_states: FeedStates
 }
 
 impl Persist {
@@ -29,7 +35,7 @@ impl Persist {
     fs_err::tokio::create_dir_all("./data/")
       .await.context("failed to create data/guilds/")?;
     let path = PathBuf::from(format!("./data/persist.bin"));
-    let container = PersistContainer::create_or_default(path, Cbor)
+    let container = PersistContainer::create_or_default(path, Cbor, OPTIONS)
       .await.context("failed to load data/persist.bin")?;
     trace!("Loaded data/persist.bin");
     Ok(container)
@@ -50,6 +56,32 @@ impl Persist {
   pub fn get_guild_plugins(&self, id: GuildId) -> HashSet<String> {
     self.guild_plugins.get(&id).map_or_else(HashSet::new, HashSet::clone)
   }
+
+  pub fn register_feed(&mut self, feed_identifier: FeedIdentifier, guild_id: GuildId, channel_id: ChannelId) -> RegisterFeedResult {
+    let feed_state = self.feed_states.get_or_insert_default(feed_identifier);
+    if let Some(channel_id_replaced) = feed_state.guilds.insert(guild_id, channel_id) {
+      RegisterFeedResult::FeedChannelReplaced(channel_id_replaced)
+    } else {
+      RegisterFeedResult::FeedChannelRegistered
+    }
+  }
+
+  pub fn unregister_feed(&mut self, feed_identifier: &FeedIdentifier, guild_id: GuildId) -> UnregisterFeedResult {
+    if let Some(feed_state) = self.feed_states.get_mut(&feed_identifier) {
+      if let Some(channel_id_removed) = feed_state.guilds.remove(&guild_id) {
+        if feed_state.guilds.is_empty() {
+          self.feed_states.remove(&feed_identifier).expect("infallible");
+          UnregisterFeedResult::FeedUnregistered(channel_id_removed)
+        } else {
+          UnregisterFeedResult::FeedChannelUnregistered(channel_id_removed)
+        }
+      } else {
+        UnregisterFeedResult::FeedChannelNotRegistered
+      }
+    } else {
+      UnregisterFeedResult::FeedNotRegistered
+    }
+  }
 }
 
 impl Default for Persist {
@@ -58,7 +90,9 @@ impl Default for Persist {
       build_id: 0,
       guild_plugins: HashMap::new(),
       cleverbot_notified_users: HashSet::new(),
-      feeds: HashMap::new()
+      #[allow(deprecated)]
+      feeds: HashMap::new(),
+      feed_states: FeedStates::default()
     }
   }
 }
@@ -109,7 +143,7 @@ impl From<PersistGuilds> for PersistGuildsWrapper {
   }
 }
 
-pub type PersistGuildContainer = ContainerSharedAsyncAtomicLocked<PersistGuild, Cbor>;
+pub type PersistGuildContainer = StandardContainerSharedAsync<PersistGuild, Cbor>;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
@@ -124,7 +158,7 @@ pub struct PersistGuild {
 impl PersistGuild {
   pub async fn create(id: GuildId) -> MelodyResult<PersistGuildContainer> {
     let path = PathBuf::from(format!("./data/guilds/{id}.bin"));
-    let container = PersistGuildContainer::create_or_default(path, Cbor)
+    let container = PersistGuildContainer::create_or_default(path, Cbor, OPTIONS)
       .await.context(format!("failed to load data/guilds/{id}.bin"))?;
     trace!("Loaded data/guilds/{id}.bin");
     Ok(container)

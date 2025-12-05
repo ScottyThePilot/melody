@@ -3,7 +3,7 @@ use serenity::client::FullEvent;
 use serenity::gateway::ShardStageUpdateEvent;
 use serenity::http::RatelimitInfo;
 use serenity::model::prelude::*;
-use tokio::task::JoinSet;
+use tokio::sync::{Mutex, RwLock};
 
 use std::collections::HashMap;
 use std::fmt;
@@ -20,11 +20,6 @@ impl<S, E> AdvancedHandler<S, E> {
   pub fn iter_handlers(&self) -> impl Iterator<Item = &dyn MelodyHandler<S, E>> {
     once(&*self.primary_handler as &dyn MelodyHandler<S, E>)
       .chain(self.secondary_handlers.iter().map(|x| &**x))
-  }
-
-  pub async fn join_all_handlers<F, R>(&self, task_builder: impl FnMut(&dyn MelodyHandler<S, E>) -> F) -> Vec<R>
-  where F: Future<Output = R> + Send + 'static, R: Send + 'static {
-    self.iter_handlers().map(task_builder).collect::<JoinSet<R>>().join_all().await
   }
 }
 
@@ -54,12 +49,93 @@ macro_rules! handler {
 
     #[allow(unused_variables)]
     #[serenity::async_trait]
+    pub trait MelodyHandlerMut<S, E>: Send + Sync
+    where S: Send + Sync, E: Send + Sync {
+      $(async fn $method(&mut self, ctx: $crate::MelodyHandlerContext<'_, S, E>, $($arg: $Arg),*) {})*
+
+      async fn pre_command(&mut self, ctx: $crate::MelodyContext<'_, S, E>) {}
+      async fn post_command(&mut self, ctx: $crate::MelodyContext<'_, S, E>) {}
+    }
+
+    #[allow(unused_variables)]
+    #[serenity::async_trait]
+    impl<S, E, T> MelodyHandler<S, E> for Mutex<T>
+    where S: Send + Sync, E: Send + Sync, T: MelodyHandlerMut<S, E> {
+      $(async fn $method(&self, ctx: $crate::MelodyHandlerContext<'_, S, E>, $($arg: $Arg),*) {
+        self.lock().await.$method(ctx, $($arg),*).await;
+      })*
+
+      async fn pre_command(&self, ctx: $crate::MelodyContext<'_, S, E>) {
+        self.lock().await.pre_command(ctx).await;
+      }
+
+      async fn post_command(&self, ctx: $crate::MelodyContext<'_, S, E>) {
+        self.lock().await.post_command(ctx).await;
+      }
+    }
+
+    #[allow(unused_variables)]
+    #[serenity::async_trait]
+    impl<S, E, T> MelodyHandler<S, E> for RwLock<T>
+    where S: Send + Sync, E: Send + Sync, T: MelodyHandlerMut<S, E> {
+      $(async fn $method(&self, ctx: $crate::MelodyHandlerContext<'_, S, E>, $($arg: $Arg),*) {
+        self.write().await.$method(ctx, $($arg),*).await;
+      })*
+
+      async fn pre_command(&self, ctx: $crate::MelodyContext<'_, S, E>) {
+        self.write().await.pre_command(ctx).await;
+      }
+
+      async fn post_command(&self, ctx: $crate::MelodyContext<'_, S, E>) {
+        self.write().await.post_command(ctx).await;
+      }
+    }
+
+    #[allow(unused_variables)]
+    #[serenity::async_trait]
     pub trait MelodyHandlerFull<S, E>: MelodyHandler<S, E>
     where S: Send + Sync, E: Send + Sync {
       async fn command_error(&self, ctx: $crate::MelodyContext<'_, S, E>, error: $crate::MelodyFrameworkError<E>);
 
       async fn command_predicate(&self, ctx: $crate::MelodyContext<'_, S, E>) -> Result<bool, E> {
         Ok(true)
+      }
+    }
+
+    #[allow(unused_variables)]
+    #[serenity::async_trait]
+    pub trait MelodyHandlerFullMut<S, E>: MelodyHandlerMut<S, E>
+    where S: Send + Sync, E: Send + Sync {
+      async fn command_error(&mut self, ctx: $crate::MelodyContext<'_, S, E>, error: $crate::MelodyFrameworkError<E>);
+
+      async fn command_predicate(&mut self, ctx: $crate::MelodyContext<'_, S, E>) -> Result<bool, E> {
+        Ok(true)
+      }
+    }
+
+    #[allow(unused_variables)]
+    #[serenity::async_trait]
+    impl<S, E, T> MelodyHandlerFull<S, E> for Mutex<T>
+    where S: Send + Sync, E: Send + Sync, T: MelodyHandlerFullMut<S, E> {
+      async fn command_error(&self, ctx: $crate::MelodyContext<'_, S, E>, error: $crate::MelodyFrameworkError<E>) {
+        self.lock().await.command_error(ctx, error).await;
+      }
+
+      async fn command_predicate(&self, ctx: $crate::MelodyContext<'_, S, E>) -> Result<bool, E> {
+        self.lock().await.command_predicate(ctx).await
+      }
+    }
+
+    #[allow(unused_variables)]
+    #[serenity::async_trait]
+    impl<S, E, T> MelodyHandlerFull<S, E> for RwLock<T>
+    where S: Send + Sync, E: Send + Sync, T: MelodyHandlerFullMut<S, E> {
+      async fn command_error(&self, ctx: $crate::MelodyContext<'_, S, E>, error: $crate::MelodyFrameworkError<E>) {
+        self.write().await.command_error(ctx, error).await;
+      }
+
+      async fn command_predicate(&self, ctx: $crate::MelodyContext<'_, S, E>) -> Result<bool, E> {
+        self.write().await.command_predicate(ctx).await
       }
     }
 
@@ -101,7 +177,34 @@ macro_rules! handler {
       }
     }
 
-    pub(crate) async fn dispatch<'a, S, E>(
+    #[cfg(feature = "feature")]
+    #[serenity::async_trait]
+    impl<S, E> MelodyHandler<S, E> for crate::feature::MelodyFeatureContainer<S, E>
+    where S: Send + Sync, E: Send + Sync {
+      $(async fn $method(&self, ctx: $crate::MelodyHandlerContext<'_, S, E>, $($arg: $Arg),*) {
+        for handler in self.values() {
+          handler.$method(ctx.clone(), $($arg.clone()),*).await;
+        };
+      })*
+
+      async fn pre_command(&self, ctx: $crate::MelodyContext<'_, S, E>) {
+        for handler in self.values() {
+          handler.pre_command(ctx.clone()).await;
+        };
+      }
+
+      async fn post_command(&self, ctx: $crate::MelodyContext<'_, S, E>) {
+        for handler in self.values() {
+          handler.post_command(ctx.clone()).await;
+        };
+      }
+
+      fn outgoing_reply(&self, ctx: $crate::MelodyContext<'_, S, E>, create_reply: CreateReply) -> CreateReply {
+        self.values().fold(create_reply, |create_reply, handler| handler.outgoing_reply(ctx, create_reply))
+      }
+    }
+
+    pub async fn dispatch<'a, S, E>(
       full_event: FullEvent,
       handler: &'a (impl MelodyHandler<S, E> + ?Sized),
       handler_context: $crate::MelodyHandlerContext<'a, S, E>

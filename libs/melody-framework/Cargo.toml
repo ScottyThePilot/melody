@@ -4,9 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+indexmap = { version = "2.12.1", optional = true }
 itertools = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["sync"] }
 tracing = { workspace = true, features = ["log"] }
 
 [dependencies.poise]
@@ -16,3 +17,7 @@ features = ["chrono", "cache", "handle_panics"]
 [dependencies.serenity]
 workspace = true
 features = ["builder", "client", "gateway", "model", "utils", "collector", "framework"]
+
+[features]
+default = []
+feature = ["dep:indexmap"]

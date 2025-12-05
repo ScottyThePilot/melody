@@ -18,6 +18,9 @@ use std::sync::Arc;
 
 
 
+/// Mentions targeting the current user will be replaced with this
+pub const CLEVERBOT_CANONICAL_NAME: &str = "CleverBot";
+
 #[derive(Debug, Clone)]
 pub struct CleverBotLoggerWrapper {
   ptr: Arc<Mutex<CleverBotLogger>>
@@ -92,7 +95,7 @@ impl CleverBotManager {
 
 pub async fn send_reply(core: &Core, message: &Message, content: impl Into<String>) -> MelodyResult {
   // whether or not to notify the user that this message is from cleverbot
-  let notify = core.operate_persist_commit(|persist| {
+  let notify = core.operate_persist_commit(async |persist| {
     Ok(persist.cleverbot_notify(message.author.id))
   }).await?;
 

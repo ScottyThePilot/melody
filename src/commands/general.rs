@@ -169,7 +169,7 @@ pub async fn emoji_stats(
   let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
   let page = page.unwrap_or(1) - 1;
 
-  let emoji_statistics = core.operate_persist_guild(guild_id, |persist_guild| {
+  let emoji_statistics = core.operate_persist_guild(guild_id, async |persist_guild| {
     core.cache.guild(guild_id).map(|guild| {
       persist_guild.emoji_stats.get_emoji_uses(|emoji_id| guild.emojis.get(&emoji_id))
     }).ok_or(MelodyError::command_cache_failure("guild"))

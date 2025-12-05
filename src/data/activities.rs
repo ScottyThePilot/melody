@@ -7,7 +7,8 @@ use rand::seq::IndexedRandom;
 use serenity::model::id::GuildId;
 use serenity::model::gateway::ActivityType;
 use serenity::gateway::ActivityData;
-use singlefile::container_shared_async::ContainerSharedAsyncAtomic;
+use singlefile::container_shared_async::StandardContainerSharedAsync;
+use singlefile::manager::StandardManagerOptions;
 use singlefile_formats::data::json_serde::Json;
 
 use std::collections::{HashSet, HashMap};
@@ -15,7 +16,9 @@ use std::path::PathBuf;
 use std::fmt::{self, Write};
 use std::num::NonZeroU32 as zu32;
 
-pub type ActivitiesContainer = ContainerSharedAsyncAtomic<Activities, Json>;
+const OPTIONS: StandardManagerOptions = StandardManagerOptions::UNLOCKED_WRITABLE;
+
+pub type ActivitiesContainer = StandardContainerSharedAsync<Activities, Json>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -27,7 +30,7 @@ impl Activities {
   #[inline]
   pub async fn create() -> MelodyResult<ActivitiesContainer> {
     let path = PathBuf::from(format!("./data/activities.json"));
-    let container = ActivitiesContainer::create_or_default(path, Json::<true>)
+    let container = ActivitiesContainer::create_or_default(path, Json::<true>, OPTIONS)
       .await.context("failed to load data/activities.json")?;
     trace!("Loaded data/activities.json");
     Ok(container)

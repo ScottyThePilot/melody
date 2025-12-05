@@ -4,15 +4,17 @@ use rand::seq::IndexedRandom;
 use serde::de::{Deserialize, Deserializer, Unexpected};
 use serenity::model::gateway::GatewayIntents;
 use serenity::model::colour::Color;
-use singlefile::container_shared_async::ContainerSharedAsyncReadonly;
+use singlefile::container_shared_async::StandardContainerSharedAsync;
+use singlefile::manager::StandardManagerOptions;
 use singlefile_formats::data::toml_serde::Toml;
 
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::str::FromStr;
 use std::time::Duration;
 
-pub type ConfigContainer = ContainerSharedAsyncReadonly<Config, Toml>;
+const OPTIONS: StandardManagerOptions = StandardManagerOptions::UNLOCKED_WRITABLE;
+
+pub type ConfigContainer = StandardContainerSharedAsync<Config, Toml>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Config {
@@ -39,7 +41,7 @@ impl Config {
   #[inline]
   pub async fn create() -> MelodyResult<ConfigContainer> {
     let path = PathBuf::from(format!("./config.toml"));
-    let container = ConfigContainer::create_or_default(path, Toml)
+    let container = ConfigContainer::create_or_default(path, Toml, OPTIONS)
       .await.context("failed to load config.toml")?;
     trace!("Loaded config.toml");
     Ok(container)
@@ -60,8 +62,61 @@ pub struct ConfigMusicPlayer {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct ConfigRss {
-  pub youtube: Option<Arc<ConfigRssYouTube>>,
-  pub twitter: Option<Arc<ConfigRssTwitter>>
+  #[serde(default = "default_message_cooldown", deserialize_with = "deserialize_duration")]
+  pub message_cooldown: Duration,
+  pub youtube: Option<ConfigRssYouTube>,
+  pub twitter: Option<ConfigRssTwitter>
+}
+
+fn default_message_cooldown() -> Duration {
+  Duration::from_secs_f64(3.0)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ConfigRssDelays {
+  /// The delay between subsequent requests can be no less than this interval.
+  #[serde(alias = "minimum_delay", deserialize_with = "deserialize_duration_opt")]
+  pub min_delay: Option<Duration>,
+  /// The delay between subesquent requests can be no more than this interval.
+  #[serde(alias = "maximum_delay", deserialize_with = "deserialize_duration_opt")]
+  pub max_delay: Option<Duration>,
+  /// The feed will attempt to request each registered sub-feed this many times per day.
+  #[serde(alias = "frequency")]
+  pub frequency_multiplier: f64
+}
+
+impl ConfigRssDelays {
+  pub fn delay(&self, queue_len: usize) -> Duration {
+    const FULL_DAY: Duration = Duration::from_secs(86400);
+
+    let mut delay = FULL_DAY
+      .checked_div(queue_len as u32)
+      .unwrap_or(Duration::MAX)
+      .mul_f64(self.frequency_multiplier);
+
+    if let Some(min_delay) = self.min_delay {
+      delay = delay.max(min_delay);
+    };
+
+    if let Some(max_delay) = self.max_delay {
+      delay = delay.min(max_delay);
+    };
+
+    delay
+  }
+}
+
+impl Default for ConfigRssDelays {
+  fn default() -> Self {
+    ConfigRssDelays {
+      // default to a request rate no more than 1 every minute
+      min_delay: Some(Duration::from_secs(60)),
+      // default to a request rate no less than 1 every 2 hours
+      max_delay: Some(Duration::from_secs(60 * 60 * 2)),
+      frequency_multiplier: 1.0
+    }
+  }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,19 +126,19 @@ pub struct ConfigRssYouTube {
   /// Defaults to `www.youtube.com/feeds/videos.xml?channel_id=`.
   #[serde(default = "default_youtube_base_url")]
   pub base_url: String,
-  /// The interval between fetches for each individual registered RSS feed.
-  #[serde(deserialize_with = "deserialize_duration")]
-  pub interval: Duration,
   /// The base domain that should be used when displaying YouTube URLs.
   /// This domain should respond to URLs the same as YouTube itself.
   ///
   /// Defaults to `www.youtube.com`.
   #[serde(default = "default_youtube_display_domain")]
-  pub display_domain: String
+  pub display_domain: String,
+  /// Delays associated with this feed.
+  #[serde(default)]
+  pub delays: ConfigRssDelays
 }
 
 impl ConfigRssYouTube {
-  pub fn get_url(&self, channel: &str) -> String {
+  pub fn url(&self, channel: &str) -> String {
     let base_url = self.base_url.trim_start_matches("https://");
     format!("https://{base_url}{channel}")
   }
@@ -103,19 +158,19 @@ pub struct ConfigRssTwitter {
   /// Note, some Nitter instances don't seem to support RSS feeds or are broken.
   #[serde(deserialize_with = "deserialize_at_least_one")]
   pub nitter_instances: Vec<String>,
-  /// The interval between fetches for each individual registered RSS feed.
-  #[serde(deserialize_with = "deserialize_duration")]
-  pub interval: Duration,
   /// The base domain that should be used when displaying Twitter URLs.
   /// This domain should respond to URLs the same as Twitter itself.
   ///
   /// Defaults to `twitter.com` (consider using `vxtwitter.com`).
   #[serde(default = "default_twitter_display_domain")]
-  pub display_domain: String
+  pub display_domain: String,
+  /// Delays associated with this feed.
+  #[serde(default)]
+  pub delays: ConfigRssDelays
 }
 
 impl ConfigRssTwitter {
-  pub fn get_url(&self, handle: &str) -> String {
+  pub fn url(&self, handle: &str) -> String {
     let mut rng = rand::rng();
     self.nitter_instances.choose(&mut rng).map(|domain| {
       let domain = domain.trim_start_matches("https://").trim_end_matches('/');
@@ -128,8 +183,14 @@ fn default_twitter_display_domain() -> String {
   "twitter.com".to_owned()
 }
 
+
+
 fn deserialize_duration<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Duration, D::Error> {
   f64::deserialize(deserializer).map(Duration::from_secs_f64)
+}
+
+fn deserialize_duration_opt<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<Duration>, D::Error> {
+  <Option<f64>>::deserialize(deserializer).map(|opt| opt.map(Duration::from_secs_f64))
 }
 
 fn deserialize_at_least_one<'de, T, D>(deserializer: D) -> Result<Vec<T>, D::Error>

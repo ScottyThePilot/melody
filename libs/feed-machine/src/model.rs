@@ -3,7 +3,7 @@ pub mod youtube;
 
 use chrono::{DateTime, Utc};
 use feed::parser::{Builder as ParserBuilder, ParseFeedError};
-use reqwest::{Client, Error as ReqwestError};
+use reqwest::{Client, Error as ReqwestError, IntoUrl};
 use itertools::Itertools;
 
 pub use mediatype::{MediaType, MediaTypeBuf, MediaTypeError};
@@ -43,14 +43,15 @@ impl ModelError {
   }
 }
 
-pub async fn get_feed(client: &Client, url: Url) -> Result<Feed, ModelError> {
+pub async fn get_feed(client: &Client, url: impl IntoUrl) -> Result<Feed, ModelError> {
+  let url = url.into_url()?;
   let payload = client.get(url.clone()).send().await?.bytes().await?;
   let parser = ParserBuilder::new().base_uri(Some(&url)).build();
   let feed = parser.parse(payload.as_ref())?;
   Ok(feed)
 }
 
-pub async fn get_feed_entries<E: TryFrom<Entry>>(client: &Client, url: Url) -> Result<Vec<E>, ModelError<E::Error>> {
+pub async fn get_feed_entries<E: TryFrom<Entry>>(client: &Client, url: impl IntoUrl) -> Result<Vec<E>, ModelError<E::Error>> {
   get_feed(client, url).await.map_err(ModelError::with)
     .and_then(|feed| convert_feed_entries(feed).map_err(ModelError::ConvertFeedEntry))
 }

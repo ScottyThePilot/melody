@@ -33,11 +33,6 @@ const COMMANDS: Commands<CommandFunction> = &[
     command!("enable": command_plugin_enable(plugin: String, guild_id: Parsed<GuildId>)),
     command!("disable": command_plugin_disable(plugin: String, guild_id: Parsed<GuildId>))
   ]),
-  command!("feeds": [
-    command!("respawn-all": command_feeds_respawn_all()),
-    command!("abort-all": command_feeds_abort_all()),
-    command!("list-tasks": command_feeds_list_tasks())
-  ]),
   command!("update-yt-dlp": command_update_yt_dlp(update_to: Option<String>)),
   command!("reload": [
     command!("activities": command_reload_activities())
@@ -82,27 +77,6 @@ impl InputAgent {
     Ok(())
   }
 
-  async fn command_feeds_respawn_all(&mut self) -> MelodyResult {
-    let feed_wrapper = self.core.state.feed.clone();
-    feed_wrapper.lock().await.respawn_all(&self.core).await;
-    Ok(())
-  }
-
-  async fn command_feeds_abort_all(&mut self) -> MelodyResult {
-    let feed_wrapper = self.core.state.feed.clone();
-    feed_wrapper.lock().await.abort_all();
-    Ok(())
-  }
-
-  async fn command_feeds_list_tasks(&mut self) -> MelodyResult {
-    let feed_wrapper = self.core.state.feed.clone();
-    for (feed, running) in feed_wrapper.lock().await.tasks() {
-      self.debug(format!("Feed task: {feed} ({})", if running { "running" } else { "stopped" }));
-    };
-
-    Ok(())
-  }
-
   async fn command_update_yt_dlp(&mut self, update_to: Option<String>) -> MelodyResult {
     if let Some(yt_dlp) = self.core.state.yt_dlp.clone() {
       let update_to = update_to.as_deref().unwrap_or("latest");
@@ -142,7 +116,7 @@ impl InputAgent {
   }
 
   async fn plugin_list(&self, guild_id: GuildId) -> HashSet<String> {
-    self.core.operate_persist(|persist| persist.get_guild_plugins(guild_id)).await
+    self.core.operate_persist(async |persist| persist.get_guild_plugins(guild_id)).await
   }
 
   async fn plugin_enable(&self, plugin: &str, guild_id: GuildId) -> MelodyResult {
@@ -161,7 +135,7 @@ impl InputAgent {
     use crate::data::MelodyFrameworkKey;
     let commands = self.core.get::<MelodyFrameworkKey>().await.read_commands_owned().await;
     melody_framework::commands::register_guild_commands(&self.core, &commands, guild_id, {
-      self.core.operate_persist_commit(|persist| {
+      self.core.operate_persist_commit(async |persist| {
         let guild_plugins = persist.get_guild_plugins_mut(guild_id);
         operation(guild_plugins);
         Ok(guild_plugins.clone())

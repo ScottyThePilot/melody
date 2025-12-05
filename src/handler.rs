@@ -3,22 +3,20 @@ mod input;
 
 use crate::prelude::*;
 use crate::data::*;
-use crate::feature::feed::{Feed, FeedEventHandler};
 pub use self::input::InputAgent;
 
 use melody_flag::Flag;
 use melody_framework::handler::{MelodyHandler, MelodyHandlerFull};
-use melody_rss_feed::{TwitterPost, YouTubeVideo};
-use melody_rss_feed::url::Url;
 use rand::seq::IndexedRandom;
 use reqwest::Client as HttpClient;
+use serenity::cache::Cache;
 use serenity::client::Client;
 use serenity::gateway::ShardManager;
 use serenity::model::channel::{Reaction, ReactionType, Message};
 use serenity::model::gateway::Ready;
 use serenity::model::guild::{Guild, UnavailableGuild};
 use serenity::model::guild::Member;
-use serenity::model::id::{ChannelId, GuildId, UserId, RoleId};
+use serenity::model::id::{GuildId, UserId, RoleId};
 use serenity::utils::{content_safe, ContentSafeOptions};
 use songbird::{SerenityInit, Config as SongbirdConfig};
 use term_stratum::StratumEvent;
@@ -45,14 +43,14 @@ pub async fn launch(event_receiver: MpscReceiver<StratumEvent>) -> MelodyResult 
   let persist_guilds = PersistGuildsWrapper::from(PersistGuilds::create().await?);
   let activities = Activities::create().await?;
 
-  let (token, intents) = config.operate(|config| {
+  let (token, intents) = config.operate(async |config| {
     (config.token.clone(), config.intents)
   }).await;
 
   let http_client = HttpClient::new();
   let state = Arc::new(State::new(
     config, persist, persist_guilds,
-    activities, http_client, FeedHandler
+    activities, http_client
   ).await?);
 
   let handler = Arc::new(Handler { setup_done: Flag::new(false) });
@@ -74,8 +72,10 @@ pub async fn launch(event_receiver: MpscReceiver<StratumEvent>) -> MelodyResult 
   ));
 
   client.start().await.context("failed to start client")?;
+
   core.abort().await;
   events_task.abort();
+  client.data.write().await.clear();
 
   Ok(())
 }
@@ -97,7 +97,7 @@ impl MelodyHandler<State, MelodyError> for Handler {
 
     if core.is_new_build() {
       info!("New build detected, registering commands");
-      let guilds = core.operate_persist(|persist| {
+      let guilds = core.operate_persist(async |persist| {
         guilds.iter()
           .map(|&guild_id| (guild_id, persist.get_guild_plugins(guild_id)))
           .collect::<Vec<(GuildId, HashSet<String>)>>()
@@ -110,47 +110,39 @@ impl MelodyHandler<State, MelodyError> for Handler {
     };
 
     // Attempt to register all subscribed RSS feeds
-    let feed_wrapper = core.state.feed.clone();
-    let feeds = core.operate_persist(|persist| {
-      persist.feeds.keys().cloned().collect::<Vec<Feed>>()
-    }).await;
-
-    for feed in feeds {
-      feed_wrapper.lock().await.register(&core, feed).await;
-    };
+    core.feed().await.spawn_feeds_from_persist().await.log_error();
 
     core.operate_tasks(|tasks| {
       // Spawn the task for cycling activity status unless it's already been spawned
       tasks.cycle_activities.get_or_insert_with(|| {
         tokio::spawn(cycle_activity_task(core.clone()))
       });
-
-      // Spawn the task for respawning the feed manager's tasks
-      tasks.respawn_feed_tasks.get_or_insert_with(|| {
-        tokio::spawn(respawn_feed_tasks_task(core.clone()))
-      });
     }).await;
   }
 
   async fn guild_create(&self, _ctx: MelodyHandlerContext<'_>, guild: Guild, is_new: Option<bool>) {
-    info!("Guild discovered: {} ({}) - {}", guild.name, guild.id, match is_new {
+    let reason = match is_new {
       Some(true) => "added to guild",
       Some(false) => "populate",
       None => "create"
-    });
+    };
+
+    info!("Guild discovered: {} ({}) - {}", guild.name, guild.id, reason);
   }
 
   async fn guild_delete(&self, ctx: MelodyHandlerContext<'_>, incomplete: UnavailableGuild, guild_full_cached: Option<Guild>) {
     let guild_name = guild_full_cached.as_ref().map_or("Unknown", |guild| guild.name.as_str());
-    info!("Guild lost: {} ({}) - {}", guild_name, incomplete.id, match incomplete.unavailable {
+    let reason = match incomplete.unavailable {
       true => "outage",
       false => "removed from guild"
-    });
+    };
+
+    info!("Guild lost: {} ({}) - {}", guild_name, incomplete.id, reason);
 
     let core = Core::from(ctx);
     if !incomplete.unavailable {
       info!("Unregistering feeds for guild: {} ({})", guild_name, incomplete.id);
-      crate::commands::unregister_guild_feeds(&core, incomplete.id).await.log_error();
+      core.feed().await.unregister_guild_feeds(incomplete.id).await.log_error();
     };
   }
 
@@ -163,7 +155,7 @@ impl MelodyHandler<State, MelodyError> for Handler {
     if !message.author.bot {
       if let Some(guild_id) = message.guild_id {
         let emojis = crate::utils::parse_emojis(&message.content);
-        core.operate_persist_guild_commit(guild_id, |persist_guild| {
+        core.operate_persist_guild_commit(guild_id, async |persist_guild| {
           // don't be greedy
           let mut rng = rand::rng();
           if let Some(&emoji) = emojis.choose(&mut rng) {
@@ -173,19 +165,20 @@ impl MelodyHandler<State, MelodyError> for Handler {
         }).await.log_error();
       };
 
-      if should_contribute_message_chain(&core, &message).await {
+      if core.state.message_chains.operate_mut(async |message_chains| message_chains.should_contribute(&message)).await {
         message.channel_id.say(&core, &message.content).await.context("failed to send message").log_error();
       };
     };
 
     if is_mentioning_user(&message, me) {
-      let options = ContentSafeOptions::new().show_discriminator(false);
-      let content = content_safe(&core, &message.content, &options, &[]);
+      let content = clean_message_for_cleverbot(&core, &message.content, me);
 
       info!("Sending message to cleverbot: {content:?}");
+      let typing = message.channel_id.start_typing(&core.http);
       match core.state.cleverbot.send(message.channel_id, &content).await {
         Ok(reply) => {
           info!("Recieved reply from cleverbot: {reply:?}");
+          let options = ContentSafeOptions::new().show_discriminator(false);
           let reply = content_safe(&core, reply, &options, &[]);
           crate::feature::cleverbot::send_reply(&core, &message, &reply).await.log_error();
           core.state.cleverbot_logger.clone()
@@ -198,6 +191,8 @@ impl MelodyHandler<State, MelodyError> for Handler {
             .log_error();
         }
       };
+
+      typing.stop();
     };
   }
 
@@ -211,7 +206,7 @@ impl MelodyHandler<State, MelodyError> for Handler {
     let core = Core::from(ctx);
 
     if let (Some(guild_id), Some(user_id), ReactionType::Custom { id: emoji_id, .. }) = (reaction.guild_id, reaction.user_id, reaction.emoji) {
-      core.operate_persist_guild_commit(guild_id, |persist_guild| {
+      core.operate_persist_guild_commit(guild_id, async |persist_guild| {
         persist_guild.emoji_stats.increment_emoji_uses(emoji_id, user_id);
         Ok(())
       }).await.log_error();
@@ -222,7 +217,7 @@ impl MelodyHandler<State, MelodyError> for Handler {
     let core = Core::from(ctx);
 
     if let (Some(guild_id), Some(user_id), ReactionType::Custom { id: emoji_id, .. }) = (reaction.guild_id, reaction.user_id, reaction.emoji) {
-      core.operate_persist_guild_commit(guild_id, |persist_guild| {
+      core.operate_persist_guild_commit(guild_id, async |persist_guild| {
         persist_guild.emoji_stats.decrement_emoji_uses(emoji_id, user_id);
         Ok(())
       }).await.log_error();
@@ -242,52 +237,6 @@ impl MelodyHandlerFull<State, MelodyError> for Handler {
   }
 }
 
-const FEED_POST_DELAY: Duration = Duration::from_secs(3);
-
-#[derive(Debug)]
-struct FeedHandler;
-
-#[serenity::async_trait]
-impl FeedEventHandler for FeedHandler {
-  async fn feed_youtube_video(&self, core: Core, channel: &str, video: YouTubeVideo) {
-    let feed = Feed::YouTube { channel: channel.to_owned() };
-    let delivery_channels = core.operate_persist(|persist| {
-      persist.feeds.get(&feed).map_or_else(Vec::new, |feed_state| {
-        feed_state.guilds.values().copied().collect::<Vec<ChannelId>>()
-      })
-    }).await;
-
-    let link = core.operate_config(|config| match config.rss.youtube.as_deref() {
-      Some(config) => with_domain(&video.link, &config.display_domain),
-      None => video.link.clone()
-    }).await;
-
-    for channel in delivery_channels {
-      channel.say(&core, link.as_str()).await.context("failed to send youtube video message").log_error();
-      tokio::time::sleep(FEED_POST_DELAY).await;
-    };
-  }
-
-  async fn feed_twitter_post(&self, core: Core, handle: &str, post: TwitterPost) {
-    let feed = Feed::Twitter { handle: handle.to_owned() };
-    let delivery_channels = core.operate_persist(|persist| {
-      persist.feeds.get(&feed).map_or_else(Vec::new, |feed_state| {
-        feed_state.guilds.values().copied().collect::<Vec<ChannelId>>()
-      })
-    }).await;
-
-    let link = core.operate_config(|config| match config.rss.twitter.as_deref() {
-      Some(config) => with_domain(&post.link, &config.display_domain),
-      None => post.link.clone()
-    }).await;
-
-    for channel in delivery_channels {
-      channel.say(&core, link.as_str()).await.context("failed to send twitter post message").log_error();
-      tokio::time::sleep(FEED_POST_DELAY).await;
-    };
-  }
-}
-
 /// Gets the remaining content of a message if it either replies to the
 /// given user, or begins with a mention of the given user.
 fn is_mentioning_user(message: &Message, who: UserId) -> bool {
@@ -296,8 +245,24 @@ fn is_mentioning_user(message: &Message, who: UserId) -> bool {
     || message.mentions_user_id(who)
 }
 
+fn clean_message_for_cleverbot(cache: impl AsRef<Cache>, content: &str, me: UserId) -> String {
+  use crate::feature::cleverbot::CLEVERBOT_CANONICAL_NAME;
+
+  let content = crate::utils::replace_user_mentions(content.trim(), |user_id, m| {
+    // only replace when mentions target the current user
+    // replace with empty when it's at the start (prefix-ping)
+    // replace with the 'cleverbot canonical name' otherwise
+    (user_id == me).then(|| if m.start() == 0 { "" } else { CLEVERBOT_CANONICAL_NAME })
+  });
+
+  let options = ContentSafeOptions::new().show_discriminator(false);
+  let content = content_safe(cache, content.trim(), &options, &[]);
+
+  content
+}
+
 async fn add_join_roles(core: &Core, member: &mut Member) -> MelodyResult {
-  let (roles, missing_roles) = core.operate_persist_guild(member.guild_id, |persist_guild| {
+  let (roles, missing_roles) = core.operate_persist_guild(member.guild_id, async |persist_guild| {
     core.cache.guild(member.guild_id).map(|guild| {
       persist_guild.join_roles.iter()
         .filter_map(|(&role_id, &filter)| filter.applies(member.user.bot).then_some(role_id))
@@ -314,7 +279,7 @@ async fn add_join_roles(core: &Core, member: &mut Member) -> MelodyResult {
   };
 
   if !missing_roles.is_empty() {
-    core.operate_persist_guild_commit(member.guild_id, |persist_guild| {
+    core.operate_persist_guild_commit(member.guild_id, async |persist_guild| {
       for role_id in missing_roles {
         persist_guild.join_roles.remove(&role_id);
         warn!("Removed non-existent role ({}) for guild ({})", role_id, member.guild_id);
@@ -325,16 +290,6 @@ async fn add_join_roles(core: &Core, member: &mut Member) -> MelodyResult {
   };
 
   Ok(())
-}
-
-async fn should_contribute_message_chain(core: &Core, message: &Message) -> bool {
-  core.state.message_chains.lock().await.should_contribute(message)
-}
-
-fn with_domain(url: &Url, domain: &str) -> Url {
-  let mut url = url.clone();
-  let _ = url.set_host(Some(domain));
-  url
 }
 
 async fn events_task(
@@ -355,22 +310,6 @@ async fn events_task(
         shard_manager.shutdown_all().await;
       }
     };
-  };
-}
-
-// Yes, a tasks-task, what a mouthfull
-async fn respawn_feed_tasks_task(core: Core) {
-  const RESPAWN_INTERVAL: Duration = Duration::from_secs(21600); // 6 hours
-
-  let mut interval = tokio::time::interval(RESPAWN_INTERVAL);
-  interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
-  interval.tick().await;
-
-  loop {
-    interval.tick().await;
-    info!("Respawning feed tasks");
-    let feed_wrapper = core.state.feed.clone();
-    feed_wrapper.lock().await.respawn_all(&core).await;
   };
 }
 

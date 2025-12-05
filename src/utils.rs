@@ -7,13 +7,24 @@ use defy::ContextualError;
 use melody_ratelimiter::RateLimiter;
 use poise::slash_argument::{SlashArgument, SlashArgError};
 use rand::seq::SliceRandom;
-use regex::Regex;
+use regex::{Captures, Match, Regex, Replacer};
+use reqwest::IntoUrl;
 use serenity::model::id::{EmojiId, RoleId, UserId};
 use tokio::sync::{Mutex, RwLock};
+use url::Url;
 
+use std::borrow::Cow;
 use std::fmt;
 use std::ops::Deref;
 use std::sync::{Arc, OnceLock};
+
+
+
+/// Terrible hack but I don't care, make your API public please
+#[inline]
+pub fn into_url(url: impl IntoUrl) -> reqwest::Result<Url> {
+  url.into_url()
+}
 
 
 
@@ -42,6 +53,27 @@ impl Deref for LazyRegex {
   fn deref(&self) -> &Self::Target {
     LazyRegex::force(self)
   }
+}
+
+
+
+pub fn replace_user_mentions<'r, R, S>(content: &str, replacer: R) -> Cow<'_, str>
+where R: FnMut(UserId, Match<'_>) -> Option<S>, S: AsRef<str> {
+  static RX_MENTION: LazyRegex = LazyRegex::new(r"<@\!?([\d]{0,30})>");
+
+  struct ReplaceUserMentions<R>(R);
+
+  impl<'r, R, S> Replacer for ReplaceUserMentions<R>
+  where R: FnMut(UserId, Match<'_>) -> Option<S>, S: AsRef<str> {
+    fn replace_append(&mut self, captures: &Captures<'_>, out: &mut String) {
+      let capture_match = captures.get_match();
+      let mention_user_id = UserId::new(captures[1].parse::<u64>().expect("infallible"));
+      let replace_result = (self.0)(mention_user_id, capture_match);
+      out.push_str(replace_result.as_ref().map_or(capture_match.as_str(), AsRef::as_ref));
+    }
+  }
+
+  RX_MENTION.replace_all(content, ReplaceUserMentions(replacer))
 }
 
 
@@ -75,7 +107,7 @@ pub fn shuffle<T>(list: &mut [T]) {
 }
 
 pub fn parse_emojis(message: &str) -> Vec<EmojiId> {
-  static RX: LazyRegex = LazyRegex::new(r"<a?:[0-9a-zA-Z_]+:(\d+)>");
+  static RX: LazyRegex = LazyRegex::new(r"<a?:[\d\w]+:(\d+)>");
   RX.captures_iter(message)
     .filter_map(|captures| captures.get(1).map(<&str>::from))
     .filter_map(|id| id.parse::<u64>().ok().map(EmojiId::new))
@@ -166,17 +198,16 @@ where singlefile::Error<FE>: Into<MelodyFileError> {
   }
 }
 
-impl<T, FE> Contextualize for Result<T, singlefile::UserError<FE, MelodyError>>
-where singlefile::Error<FE>: Into<MelodyFileError> {
+impl<T, E> Contextualize for Result<T, singlefile::OrUserError<E, MelodyError>>
+where E: Into<MelodyFileError> {
   type Output = MelodyResult<T>;
 
   fn context(self, context: impl Into<String>) -> Self::Output {
     self.map_err(|error| {
       MelodyError::FileError(ContextualError::new(
         match error {
-          singlefile::UserError::Format(error) => singlefile::Error::Format(error).into(),
-          singlefile::UserError::Io(error) => singlefile::Error::Io(error).into(),
-          singlefile::UserError::User(error) => return error
+          singlefile::OrUserError::Base(error) => error.into(),
+          singlefile::OrUserError::User(error) => return error
         },
         context.into()
       ))
@@ -204,28 +235,30 @@ impl<T> Contextualize for Result<T, serenity::Error> {
 
 
 
+#[allow(unused)]
 pub trait Operate<T> {
   async fn operate<F, R>(&self, operation: F) -> R
-  where F: FnOnce(&T) -> R;
+  where F: AsyncFnOnce(&T) -> R;
 }
 
+#[allow(unused)]
 pub trait OperateMut<T> {
   async fn operate_mut<F, R>(&self, operation: F) -> R
-  where F: FnOnce(&mut T) -> R;
+  where F: AsyncFnOnce(&mut T) -> R;
 }
 
 macro_rules! impl_operate_deref {
   ($O:ident, $T:ident, $Type:ty) => (
     impl<$O, $T> Operate<T> for $Type where $O: Operate<T> {
       async fn operate<F, R>(&self, operation: F) -> R
-      where F: FnOnce(&T) -> R {
+      where F: AsyncFnOnce(&T) -> R {
         $O::operate(self, operation).await
       }
     }
 
     impl<$O, $T> OperateMut<T> for $Type where $O: OperateMut<T> {
       async fn operate_mut<F, R>(&self, operation: F) -> R
-      where F: FnOnce(&mut T) -> R {
+      where F: AsyncFnOnce(&mut T) -> R {
         $O::operate_mut(self, operation).await
       }
     }
@@ -239,32 +272,32 @@ impl_operate_deref!(O, T, Arc<O>);
 
 impl<T> OperateMut<T> for Mutex<T> {
   async fn operate_mut<F, R>(&self, operation: F) -> R
-  where F: FnOnce(&mut T) -> R {
+  where F: AsyncFnOnce(&mut T) -> R {
     let mut guard = self.lock().await;
-    operation(&mut *guard)
+    operation(&mut *guard).await
   }
 }
 
 impl<T> Operate<T> for RwLock<T> {
   async fn operate<F, R>(&self, operation: F) -> R
-  where F: FnOnce(&T) -> R {
+  where F: AsyncFnOnce(&T) -> R {
     let guard = self.read().await;
-    operation(&*guard)
+    operation(&*guard).await
   }
 }
 
 impl<T> OperateMut<T> for RwLock<T> {
   async fn operate_mut<F, R>(&self, operation: F) -> R
-  where F: FnOnce(&mut T) -> R {
+  where F: AsyncFnOnce(&mut T) -> R {
     let mut guard = self.write().await;
-    operation(&mut *guard)
+    operation(&mut *guard).await
   }
 }
 
 impl<T> OperateMut<T> for RateLimiter<T> {
   async fn operate_mut<F, R>(&self, operation: F) -> R
-  where F: FnOnce(&mut T) -> R {
+  where F: AsyncFnOnce(&mut T) -> R {
     let mut guard = self.get().await;
-    operation(&mut *guard)
+    operation(&mut *guard).await
   }
 }

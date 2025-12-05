@@ -258,7 +258,6 @@ struct QueueBundle {
   track: Option<TrackHandle>
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 struct Queue {
   /// Position 0 in the queue is special and cannot be cleared, as it is the currently playing track.
