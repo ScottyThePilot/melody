@@ -12,7 +12,6 @@ use serenity::model::channel::Message;
 use serenity::model::id::ChannelId;
 use tokio::sync::Mutex;
 
-use std::collections::HashMap;
 use std::time::Duration;
 use std::sync::Arc;
 

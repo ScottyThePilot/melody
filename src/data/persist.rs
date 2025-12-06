@@ -8,7 +8,6 @@ use singlefile::manager::StandardManagerOptions;
 use singlefile_formats::data::cbor_serde::Cbor;
 use tokio::sync::RwLock;
 
-use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 

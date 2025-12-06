@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use crate::data::{Core, ConfigRss, ConfigRssTwitter, ConfigRssYouTube};
 
-use ahash::{AHashMap, AHashSet};
 use chrono::{DateTime, Utc};
 use feed_machine::handle::{Context, Model, HandleWithContext};
 use feed_machine::model::twitter::TwitterPost;
@@ -100,8 +99,8 @@ impl FeedManager {
   }
 
   pub async fn unregister_guild_feeds(&self, guild_id: GuildId) -> MelodyResult<usize> {
-    let mut feed_identifiers_youtube = AHashSet::new();
-    let mut feed_identifiers_twitter = AHashSet::new();
+    let mut feed_identifiers_youtube = HashSet::new();
+    let mut feed_identifiers_twitter = HashSet::new();
 
     self.context.core.operate_persist_commit(async |persist| {
       feed_identifiers_youtube.extend(persist.feed_states.remove_guild_youtube_feeds(guild_id));
@@ -233,7 +232,7 @@ impl Context<FeedModelYouTube> for FeedContext {
 
     let guilds = self.core.operate_persist(async |persist| {
       persist.feed_states.youtube.get(feed_identifier)
-        .map_or_else(AHashMap::new, |feed_state| feed_state.guilds.clone())
+        .map_or_else(HashMap::new, |feed_state| feed_state.guilds.clone())
     }).await;
 
     for entry in entries {
@@ -288,7 +287,7 @@ impl Context<FeedModelTwitter> for FeedContext {
 
     let guilds = self.core.operate_persist(async |persist| {
       persist.feed_states.twitter.get(feed_identifier)
-        .map_or_else(AHashMap::new, |feed_state| feed_state.guilds.clone())
+        .map_or_else(HashMap::new, |feed_state| feed_state.guilds.clone())
     }).await;
 
     for entry in entries {
@@ -344,8 +343,8 @@ macro_rules! match_feed_states {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct FeedStates {
-  pub twitter: AHashMap<FeedIdentifierTwitter, FeedState>,
-  pub youtube: AHashMap<FeedIdentifierYouTube, FeedState>
+  pub twitter: HashMap<FeedIdentifierTwitter, FeedState>,
+  pub youtube: HashMap<FeedIdentifierYouTube, FeedState>
 }
 
 impl FeedStates {
@@ -413,12 +412,12 @@ impl Extend<(FeedIdentifier, FeedState)> for FeedStates {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeedState {
   pub last_update: DateTime<Utc>,
-  pub guilds: AHashMap<GuildId, ChannelId>
+  pub guilds: HashMap<GuildId, ChannelId>
 }
 
 impl FeedState {
   pub fn new(last_update: DateTime<Utc>) -> Self {
-    FeedState { last_update, guilds: AHashMap::new() }
+    FeedState { last_update, guilds: HashMap::new() }
   }
 }
 

@@ -6,8 +6,6 @@ use log::Level;
 use melody_commander::{Command, Commands, Parsed, resolve_args};
 use serenity::model::id::GuildId;
 
-use std::collections::HashSet;
-
 macro_rules! command {
   ($name:literal: $function:ident($($arg:ident: $Arg:ty),*)) => (
     <Command<CommandFunction>>::new_target($name, |agent, remaining_args| Box::pin(async move {

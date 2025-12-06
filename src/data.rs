@@ -24,7 +24,6 @@ use serenity::prelude::{TypeMap, TypeMapKey};
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
 
-use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, OnceLock};
 

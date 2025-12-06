@@ -7,7 +7,6 @@ use super::{MelodyContext, CommandMetaData};
 use serenity::model::id::{ChannelId, GuildId, UserId};
 use serenity::model::channel::Attachment;
 
-use std::num::NonZeroUsize;
 use std::sync::Arc;
 
 
@@ -431,7 +430,7 @@ async fn music_player_queue_remove(
 ) -> MelodyResult {
   let core = Core::from(ctx);
   let guild_id = ctx.guild_id().ok_or(MelodyError::COMMAND_NOT_IN_GUILD)?;
-  let index = NonZeroUsize::new(index.unwrap_or(1))
+  let index = zusize::new(index.unwrap_or(1))
     .ok_or(MelodyError::COMMAND_PRECONDITION_VIOLATION_ARGUMENTS)?;
 
   send_response_result(ctx, {

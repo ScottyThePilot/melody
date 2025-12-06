@@ -1,9 +1,10 @@
+use crate::prelude::*;
+
 use ahash::AHasher;
 use serenity::model::id::{ChannelId, UserId};
 use serenity::model::channel::Message;
 use tokio::sync::Mutex;
 
-use std::collections::HashMap;
 use std::hash::{Hasher, Hash};
 use std::sync::Arc;
 

@@ -23,7 +23,6 @@ use term_stratum::StratumEvent;
 use tokio::sync::mpsc::UnboundedReceiver as MpscReceiver;
 use tokio::time::MissedTickBehavior;
 
-use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 

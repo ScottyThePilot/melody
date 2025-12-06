@@ -12,8 +12,6 @@ pub use melody_framework::commands::{CommandMetaData, HelpLocalization, build_he
 use serenity::model::colour::Color;
 use serenity::model::permissions::Permissions;
 
-use std::collections::HashSet;
-
 
 
 const COMMANDS: &[fn() -> MelodyCommand] = &[

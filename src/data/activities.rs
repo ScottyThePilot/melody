@@ -11,10 +11,8 @@ use singlefile::container_shared_async::StandardContainerSharedAsync;
 use singlefile::manager::StandardManagerOptions;
 use singlefile_formats::data::json_serde::Json;
 
-use std::collections::{HashSet, HashMap};
 use std::path::PathBuf;
 use std::fmt::{self, Write};
-use std::num::NonZeroU32 as zu32;
 
 const OPTIONS: StandardManagerOptions = StandardManagerOptions::UNLOCKED_WRITABLE;
 

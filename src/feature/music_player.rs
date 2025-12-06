@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use crate::data::Core;
 use crate::utils::youtube::{self, YtDlpSource, YtDlp};
 
@@ -10,10 +11,8 @@ use songbird::input::{Input, HttpRequest};
 use songbird::error::JoinError;
 use tokio::sync::Mutex;
 
-use std::collections::HashMap;
 use std::collections::vec_deque::VecDeque;
 use std::fmt;
-use std::num::NonZeroUsize;
 use std::sync::Arc;
 
 
@@ -107,7 +106,7 @@ impl MusicPlayer {
     self.queue_manipulate(guild_id, |queue| queue.shuffle()).await
   }
 
-  pub async fn queue_remove(&self, guild_id: GuildId, index: NonZeroUsize) -> Option<QueueItem> {
+  pub async fn queue_remove(&self, guild_id: GuildId, index: zusize) -> Option<QueueItem> {
     self.queue_manipulate(guild_id, |queue| queue.remove(index)).await
   }
 
@@ -293,7 +292,7 @@ impl Queue {
     self.contents.extend(items);
   }
 
-  fn remove(&mut self, index: NonZeroUsize) -> Option<QueueItem> {
+  fn remove(&mut self, index: zusize) -> Option<QueueItem> {
     self.contents.remove(index.get())
   }
 

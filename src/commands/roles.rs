@@ -8,8 +8,6 @@ use serenity::model::id::{UserId, GuildId, RoleId};
 use serenity::model::guild::{Member, Role};
 use serenity::utils::{content_safe, ContentSafeOptions};
 
-use std::collections::{HashMap, HashSet};
-
 
 
 const BOT_ROLE_TOO_LOW: &str = "The role you have specified is above my highest role and inaccessible to me";
