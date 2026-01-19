@@ -221,7 +221,7 @@ impl Core {
     let shard_runners_lock = shard_runners.lock().await;
     self.operate_activities(async |activities| {
       for (_, shard_runner) in shard_runners_lock.iter() {
-        let activitiy = activities.select(self).log_error();
+        let activitiy = activities.select(self).await.log_error();
         shard_runner.runner_tx.set_activity(activitiy);
       };
     }).await;

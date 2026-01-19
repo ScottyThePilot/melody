@@ -34,7 +34,9 @@ pub struct Config {
   #[serde(default)]
   pub rss: ConfigRss,
   #[serde(default)]
-  pub music_player: Option<ConfigMusicPlayer>
+  pub music_player: Option<ConfigMusicPlayer>,
+  #[serde(default = "default_emulate_status_modes")]
+  pub emulate_status_modes: bool
 }
 
 impl Config {
@@ -50,6 +52,10 @@ impl Config {
 
 fn default_cleverbot_ratelimit() -> Duration {
   Duration::from_secs_f64(5.0)
+}
+
+fn default_emulate_status_modes() -> bool {
+  false
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -133,7 +139,7 @@ pub struct ConfigRssYouTube {
   #[serde(default = "default_youtube_display_domain")]
   pub display_domain: String,
   /// Delays associated with this feed.
-  #[serde(default)]
+  #[serde(default, flatten)]
   pub delays: ConfigRssDelays
 }
 
@@ -165,7 +171,7 @@ pub struct ConfigRssTwitter {
   #[serde(default = "default_twitter_display_domain")]
   pub display_domain: String,
   /// Delays associated with this feed.
-  #[serde(default)]
+  #[serde(default, flatten)]
   pub delays: ConfigRssDelays
 }
 

@@ -58,11 +58,12 @@ intents = [
 
 # Settings for YouTube feeds (optional, omit to disable YouTube feeds)
 [rss.youtube]
+min_delay = 60
+max_delay = 7200
+frequency_multiplier = 1
 # The path that should be used for getting YouTube RSS feeds (optional)
 # Defaults to 'www.youtube.com/feeds/videos.xml?channel_id='
 base_url = "www.youtube.com/feeds/videos.xml?channel_id="
-# The interval, in seconds, between fetches for each individual registered RSS feed (required)
-interval = 900
 # The base domain that should be displayed instead of 'www.youtube.com' (optional)
 # Use this if you would rather redirect to a privacy frontend like Piped
 display_domain = "www.youtube.com"
@@ -71,11 +72,12 @@ display_domain = "www.youtube.com"
 # This relies on Nitter instances to retrieve RSS feeds of Twitter accounts
 # Due to recent events, this may not always be reliable
 [rss.twitter]
+min_delay = 60
+max_delay = 7200
+frequency_multiplier = 1
 # A list of Nitter instance domains that should be used for fetching RSS feeds (required)
 # Note, some Nitter instances (like nitter.net) do not actually support RSS feeds for some reason
 nitter_instances = ["unofficialbird.com"]
-# The interval, in seconds, between fetches for each individual registered RSS feed (required)
-interval = 300
 # The base domain that should be displayed instead of 'twitter.com' (optional)
 # Use this if you would rather redirect to a privacy frontend like Nitter or a FixTweet service
 display_domain = "vxtwitter.com"

@@ -380,6 +380,16 @@ impl FeedStates {
     )
   }
 
+  #[allow(unused)]
+  pub fn iter_feed_states(&self) -> impl Iterator<Item = &FeedState> {
+    Iterator::chain(self.youtube.values(), self.twitter.values())
+  }
+
+  #[allow(unused)]
+  pub fn iter_feed_states_mut(&mut self) -> impl Iterator<Item = &mut FeedState> {
+    Iterator::chain(self.youtube.values_mut(), self.twitter.values_mut())
+  }
+
   pub fn remove_guild_youtube_feeds(&mut self, guild_id: GuildId) -> impl Iterator<Item = FeedIdentifierYouTube> {
     self.youtube
       .extract_if(move |_, feed_state| {

@@ -17,7 +17,6 @@ use serenity::model::gateway::Ready;
 use serenity::model::guild::{Guild, UnavailableGuild};
 use serenity::model::guild::Member;
 use serenity::model::id::{GuildId, UserId, RoleId};
-use serenity::utils::{content_safe, ContentSafeOptions};
 use songbird::{SerenityInit, Config as SongbirdConfig};
 use term_stratum::StratumEvent;
 use tokio::sync::mpsc::UnboundedReceiver as MpscReceiver;
@@ -42,8 +41,9 @@ pub async fn launch(event_receiver: MpscReceiver<StratumEvent>) -> MelodyResult 
   let persist_guilds = PersistGuildsWrapper::from(PersistGuilds::create().await?);
   let activities = Activities::create().await?;
 
-  let (token, intents) = config.operate(async |config| {
-    (config.token.clone(), config.intents)
+  let (token, intents) = config.operate_mut(async |config| {
+    // clear the token from the config state, but don't commit it
+    (std::mem::replace(&mut config.token, "[REDACTED]".to_owned()), config.intents)
   }).await;
 
   let http_client = HttpClient::new();
@@ -177,8 +177,7 @@ impl MelodyHandler<State, MelodyError> for Handler {
       match core.state.cleverbot.send(message.channel_id, &content).await {
         Ok(reply) => {
           info!("Recieved reply from cleverbot: {reply:?}");
-          let options = ContentSafeOptions::new().show_discriminator(false);
-          let reply = content_safe(&core, reply, &options, &[]);
+          let reply = crate::utils::message_content_human_readable(&core, &reply);
           crate::feature::cleverbot::send_reply(&core, &message, &reply).await.log_error();
           core.state.cleverbot_logger.clone()
             .log(message.channel_id, content, reply).await.log_error();
@@ -254,8 +253,7 @@ fn clean_message_for_cleverbot(cache: impl AsRef<Cache>, content: &str, me: User
     (user_id == me).then(|| if m.start() == 0 { "" } else { CLEVERBOT_CANONICAL_NAME })
   });
 
-  let options = ContentSafeOptions::new().show_discriminator(false);
-  let content = content_safe(cache, content.trim(), &options, &[]);
+  let content = crate::utils::message_content_human_readable(cache, &content);
 
   content
 }

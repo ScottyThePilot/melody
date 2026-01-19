@@ -31,6 +31,12 @@ const COMMANDS: Commands<CommandFunction> = &[
     command!("enable": command_plugin_enable(plugin: String, guild_id: Parsed<GuildId>)),
     command!("disable": command_plugin_disable(plugin: String, guild_id: Parsed<GuildId>))
   ]),
+  command!("inspect": [
+    command!("activities": command_inspect_activities()),
+    command!("config": command_inspect_config()),
+    command!("persist": command_inspect_persist()),
+    command!("persist-guild": command_inspect_persist_guild(guild_id: Parsed<GuildId>))
+  ]),
   command!("update-yt-dlp": command_update_yt_dlp(update_to: Option<String>)),
   command!("reload": [
     command!("activities": command_reload_activities())
@@ -72,6 +78,30 @@ impl InputAgent {
   async fn command_plugin_disable(&mut self, plugin: String, guild_id: GuildId) -> MelodyResult {
     self.plugin_disable(&plugin, guild_id).await?;
     self.info(format!("Disabled plugin {plugin} for guild ({guild_id})"));
+    Ok(())
+  }
+
+  async fn command_inspect_activities(&mut self) -> MelodyResult {
+    self.core.operate_activities(async |activities| info!("{activities:#?}")).await;
+    Ok(())
+  }
+
+  async fn command_inspect_config(&mut self) -> MelodyResult {
+    self.core.operate_config(async |config| info!("{config:#?}")).await;
+    Ok(())
+  }
+
+  async fn command_inspect_persist(&mut self) -> MelodyResult {
+    self.core.operate_persist(async |persist| println!("{persist:#?}")).await;
+    Ok(())
+  }
+
+  async fn command_inspect_persist_guild(&mut self, guild_id: GuildId) -> MelodyResult {
+    self.core.operate_persist_guild(guild_id, async |persist_guild| {
+      println!("{persist_guild:#?}");
+      Ok(())
+    }).await?;
+
     Ok(())
   }
 

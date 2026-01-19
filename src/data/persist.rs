@@ -37,6 +37,13 @@ impl Persist {
     let container = PersistContainer::create_or_default(path, Cbor, OPTIONS)
       .await.context("failed to load data/persist.bin")?;
     trace!("Loaded data/persist.bin");
+
+    //// TODO: remove this eventually
+    container.operate_mut(async |persist| {
+      #[allow(deprecated)]
+      persist.feed_states.extend(persist.feeds.drain());
+    }).await;
+
     Ok(container)
   }
 

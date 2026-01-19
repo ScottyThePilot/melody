@@ -34,11 +34,14 @@ impl Activities {
     Ok(container)
   }
 
-  pub fn select(&self, core: &Core) -> Result<ActivityData, ActivityError> {
+  pub async fn select(&self, core: &Core) -> Result<ActivityData, ActivityError> {
+    let emulate_status_modes = core.operate_config(async |config| config.emulate_status_modes).await;
+
+    // TODO: ThreadRng isn't thread safe, making this fully async could have problems with this
     let mut rng = rand::rng();
     let activity_data = self.activities.choose_weighted(&mut rng, |v| v.variant.weight.get())
       .map_err(ActivityError::CannotSelectRandomActivity)?
-      .to_activity_data(&mut rng, core)?;
+      .to_activity_data(&mut rng, emulate_status_modes, core)?;
     Ok(activity_data)
   }
 }
@@ -90,14 +93,33 @@ pub struct Activity {
 }
 
 impl Activity {
-  pub fn to_activity_data(&self, rng: &mut impl Rng, core: &Core) -> Result<ActivityData, ActivityError> {
+  pub fn to_activity_data(&self, rng: &mut impl Rng, emulate_status_modes: bool, core: &Core) -> Result<ActivityData, ActivityError> {
+    if emulate_status_modes {
+      self.to_activity_data_emulate_mode(rng, core)
+    } else {
+      self.to_activity_data_no_emulate_mode(rng, core)
+    }
+  }
+
+  pub fn to_activity_data_emulate_mode(&self, rng: &mut impl Rng, core: &Core) -> Result<ActivityData, ActivityError> {
+    let mut text = String::new();
+    if let Some(mode_text) = self.mode.to_str() {
+      text.push_str(mode_text);
+      text.push(' ');
+    };
+
+    self.variant.variant.print_append(&mut text, rng, core)?;
+    Ok(ActivityData::custom(text))
+  }
+
+  pub fn to_activity_data_no_emulate_mode(&self, rng: &mut impl Rng, core: &Core) -> Result<ActivityData, ActivityError> {
     let text = self.variant.variant.print(rng, core)?;
     Ok(match self.mode {
       ActivityMode::Playing => ActivityData::playing(text),
       ActivityMode::Listening => ActivityData::listening(text),
       ActivityMode::Watching => ActivityData::watching(text),
-      ActivityMode::Custom => ActivityData::custom(text),
-      ActivityMode::Competing => ActivityData::competing(text)
+      ActivityMode::Competing => ActivityData::competing(text),
+      ActivityMode::Custom => ActivityData::custom(text)
     })
   }
 }
@@ -206,13 +228,25 @@ impl ActivityVariant {
   }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum ActivityMode {
   #[serde(rename = "playing")] Playing,
   #[serde(rename = "listening")] Listening,
   #[serde(rename = "watching")] Watching,
-  #[serde(rename = "custom")] Custom,
-  #[serde(rename = "competing")] Competing
+  #[serde(rename = "competing")] Competing,
+  #[serde(rename = "custom")] Custom
+}
+
+impl ActivityMode {
+  pub const fn to_str(self) -> Option<&'static str> {
+    match self {
+      Self::Playing => Some("Playing"),
+      Self::Listening => Some("Listening to"),
+      Self::Watching => Some("Watching"),
+      Self::Competing => Some("Competing in"),
+      Self::Custom => None
+    }
+  }
 }
 
 #[derive(Debug, Error)]
