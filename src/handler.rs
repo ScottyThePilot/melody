@@ -7,7 +7,6 @@ pub use self::input::InputAgent;
 
 use melody_flag::Flag;
 use melody_framework::handler::{MelodyHandler, MelodyHandlerFull};
-use rand::seq::IndexedRandom;
 use reqwest::Client as HttpClient;
 use serenity::cache::Cache;
 use serenity::client::Client;
@@ -156,8 +155,7 @@ impl MelodyHandler<State, MelodyError> for Handler {
         let emojis = crate::utils::parse_emojis(&message.content);
         core.operate_persist_guild_commit(guild_id, async |persist_guild| {
           // don't be greedy
-          let mut rng = rand::rng();
-          if let Some(&emoji) = emojis.choose(&mut rng) {
+          if let Some(&emoji) = emojis.choose_default() {
             persist_guild.emoji_stats.increment_emoji_uses(emoji, message.author.id);
           };
           Ok(())

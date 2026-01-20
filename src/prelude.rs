@@ -1,10 +1,6 @@
 #![allow(unused)]
 
-pub use crate::utils::{
-  Contextualize,
-  Operate,
-  OperateMut
-};
+pub use crate::utils::{Contextualize, Operate, OperateMut};
 pub use crate::{
   MelodyResult,
   MelodyError,
@@ -14,6 +10,7 @@ pub use crate::{
 
 pub use defy::{Log, Print};
 pub use itertools::Itertools;
+pub use melody_random::RandomUtils;
 pub use serenity::model::mention::Mentionable;
 
 pub use std::collections::{HashMap, HashSet};

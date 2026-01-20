@@ -276,7 +276,7 @@ impl Queue {
   fn shuffle(&mut self) {
     match self.contents.make_contiguous().split_first_mut() {
       Some((_, &mut [])) | None => (),
-      Some((_, contents)) => crate::utils::shuffle(contents)
+      Some((_, contents)) => contents.shuffle_default()
     };
   }
 

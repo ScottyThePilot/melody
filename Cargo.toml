@@ -27,6 +27,7 @@ melody-commander = { workspace = true }
 melody-connect-four = { workspace = true }
 melody-flag = { workspace = true }
 melody-framework = { workspace = true }
+melody-random = { workspace = true }
 melody-ratelimiter = { workspace = true }
 poise = { workspace = true }
 rand = { workspace = true }
@@ -58,6 +59,7 @@ members = [
   "libs/melody-connect-four",
   "libs/melody-flag",
   "libs/melody-framework",
+  "libs/melody-random",
   "libs/melody-ratelimiter",
   "libs/melody-rss-feed",
   "libs/melody-timer",
@@ -74,7 +76,9 @@ futures = { version = "0.3.31" }
 image = { version = "0.25.6", default-features = false }
 itertools = { version = "0.14" }
 log = { version = "0.4" }
-rand = { version = "0.9.2", features = ["small_rng"] }
+rand = { version = "0.9.2" }
+rand_chacha = { version = "0.9.0" }
+rand_xoshiro = { version = "0.7.0" }
 regex = { version = "1.8.4" }
 reqwest = { version = "0.12" }
 serde = { version = "1.0", features = ["derive", "rc"] }
@@ -101,6 +105,7 @@ melody-commander = { path = "./libs/melody-commander" }
 melody-connect-four = { path = "./libs/melody-connect-four" }
 melody-flag = { path = "./libs/melody-flag" }
 melody-framework = { path = "./libs/melody-framework" }
+melody-random = { path = "./libs/melody-random" }
 melody-ratelimiter = { path = "./libs/melody-ratelimiter" }
 melody-rss-feed = { path = "./libs/melody-rss-feed" }
 melody-timer = { path = "./libs/melody-timer" }
@@ -112,7 +117,7 @@ version = "0.6.1"
 [workspace.dependencies.serenity]
 default-features = false
 features = ["builder", "client", "gateway", "model", "utils", "collector", "framework"]
-version = "0.12.4"
+version = "0.12.5"
 
 [profile.dev]
 opt-level = 0

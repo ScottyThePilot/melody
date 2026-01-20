@@ -197,7 +197,7 @@ async fn music_player_play_youtube_playlist(
               let items_count = items.len();
 
               if shuffle {
-                crate::utils::shuffle(&mut items);
+                items.shuffle_default();
               };
 
               match music_player.play(&core, guild_id, channel_id, items).await {

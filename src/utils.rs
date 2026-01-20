@@ -6,7 +6,6 @@ use chrono::{DateTime, Utc};
 use defy::ContextualError;
 use melody_ratelimiter::RateLimiter;
 use poise::slash_argument::{SlashArgument, SlashArgError};
-use rand::seq::SliceRandom;
 use regex::{Captures, Match, Regex, Replacer};
 use reqwest::IntoUrl;
 use serenity::cache::Cache;
@@ -110,10 +109,6 @@ impl SlashArgument for RoleOrUser {
   fn create(builder: serenity::builder::CreateCommandOption) -> serenity::builder::CreateCommandOption {
     builder.kind(serenity::model::application::CommandOptionType::Mentionable)
   }
-}
-
-pub fn shuffle<T>(list: &mut [T]) {
-  list.shuffle(&mut rand::rng());
 }
 
 pub fn parse_emojis(message: &str) -> Vec<EmojiId> {

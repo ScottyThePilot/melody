@@ -30,6 +30,7 @@ extern crate melody_commander;
 extern crate melody_connect_four;
 extern crate melody_flag;
 extern crate melody_framework;
+extern crate melody_random;
 extern crate melody_ratelimiter;
 extern crate poise;
 extern crate rand;
