@@ -19,10 +19,15 @@ use crate::model::{HasDateTime, ModelError};
 pub trait Context<M: Model>: Send + Sync + 'static {
   type Error: From<crate::model::ModelError<<M::Entry as TryFrom<Entry>>::Error>> + Send;
 
+  /// Returns the client that the model should use for making HTTP requests.
   fn client(&self) -> &Client;
-  fn on_manager_error(&self, error: Self::Error);
+  /// Handles an error, returning `true` if the task should continue, or `false` if it should terminate.
+  fn on_manager_error(&self, error: Self::Error) -> bool;
+  /// Handles newly discovered feed entries.
   async fn on_new_entries(&self, identifier: &M::Identifier, entries: Vec<M::Entry>);
+  /// Stores the timestamp of the latest feed entry for later retrieval.
   async fn save_update_datetime(&self, identifier: &M::Identifier, update: DateTime<Utc>) -> Result<(), Self::Error>;
+  /// Retrieves the timestamp of the latest feed entry, if possible.
   async fn load_update_datetime(&self, identifier: &M::Identifier) -> Result<Option<DateTime<Utc>>, Self::Error>;
 }
 
@@ -36,7 +41,7 @@ impl<T, M: Model> Context<M> for Arc<T> where T: Context<M> {
   }
 
   #[inline]
-  fn on_manager_error(&self, error: Self::Error) {
+  fn on_manager_error(&self, error: Self::Error) -> bool {
     T::on_manager_error(self, error)
   }
 
@@ -236,7 +241,7 @@ impl<M: Model> Handle<M> {
   }
 
   async fn task_static<C: Context<M>>(self, context: C) {
-    self.inner.task(&context).await.unwrap_or_else(|error| context.on_manager_error(error));
+    self.inner.task(&context).await;
     self.inner.write_join_handle().await.take();
   }
 }
@@ -290,25 +295,34 @@ impl<M: Model> HandleInner<M> {
     rotate_queue(&mut *self.write_queue().await)
   }
 
-  async fn task<C: Context<M>>(&self, context: &C) -> Result<(), C::Error> {
-    trace!("started feed task for model `{}`", std::any::type_name::<M>());
+  async fn task<C: Context<M>>(&self, context: &C) {
+    debug!("started feed task for model `{}`", std::any::type_name::<M>());
 
     let mut last_advance = Instant::now();
     while self.wait(last_advance).await && let Some(identifier) = self.rotate_queue().await {
       last_advance = Instant::now();
 
-      let url = self.model.url(&identifier).map_err(ModelError::from)?;
-      let last_update = context.load_update_datetime(&identifier).await?.unwrap_or(DateTime::UNIX_EPOCH);
+      let should_continue = self.task_advance(identifier, context).await
+        .map_or_else(|error| context.on_manager_error(error), |()| true);
 
-      trace!("requesting feed entries for model `{}` and feed identifier `{:?}`", std::any::type_name::<M>(), identifier);
-      let mut entries = crate::model::get_feed_entries::<M::Entry>(context.client(), url).await?;
-      entries.retain(|entry| entry.datetime() > last_update && self.model.filter(entry));
-      entries.sort_unstable_by_key(|entry| entry.datetime());
+      if !should_continue { break };
 
-      if let Some(last_update) = entries.iter().map(|entry| entry.datetime()).max() {
-        context.save_update_datetime(&identifier, last_update).await?;
-        context.on_new_entries(&identifier, entries).await;
-      };
+      trace!("continuing feed task for model `{}`", std::any::type_name::<M>());
+    };
+  }
+
+  async fn task_advance<C: Context<M>>(&self, identifier: M::Identifier, context: &C) -> Result<(), C::Error> {
+    let url = self.model.url(&identifier).map_err(ModelError::from)?;
+    let last_update = context.load_update_datetime(&identifier).await?.unwrap_or(DateTime::UNIX_EPOCH);
+
+    debug!("requesting feed entries for model `{}` and feed identifier `{:?}`", std::any::type_name::<M>(), identifier);
+    let mut entries = crate::model::get_feed_entries::<M::Entry>(context.client(), url).await?;
+    entries.retain(|entry| entry.datetime() > last_update && self.model.filter(entry));
+    entries.sort_unstable_by_key(|entry| entry.datetime());
+
+    if let Some(last_update) = entries.iter().map(|entry| entry.datetime()).max() {
+      context.save_update_datetime(&identifier, last_update).await?;
+      context.on_new_entries(&identifier, entries).await;
     };
 
     Ok(())

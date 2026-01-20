@@ -219,8 +219,10 @@ impl Context<FeedModelYouTube> for FeedContext {
     &self.client
   }
 
-  fn on_manager_error(&self, error: Self::Error) {
+  fn on_manager_error(&self, error: Self::Error) -> bool {
     error!("{error}");
+
+    true
   }
 
   async fn on_new_entries(&self, feed_identifier: &FeedIdentifierYouTube, entries: Vec<YouTubeVideo>) {
@@ -274,8 +276,10 @@ impl Context<FeedModelTwitter> for FeedContext {
     &self.client
   }
 
-  fn on_manager_error(&self, error: Self::Error) {
+  fn on_manager_error(&self, error: Self::Error) -> bool {
     error!("{error}");
+
+    true
   }
 
   async fn on_new_entries(&self, feed_identifier: &FeedIdentifierTwitter, entries: Vec<TwitterPost>) {
