@@ -92,13 +92,13 @@ impl InputAgent {
   }
 
   async fn command_inspect_persist(&mut self) -> MelodyResult {
-    self.core.operate_persist(async |persist| println!("{persist:#?}")).await;
+    self.core.operate_persist(async |persist| info!("{persist:#?}")).await;
     Ok(())
   }
 
   async fn command_inspect_persist_guild(&mut self, guild_id: GuildId) -> MelodyResult {
     self.core.operate_persist_guild(guild_id, async |persist_guild| {
-      println!("{persist_guild:#?}");
+      info!("{persist_guild:#?}");
       Ok(())
     }).await?;
 

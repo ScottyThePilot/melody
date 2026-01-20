@@ -52,6 +52,11 @@ extern crate uord;
 extern crate url;
 extern crate yggdrasil;
 
+#[allow(unused)]
+macro_rules! println {
+  ($($tt:tt)*) => (info!($($tt)*));
+}
+
 #[macro_use] pub(crate) mod utils;
 pub(crate) mod prelude;
 pub(crate) mod commands;
