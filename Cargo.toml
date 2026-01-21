@@ -16,7 +16,8 @@ cleverbot-logs = { workspace = true }
 const-random = { version = "0.1.15" }
 defy = { workspace = true }
 feed-machine = { workspace = true }
-fern = { version = "0.7.1" }
+fern = { version = "0.7.1", features = ["colored"] }
+flate2 = { version = "1.1.8" }
 float-ord = { workspace = true }
 fs-err = { workspace = true, features = ["tokio"] }
 futures = { workspace = true }

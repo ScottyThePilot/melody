@@ -58,6 +58,7 @@ macro_rules! println {
 }
 
 #[macro_use] pub(crate) mod utils;
+pub(crate) mod logger;
 pub(crate) mod prelude;
 pub(crate) mod commands;
 pub(crate) mod data;
@@ -68,8 +69,6 @@ use serenity::prelude::SerenityError;
 use term_stratum::StratumEvent;
 use tokio::sync::mpsc::UnboundedReceiver as AsyncReceiver;
 
-use std::sync::mpsc::Sender as SyncSender;
-
 pub const BUILD_ID: u64 = const_random::const_random!(u64);
 pub const BUILD_DATE: &str = build_info::build_datetime_local_fixed_format!("%-d %b %Y %-H:%M:%S %z");
 pub const BUILD_GIT_HASH: &str = build_info::git_hash_short!();
@@ -78,7 +77,7 @@ fn main() {
   yggdrasil::reroot().expect("unable to set root dir");
   let (logger_sender, logger_receiver) = std::sync::mpsc::channel();
   let (event_sender, event_receiver) = tokio::sync::mpsc::unbounded_channel();
-  setup_logger(logger_sender).expect("failed to setup logger");
+  crate::logger::setup(logger_sender).expect("failed to setup logger");
 
   term_stratum::run(
     env!("CARGO_PKG_NAME"),
@@ -94,35 +93,6 @@ async fn run(event_reciever: AsyncReceiver<StratumEvent>) {
     Err(error) => error!("{error}"),
     Ok(()) => ()
   };
-}
-
-fn setup_logger(sender: SyncSender<String>) -> Result<(), fern::InitError> {
-  let me = env!("CARGO_PKG_NAME").replace('-', "_");
-  fern::Dispatch::new()
-    .format(move |out, message, record| {
-      out.finish(format_args!(
-        "{}[{}]({}) {}",
-        chrono::Local::now().format("[%H:%M:%S]"),
-        record.level(),
-        record.target(),
-        message
-      ))
-    })
-    .level(log::LevelFilter::Warn)
-    .level_for(me, log::LevelFilter::Trace)
-    .level_for("feed_machine", log::LevelFilter::Debug)
-    .level_for("melody_commander", log::LevelFilter::Info)
-    .level_for("melody_flag", log::LevelFilter::Info)
-    .level_for("melody_framework", log::LevelFilter::Trace)
-    .level_for("melody_ratelimiter", log::LevelFilter::Info)
-    .level_for("melody_rss_feed", log::LevelFilter::Info)
-    .chain(sender)
-    .chain({
-      fs_err::create_dir_all("./data/")?;
-      fern::log_file("./data/latest.log")?
-    })
-    .apply()?;
-  Ok(())
 }
 
 pub type MelodyResult<T = ()> = Result<T, MelodyError>;
