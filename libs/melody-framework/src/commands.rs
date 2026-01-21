@@ -11,8 +11,10 @@ use serenity::model::application::Command as SerenityCommand;
 use serenity::model::Permissions;
 use serenity::model::colour::Color;
 
+use std::any::Any;
 use std::fmt;
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 
 
@@ -20,7 +22,8 @@ use std::collections::{HashMap, HashSet};
 pub struct CommandMetaData {
   info_localizations: Option<HashMap<String, String>>,
   usage_localizations: HashMap<String, Vec<String>>,
-  examples_localizations: HashMap<String, Vec<String>>
+  examples_localizations: HashMap<String, Vec<String>>,
+  condition: CommandCondition
 }
 
 impl CommandMetaData {
@@ -33,10 +36,8 @@ impl CommandMetaData {
     self
   }
 
-  pub fn info_localized_concat(mut self, locale: impl Into<String>, contents: impl IntoIterator<Item = impl std::fmt::Display>) -> Self {
-    let contents = contents.into_iter().join(" ");
-    self.info_localizations.get_or_insert_default().insert(locale.into(), contents);
-    self
+  pub fn info_localized_concat(self, locale: impl Into<String>, contents: impl IntoIterator<Item = impl std::fmt::Display>) -> Self {
+    self.info_localized(locale, contents.into_iter().join(" "))
   }
 
   pub fn usage_localized(mut self, locale: impl Into<String>, contents: impl IntoIterator<Item = impl Into<String>>) -> Self {
@@ -51,6 +52,11 @@ impl CommandMetaData {
     self
   }
 
+  pub fn condition(mut self, condition: impl Into<CommandCondition>) -> Self {
+    self.condition = condition.into();
+    self
+  }
+
   pub const fn get_info_localizations(&self) -> &Option<HashMap<String, String>> {
     &self.info_localizations
   }
@@ -62,7 +68,108 @@ impl CommandMetaData {
   pub const fn get_examples_localizations(&self) -> &HashMap<String, Vec<String>> {
     &self.examples_localizations
   }
+
+  pub const fn get_condition(&self) -> &CommandCondition {
+    &self.condition
+  }
 }
+
+#[derive(Clone)]
+pub struct CommandConditionFunction {
+  ptr: Arc<dyn for<'a> Fn(&'a (dyn Any + Send + Sync)) -> bool + Send + Sync + 'static>
+}
+
+impl CommandConditionFunction {
+  pub fn new<F>(function: F) -> Self
+  where for<'a> F: Fn(&'a (dyn Any + Send + Sync)) -> bool + Send + Sync + 'static {
+    CommandConditionFunction { ptr: Arc::new(function) }
+  }
+
+  pub fn new_downcast<T, F>(function: F) -> Self
+  where for<'a> F: Fn(Option<&'a T>) -> bool + Send + Sync + 'static, T: Any + Send + Sync {
+    Self::new(move |any| function(any.downcast_ref::<T>()))
+  }
+
+  pub fn run(&self, argument: &(dyn Any + Send + Sync)) -> bool {
+    (self.ptr)(argument)
+  }
+}
+
+impl Eq for CommandConditionFunction {}
+
+impl PartialEq for CommandConditionFunction {
+  fn eq(&self, other: &Self) -> bool {
+    Arc::ptr_eq(&self.ptr, &other.ptr)
+  }
+}
+
+impl fmt::Debug for CommandConditionFunction {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct("CommandConditionFunction").finish_non_exhaustive()
+  }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum CommandCondition {
+  #[default]
+  Always,
+  Never,
+  All(Vec<Self>),
+  Any(Vec<Self>),
+  Not(Box<Self>),
+  Function(CommandConditionFunction)
+}
+
+impl CommandCondition {
+  pub const fn always() -> Self {
+    Self::Always
+  }
+
+  pub const fn never() -> Self {
+    Self::Never
+  }
+
+  pub fn all(conditions: impl IntoIterator<Item = impl Into<Self>>) -> Self {
+    Self::All(conditions.into_iter().map(Into::into).collect::<Vec<Self>>())
+  }
+
+  pub fn any(conditions: impl IntoIterator<Item = impl Into<Self>>) -> Self {
+    Self::Any(conditions.into_iter().map(Into::into).collect::<Vec<Self>>())
+  }
+
+  pub fn not(self) -> Self {
+    Self::Not(Box::new(self))
+  }
+
+  pub fn test(&self, argument: &(dyn Any + Send + Sync)) -> bool {
+    match self {
+      Self::Always => true,
+      Self::Never => false,
+      Self::All(conditions) => conditions.iter().all(|condition| condition.test(argument)),
+      Self::Any(conditions) => conditions.iter().any(|condition| condition.test(argument)),
+      Self::Not(condition) => !condition.test(argument),
+      Self::Function(function) => function.run(argument)
+    }
+  }
+}
+
+impl From<bool> for CommandCondition {
+  fn from(value: bool) -> Self {
+    if value {
+      CommandCondition::Always
+    } else {
+      CommandCondition::Never
+    }
+  }
+}
+
+impl From<CommandConditionFunction> for CommandCondition {
+  fn from(value: CommandConditionFunction) -> Self {
+    CommandCondition::Function(value)
+  }
+}
+
+
 
 fn create_application_commands<'a, S: 'a, E: 'a>(commands: impl IntoIterator<Item = &'a MelodyCommand<S, E>>) -> Vec<CreateCommand> {
   fn recursively_add_context_menu_commands<S, E>(builder: &mut Vec<CreateCommand>, command: &MelodyCommand<S, E>) {
@@ -85,6 +192,15 @@ fn create_application_commands<'a, S: 'a, E: 'a>(commands: impl IntoIterator<Ite
   };
 
   commands_builder
+}
+
+pub fn create_commands_list<S, E>(
+  commands: &'static [fn() -> MelodyCommand<S, E>],
+  argument: &(dyn Any + Send + Sync)
+) -> Vec<MelodyCommand<S, E>> {
+  commands.into_iter().map(|f| f())
+    .filter(|command| command_satisfies_condition(command, argument))
+    .collect::<Vec<MelodyCommand<S, E>>>()
 }
 
 pub async fn register_guild_commands<S, E>(
@@ -132,9 +248,26 @@ pub fn iter_common_commands<S, E>(commands: &[MelodyCommand<S, E>])
   commands.iter().filter(|command| command.category.is_none())
 }
 
+pub fn iter_common_commands_with_argument<'a, S, E>(commands: &'a [MelodyCommand<S, E>], argument: &'a (dyn Any + Send + Sync))
+-> impl Iterator<Item = &'a MelodyCommand<S, E>> + DoubleEndedIterator + Clone {
+  iter_common_commands(commands)
+    .filter(move |command| command_satisfies_condition(command, argument))
+}
+
 pub fn iter_exclusive_commands<S, E>(commands: &[MelodyCommand<S, E>])
 -> impl Iterator<Item = &MelodyCommand<S, E>> + DoubleEndedIterator + Clone {
   commands.iter().filter(|command| command.category.is_some())
+}
+
+pub fn iter_exclusive_commands_with_argument<'a, S, E>(commands: &'a [MelodyCommand<S, E>], argument: &'a (dyn Any + Send + Sync))
+-> impl Iterator<Item = &'a MelodyCommand<S, E>> + DoubleEndedIterator + Clone {
+  iter_exclusive_commands(commands)
+    .filter(move |command| command_satisfies_condition(command, argument))
+}
+
+pub fn command_satisfies_condition<S, E>(command: &MelodyCommand<S, E>, argument: &(dyn Any + Send + Sync)) -> bool {
+  command.custom_data.downcast_ref::<CommandMetaData>()
+    .is_some_and(|metadata| metadata.get_condition().test(argument))
 }
 
 #[derive(Debug, Clone, Copy)]

@@ -1,11 +1,12 @@
 use crate::prelude::*;
-use crate::data::Core;
+use crate::data::{Core, State};
 use crate::feature::music_player::{MusicPlayer, QueueItem, AttachmentItem, YouTubeItem};
 use crate::utils::youtube;
 use super::{MelodyContext, CommandMetaData};
 
 use serenity::model::id::{ChannelId, GuildId, UserId};
 use serenity::model::channel::Attachment;
+use melody_framework::commands::CommandConditionFunction;
 
 use std::sync::Arc;
 
@@ -66,6 +67,9 @@ use std::sync::Arc;
       "/music-player stop",
       "/music-player kill"
     ])
+    .condition(CommandConditionFunction::new_downcast(|state: Option<&State>| {
+      state.is_some_and(|state| state.music_player.is_some())
+    }))
 )]
 pub async fn music_player(_ctx: MelodyContext<'_>) -> MelodyResult {
   Err(MelodyError::COMMAND_PRECONDITION_VIOLATION_ROOT_COMMAND)

@@ -32,8 +32,8 @@ const COMMANDS: &[fn() -> MelodyCommand] = &[
   self::roles::join_roles
 ];
 
-pub fn create_commands_list() -> Vec<MelodyCommand> {
-  COMMANDS.into_iter().map(|f| f()).collect()
+pub fn create_commands_list(state: &State) -> Vec<MelodyCommand> {
+  melody_framework::commands::create_commands_list(COMMANDS, state)
 }
 
 #[poise::command(

@@ -53,7 +53,7 @@ pub async fn launch(event_receiver: MpscReceiver<StratumEvent>) -> MelodyResult 
 
   let handler = Arc::new(Handler { setup_done: Flag::new(false) });
   let framework = MelodyFrameworkOptions::new(state.clone(), handler)
-    .with_commands(crate::commands::create_commands_list())
+    .with_commands(crate::commands::create_commands_list(&state))
     .build();
 
   let mut client = Client::builder(&token, intents)

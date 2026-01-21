@@ -110,7 +110,7 @@ fn setup_logger(sender: SyncSender<String>) -> Result<(), fern::InitError> {
     })
     .level(log::LevelFilter::Warn)
     .level_for(me, log::LevelFilter::Trace)
-    .level_for("feed_machine", log::LevelFilter::Trace)
+    .level_for("feed_machine", log::LevelFilter::Debug)
     .level_for("melody_commander", log::LevelFilter::Info)
     .level_for("melody_flag", log::LevelFilter::Info)
     .level_for("melody_framework", log::LevelFilter::Trace)
@@ -137,7 +137,7 @@ pub enum MelodyError {
   #[error("Command Error: {0}")]
   CommandError(#[from] MelodyCommandError),
   #[error("Input Error: {0}")]
-  InputError(#[from] crate::melody_commander::CommandError),
+  InputError(#[from] melody_commander::CommandError),
   #[error("YT-DLP Error: {0}")]
   YtDlpError(#[from] crate::utils::youtube::YtDlpError),
   #[error("Feed Model Error: {0}")]
