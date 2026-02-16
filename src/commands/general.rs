@@ -252,15 +252,15 @@ pub async fn console(
   let mut input_agent = crate::handler::InputAgent::new(Core::from(ctx));
   let result = input_agent.line(internal_command_text).await;
   if let Err(err) = result {
-    input_agent.error(err.to_string());
+    input_agent.output_mut().error(err.to_string());
   };
 
-  if input_agent.output().is_empty() {
-    input_agent.trace("(no output)");
+  if input_agent.output().messages().is_empty() {
+    input_agent.output_mut().trace("(no output)");
   };
 
   let mut output = Vec::new();
-  for (level, line) in input_agent.into_output() {
+  for (level, line) in input_agent.into_output().into_messages() {
     let level_prefix = match level {
       Level::Error => "[ERROR]: ",
       Level::Warn => "[WARN]: ",

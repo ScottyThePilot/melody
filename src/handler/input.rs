@@ -46,59 +46,84 @@ const COMMANDS: Commands<CommandFunction> = &[
 #[derive(Debug, Clone)]
 pub struct InputAgent {
   core: Core,
-  output: Vec<(Level, String)>
+  allowed_plugins: Option<HashSet<String>>,
+  output: InputAgentOutput
 }
 
 impl InputAgent {
   pub fn new(core: impl Into<Core>) -> Self {
     InputAgent {
       core: core.into(),
-      output: Vec::new()
+      allowed_plugins: None,
+      output: InputAgentOutput::new()
     }
   }
 
+  async fn get_allowed_plugins(&mut self) -> &HashSet<String> {
+    get_or_insert_with_async(&mut self.allowed_plugins, async || {
+      use crate::data::MelodyFrameworkKey;
+      let commands = self.core.get::<MelodyFrameworkKey>().await.read_commands_owned().await;
+      let allowed_plugins = commands.iter()
+        .filter_map(|command| command.category.as_deref())
+        .chain(crate::commands::HARDCODED_PLUGINS.into_iter().copied())
+        .map(str::to_owned)
+        .collect::<HashSet<String>>();
+      allowed_plugins
+    }).await
+  }
+
   async fn command_stop(&mut self) -> MelodyResult {
-    self.info("Shutdown triggered");
+    self.output.info("Shutdown triggered");
     self.core.trigger_shutdown().await;
     Ok(())
   }
 
   async fn command_plugin_list(&mut self, guild_id: GuildId) -> MelodyResult {
     let plugins = self.plugin_list(guild_id).await;
-    self.info(format!("Plugins for guild ({guild_id}): {}", plugins.iter().join(", ")));
+    self.output.info(format!("Plugins for guild ({guild_id}): {}", plugins.iter().join(", ")));
     Ok(())
   }
 
   async fn command_plugin_enable(&mut self, plugin: String, guild_id: GuildId) -> MelodyResult {
-    self.plugin_enable(&plugin, guild_id).await?;
-    self.info(format!("Enabled plugin {plugin} for guild ({guild_id})"));
+    if self.get_allowed_plugins().await.contains(&plugin) {
+      self.plugin_enable(&plugin, guild_id).await?;
+      self.output.info(format!("Enabled plugin {plugin} for guild ({guild_id})"));
+    } else {
+      self.output.info(format!("No such plugin {plugin}"));
+    };
+
     Ok(())
   }
 
   async fn command_plugin_disable(&mut self, plugin: String, guild_id: GuildId) -> MelodyResult {
-    self.plugin_disable(&plugin, guild_id).await?;
-    self.info(format!("Disabled plugin {plugin} for guild ({guild_id})"));
+    if self.get_allowed_plugins().await.contains(&plugin) {
+      self.plugin_disable(&plugin, guild_id).await?;
+      self.output.info(format!("Disabled plugin {plugin} for guild ({guild_id})"));
+    } else {
+      self.output.info(format!("No such plugin {plugin}"));
+    };
+
     Ok(())
   }
 
   async fn command_inspect_activities(&mut self) -> MelodyResult {
-    self.core.operate_activities(async |activities| info!("{activities:#?}")).await;
+    self.core.operate_activities(async |activities| self.output.info(format!("{activities:#?}"))).await;
     Ok(())
   }
 
   async fn command_inspect_config(&mut self) -> MelodyResult {
-    self.core.operate_config(async |config| info!("{config:#?}")).await;
+    self.core.operate_config(async |config| self.output.info(format!("{config:#?}"))).await;
     Ok(())
   }
 
   async fn command_inspect_persist(&mut self) -> MelodyResult {
-    self.core.operate_persist(async |persist| info!("{persist:#?}")).await;
+    self.core.operate_persist(async |persist| self.output.info(format!("{persist:#?}"))).await;
     Ok(())
   }
 
   async fn command_inspect_persist_guild(&mut self, guild_id: GuildId) -> MelodyResult {
     self.core.operate_persist_guild(guild_id, async |persist_guild| {
-      info!("{persist_guild:#?}");
+      self.output.info(format!("{persist_guild:#?}"));
       Ok(())
     }).await?;
 
@@ -108,13 +133,13 @@ impl InputAgent {
   async fn command_update_yt_dlp(&mut self, update_to: Option<String>) -> MelodyResult {
     if let Some(yt_dlp) = self.core.state.yt_dlp.clone() {
       let update_to = update_to.as_deref().unwrap_or("latest");
-      self.info(format!("Updating yt-dlp..."));
+      self.output.info(format!("Updating yt-dlp..."));
       let yt_dlp_output = yt_dlp.update(update_to).await?;
       for yt_dlp_output_line in yt_dlp_output.lines() {
-        self.trace(format!("(yt-dlp): {yt_dlp_output_line:?}"));
+        self.output.trace(format!("(yt-dlp): {yt_dlp_output_line:?}"));
       };
     } else {
-      self.error(format!("Cannot update yt-dlp, no yt-dlp path in config"));
+      self.output.error(format!("Cannot update yt-dlp, no yt-dlp path in config"));
     };
 
     Ok(())
@@ -122,7 +147,7 @@ impl InputAgent {
 
   async fn command_reload_activities(&mut self) -> MelodyResult {
     self.core.reload_activities().await?;
-    self.info("Reloaded data/activities.json");
+    self.output.info("Reloaded data/activities.json");
 
     Ok(())
   }
@@ -134,12 +159,17 @@ impl InputAgent {
   }
 
   #[inline]
-  pub fn output(&self) -> &[(Level, String)] {
+  pub fn output(&self) -> &InputAgentOutput {
     &self.output
   }
 
   #[inline]
-  pub fn into_output(self) -> Vec<(Level, String)> {
+  pub fn output_mut(&mut self) -> &mut InputAgentOutput {
+    &mut self.output
+  }
+
+  #[inline]
+  pub fn into_output(self) -> InputAgentOutput {
     self.output
   }
 
@@ -170,12 +200,33 @@ impl InputAgent {
       }).await?
     }).await.context("failed to register commands")
   }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct InputAgentOutput {
+  messages: Vec<(Level, String)>
+}
+
+impl InputAgentOutput {
+  pub fn new() -> Self {
+    Self { messages: Vec::new() }
+  }
+
+  #[inline]
+  pub fn messages(&self) -> &[(Level, String)] {
+    &self.messages
+  }
+
+  #[inline]
+  pub fn into_messages(self) -> Vec<(Level, String)> {
+    self.messages
+  }
 
   #[allow(unused)]
   pub fn log(&mut self, level: Level, message: impl Into<String>) {
     let message = message.into();
     log!(level, "{message}");
-    self.output.push((level, message));
+    self.messages.push((level, message));
   }
 
   #[allow(unused)]
@@ -201,5 +252,14 @@ impl InputAgent {
   #[allow(unused)]
   pub fn trace(&mut self, message: impl Into<String>) {
     self.log(Level::Trace, message);
+  }
+}
+
+async fn get_or_insert_with_async<T>(option: &mut Option<T>, f: impl AsyncFnOnce() -> T) -> &mut T {
+  // stupid hack because borrow checker is stupid
+  if option.is_some() {
+    unsafe { option.as_mut().unwrap_unchecked() }
+  } else {
+    option.insert(f().await)
   }
 }

@@ -298,7 +298,7 @@ async fn events_task(
       StratumEvent::Input(line) => {
         let result = input_agent.line(line).await;
         if let Err(err) = result {
-          input_agent.error(err.to_string());
+          input_agent.output_mut().error(err.to_string());
         };
       },
       StratumEvent::Terminate => {
