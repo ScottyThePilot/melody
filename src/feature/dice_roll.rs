@@ -1,6 +1,7 @@
 use chumsky::prelude::*;
 use chumsky::error::SimpleReason;
 use chumsky::text::whitespace;
+use rand::Rng;
 
 use std::fmt;
 use std::str::FromStr;
@@ -109,8 +110,8 @@ impl Roll {
     Roll { dice: 1, sides: 2, modifier: 0, mode: None, target }
   }
 
-  pub fn execute(self) -> ExecutedRoll {
-    let roll_results = (0..self.dice).map(|_| rand::random_range(1..=self.sides)).collect();
+  pub fn execute(self, rng: &mut (impl Rng + ?Sized)) -> ExecutedRoll {
+    let roll_results = (0..self.dice).map(|_| rng.random_range(1..=self.sides)).collect();
     ExecutedRoll { roll_results, roll: self.normalize() }
   }
 

@@ -11,6 +11,67 @@ use rand_chacha::{ChaCha12Core, ChaCha12Rng};
 use rand_xoshiro::Xoshiro256PlusPlus;
 
 use std::ops::DerefMut;
+use std::cell::RefCell;
+use std::thread::LocalKey;
+
+
+
+pub type SecureThreadRng = ThreadRng<SecureRng>;
+pub type SecureReseedingThreadRng = ThreadRng<SecureReseedingRng>;
+
+const _: () = assert_is_threadsafe::<ThreadRng<SecureRng>>();
+const _: () = assert_is_threadsafe::<ThreadRng<SecureReseedingRng>>();
+
+#[macro_export]
+macro_rules! impl_thread_local {
+  (for $Type:ty, $expr:expr) => (
+    impl $crate::ThreadLocal for $Type {
+      fn get_key() -> &'static $crate::LocalKeyCell<Self> {
+        std::thread_local!{
+          static KEY: std::cell::RefCell<$Type> = {
+            std::cell::RefCell::new($expr)
+          };
+        }
+
+        &KEY
+      }
+    }
+  );
+}
+
+pub type LocalKeyCell<T> = LocalKey<RefCell<T>>;
+
+pub trait ThreadLocal: Sized + 'static {
+  fn get_key() -> &'static LocalKeyCell<Self>;
+}
+
+pub struct ThreadRng<T: 'static> {
+  inner: &'static LocalKeyCell<T>
+}
+
+impl<T: ThreadLocal> ThreadRng<T> {
+  pub fn new() -> Self {
+    ThreadRng { inner: T::get_key() }
+  }
+}
+
+impl<T: ThreadLocal + RngCore> RngCore for ThreadRng<T> {
+  #[inline(always)]
+  fn next_u32(&mut self) -> u32 {
+    self.inner.with_borrow_mut(RngCore::next_u32)
+  }
+
+  #[inline(always)]
+  fn next_u64(&mut self) -> u64 {
+    self.inner.with_borrow_mut(RngCore::next_u64)
+  }
+
+  fn fill_bytes(&mut self, dst: &mut [u8]) {
+    self.inner.with_borrow_mut(|inner| inner.fill_bytes(dst))
+  }
+}
+
+impl<T: ThreadLocal + CryptoRng> CryptoRng for ThreadRng<T> {}
 
 
 
@@ -55,6 +116,8 @@ impl RngCore for SecureRng {
 }
 
 impl CryptoRng for SecureRng {}
+
+impl_thread_local!(for SecureRng, SecureRng::new());
 
 
 
@@ -101,6 +164,10 @@ impl RngCore for SecureReseedingRng {
 }
 
 impl CryptoRng for SecureReseedingRng {}
+
+impl_thread_local!(for SecureReseedingRng, {
+  SecureReseedingRng::new().unwrap()
+});
 
 
 
