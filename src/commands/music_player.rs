@@ -469,6 +469,8 @@ async fn music_player_join(ctx: MelodyContext<'_>) -> MelodyResult {
     match ensure_in_channel(&core, guild_id, ctx.author().id).await {
       Err(response) => Err(response),
       Ok((music_player, channel_id)) => Ok({
+        ctx.defer().await.context("failed to defer response")?;
+
         match music_player.join(&core, guild_id, channel_id).await {
           Ok(()) => format!("Joined channel {}", channel_id.mention()),
           Err(err) => {
@@ -500,6 +502,8 @@ async fn music_player_leave(ctx: MelodyContext<'_>) -> MelodyResult {
     match ensure_in_same_channel(&core, guild_id, ctx.author().id).await {
       Err(response) => Err(response),
       Ok((music_player, channel_id)) => Ok({
+        ctx.defer().await.context("failed to defer response")?;
+
         match music_player.leave(&core, guild_id).await {
           Ok(()) => format!("Left channel {}", channel_id.mention()),
           Err(err) => {

@@ -157,14 +157,21 @@ impl MusicPlayer {
 async fn join_and_deafen(
   songbird: &Arc<Songbird>, guild_id: GuildId, channel_id: ChannelId
 ) -> Result<Arc<Mutex<Call>>, JoinError> {
-  let call = songbird.join(guild_id, channel_id).await?;
-  let mut call_handle = call.lock().await;
-  if !call_handle.is_deaf() {
-    call_handle.deafen(true).await?;
-  };
+  match songbird.join(guild_id, channel_id).await {
+    Ok(call) => {
+      let mut call_handle = call.lock().await;
+      if !call_handle.is_deaf() {
+        call_handle.deafen(true).await?;
+      };
 
-  std::mem::drop(call_handle);
-  Ok(call)
+      std::mem::drop(call_handle);
+      Ok(call)
+    },
+    Err(error) => {
+      let _ = songbird.remove(guild_id).await;
+      Err(error)
+    }
+  }
 }
 
 #[derive(Debug, Clone)]
