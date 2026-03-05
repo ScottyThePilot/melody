@@ -6,27 +6,36 @@ use std::str::FromStr;
 use std::any::type_name;
 
 #[derive(Debug, Clone, Copy)]
-pub struct Command<T: 'static> {
+pub struct Command<T: 'static, H: 'static> {
   pub name: &'static str,
-  pub body: CommandBody<T>
+  pub help: H,
+  pub body: CommandBody<T, H>
 }
 
-impl<T: 'static> Command<T> {
-  pub const fn new_group(name: &'static str, commands: Commands<T>) -> Self {
-    Command { name, body: CommandBody::Group { commands } }
+impl<T: 'static, H: 'static> Command<T, H> {
+  pub const fn new_group(name: &'static str, help: H, commands: Commands<T, H>) -> Self {
+    Command { name, help, body: CommandBody::Group { commands } }
   }
 
-  pub const fn new_target(name: &'static str, target: T) -> Self {
-    Command { name, body: CommandBody::Target { target } }
+  pub const fn new_target(name: &'static str, help: H, target: T) -> Self {
+    Command { name, help, body: CommandBody::Target { target } }
+  }
+
+  pub const fn subcommands(&self) -> Option<&'static [Self]> {
+    if let CommandBody::Group { commands } = self.body {
+      Some(commands)
+    } else {
+      None
+    }
   }
 }
 
-pub type Commands<T> = &'static [Command<T>];
+pub type Commands<T, H> = &'static [Command<T, H>];
 
 #[derive(Debug, Clone, Copy)]
-pub enum CommandBody<T: 'static> {
+pub enum CommandBody<T: 'static, H: 'static> {
   Group {
-    commands: Commands<T>
+    commands: Commands<T, H>
   },
   Target {
     target: T
@@ -34,15 +43,14 @@ pub enum CommandBody<T: 'static> {
 }
 
 #[derive(Debug, Clone)]
-pub struct CommandOutput<T: 'static> {
+pub struct CommandOutput<T: 'static, H: 'static> {
   pub target: &'static T,
+  pub help: &'static H,
   pub remaining_args: Box<[String]>
 }
 
 #[derive(Debug, Error)]
 pub enum CommandError {
-  #[error("empty command group")]
-  EmptyCommandGroup,
   #[error("insufficient arguments, expected one of {0:?}")]
   InsufficientArgsCommand(Vec<&'static str>),
   #[error("insufficient arguments, expected {0}")]
@@ -65,32 +73,114 @@ pub enum CommandError {
 
 type GenericError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
-pub fn apply<T: 'static>(input: &str, commands: Commands<T>) -> Result<CommandOutput<T>, CommandError> {
+pub fn apply<T: 'static, H: 'static>(input: &str, commands: Commands<T, H>) -> Result<CommandOutput<T, H>, CommandError> {
   split_args(input).and_then(|args| {
     let mut args = VecDeque::from(args);
-    let target = find_target_args(&mut args, commands)?;
+    let (target, help) = find_target_args(&mut args, commands)?;
     let remaining_args = Vec::from(args).into_boxed_slice();
-    Ok(CommandOutput { target, remaining_args })
+    Ok(CommandOutput { target, help, remaining_args })
   })
 }
 
-fn find_target_args<T: 'static>(
-  args: &mut VecDeque<String>,
-  commands: Commands<T>
-) -> Result<&'static T, CommandError> {
-  let first_arg = args.pop_front()
-    .ok_or_else(|| CommandError::InsufficientArgsCommand(command_names(commands)))?;
-  let body = commands.iter()
-    .find_map(|command| command.name.eq_ignore_ascii_case(&first_arg).then_some(&command.body))
-    .ok_or_else(|| CommandError::CommandNotFound(first_arg))?;
+#[derive(Debug, Clone, Copy)]
+pub enum CommandNode<T: 'static, H: 'static> {
+  Command(&'static Command<T, H>),
+  Commands(Commands<T, H>)
+}
 
-  match body {
-    CommandBody::Group { commands } => find_target_args(args, commands),
-    CommandBody::Target { target } => Ok(target)
+impl<T, H> CommandNode<T, H> {
+  pub fn traverse(mut self, mut args: &[String]) -> TraverseResult<'_, T, H> {
+    while let Some((arg, args_remaining)) = args.split_first() {
+      args = args_remaining;
+
+      let (commands, command) = match self {
+        Self::Commands(commands) => (Some(commands), None),
+        Self::Command(command) => match command.body {
+          CommandBody::Target { .. } => (None, Some(command)),
+          CommandBody::Group { commands } => (Some(commands), Some(command))
+        }
+      };
+
+      let Some(commands) = commands else {
+        return TraverseResult::NotFound { commands, command, arg, args };
+      };
+
+      if let Some(command) = find_command_in_list(arg, commands) {
+        self = Self::Command(command);
+      } else {
+        return TraverseResult::NotFound { commands: Some(commands), command, arg, args };
+      };
+    };
+
+    TraverseResult::Found { node: self }
   }
 }
 
-fn command_names<T>(commands: Commands<T>) -> Vec<&'static str> {
+#[derive(Debug, Clone, Copy)]
+pub enum TraverseResult<'a, T: 'static, H: 'static> {
+  Found {
+    node: CommandNode<T, H>
+  },
+  NotFound {
+    commands: Option<Commands<T, H>>,
+    command: Option<&'static Command<T, H>>,
+    arg: &'a String,
+    args: &'a [String]
+  }
+}
+
+impl<'a, T, H> TraverseResult<'a, T, H> {
+  pub fn command(self) -> Option<&'static Command<T, H>> {
+    match self {
+      Self::Found { node: CommandNode::Command(command) } => Some(command),
+      Self::Found { node: CommandNode::Commands(..) } => None,
+      Self::NotFound { command, .. } => command
+    }
+  }
+}
+
+pub fn find_command<T: 'static, H: 'static>(
+  args: &[String],
+  commands: Commands<T, H>
+) -> Result<&'static Command<T, H>, CommandError> {
+  let (first_arg, args) = args.split_first()
+    .ok_or_else(|| CommandError::InsufficientArgsCommand(command_names(commands)))?;
+  let command = find_command_in_list(first_arg, commands)
+    .ok_or_else(|| CommandError::CommandNotFound(first_arg.to_owned()))?;
+
+  args.iter().try_fold(command, |command, arg| {
+    match &command.body {
+      CommandBody::Group { commands } => {
+        find_command_in_list(arg, commands)
+          .ok_or_else(|| CommandError::CommandNotFound(arg.to_owned()))
+      },
+      CommandBody::Target { .. } => {
+        Err(CommandError::CommandNotFound(arg.to_owned()))
+      }
+    }
+  })
+}
+
+pub fn find_command_in_list<T: 'static, H: 'static>(name: &str, commands: Commands<T, H>) -> Option<&'static Command<T, H>> {
+  commands.iter().find_map(|command| command.name.eq_ignore_ascii_case(name).then_some(command))
+}
+
+fn find_target_args<T: 'static, H: 'static>(
+  args: &mut VecDeque<String>,
+  commands: Commands<T, H>
+) -> Result<(&'static T, &'static H), CommandError> {
+  let first_arg = args.pop_front()
+    .ok_or_else(|| CommandError::InsufficientArgsCommand(command_names(commands)))?;
+  let command = find_command_in_list(&first_arg, commands)
+    .ok_or_else(|| CommandError::CommandNotFound(first_arg))?;
+
+  match &command.body {
+    CommandBody::Group { commands } => find_target_args(args, commands),
+    CommandBody::Target { target } => Ok((target, &command.help))
+  }
+}
+
+fn command_names<T, H>(commands: Commands<T, H>) -> Vec<&'static str> {
   commands.iter().map(|command| command.name).collect()
 }
 

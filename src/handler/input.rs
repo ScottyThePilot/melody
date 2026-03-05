@@ -6,42 +6,153 @@ use log::Level;
 use melody_commander::{Command, Commands, Parsed, resolve_args};
 use serenity::model::id::GuildId;
 
-macro_rules! command {
-  ($name:literal: $function:ident($($arg:ident: $Arg:ty),*)) => (
-    <Command<CommandFunction>>::new_target($name, |agent, remaining_args| Box::pin(async move {
+macro_rules! command_function {
+  ($function:ident(..)) => (
+    |agent, remaining_args| Box::pin(async move {
+      agent.$function(remaining_args).await
+    })
+  );
+  ($function:ident($($arg:ident: $Arg:ty),* $(,)?)) => (
+    |agent, remaining_args| Box::pin(async move {
       let ($($arg,)*) = resolve_args::<($($Arg,)*)>(&remaining_args)?;
       agent.$function($($arg,)*).await
-    }))
+    })
   );
-  ($name:literal: [$($command:expr),* $(,)?]) => (
-    <Command<CommandFunction>>::new_group($name, &[$($command),*])
+}
+
+macro_rules! command {
+  (
+    name: $name:expr,
+    description: $description:expr,
+    usage: $usage:expr,
+    target: $function:ident($($tt:tt)*)
+  ) => (
+    Command::new_target(
+      $name,
+      CommandHelp { description: $description, usage: $usage },
+      command_function!($function($($tt)*))
+    )
+  );
+  (
+    name: $name:expr,
+    description: $description:expr,
+    usage: $usage:expr,
+    group: [$($group_item:expr),* $(,)?]
+  ) => (
+    Command::new_group(
+      $name,
+      CommandHelp { description: $description, usage: $usage },
+      &[$($group_item),*]
+    )
   );
 }
 
 type CommandFunction = for<'a> fn(&'a mut InputAgent, Box<[String]>) -> BoxFuture<'a, MelodyResult>;
 
-const COMMANDS: Commands<CommandFunction> = &[
-  command!("stop": command_stop()),
+const COMMANDS: Commands<CommandFunction, CommandHelp> = &[
+  command!{
+    name: "help",
+    description: "Retrieves help for the given command or subcommand",
+    usage: "help <command-path>...",
+    target: command_help(..)
+  },
+  command!{
+    name: "stop",
+    description: "Stops the bot",
+    usage: "stop",
+    target: command_stop()
+  },
   // a few months ago, i was using tmux, and typing `stop` did not immediately kill the tmux session,
   // now it does, and i can't find any resources on changing the magic words it uses, so i get to
   // pull out the thesaurus to work around this...
-  command!("halt": command_stop()),
-  command!("plugin": [
-    command!("list": command_plugin_list(guild_id: Parsed<GuildId>)),
-    command!("enable": command_plugin_enable(plugin: String, guild_id: Parsed<GuildId>)),
-    command!("disable": command_plugin_disable(plugin: String, guild_id: Parsed<GuildId>))
-  ]),
-  command!("inspect": [
-    command!("activities": command_inspect_activities()),
-    command!("config": command_inspect_config()),
-    command!("persist": command_inspect_persist()),
-    command!("persist-guild": command_inspect_persist_guild(guild_id: Parsed<GuildId>))
-  ]),
-  command!("update-yt-dlp": command_update_yt_dlp(update_to: Option<String>)),
-  command!("reload": [
-    command!("activities": command_reload_activities())
-  ])
+  command!{
+    name: "halt",
+    description: "Stops the bot",
+    usage: "halt",
+    target: command_stop()
+  },
+  command!{
+    name: "plugin",
+    description: "Command group for plugin utilities",
+    usage: "plugin <list|enable|disable>",
+    group: [
+      command!{
+        name: "list",
+        description: "Lists the plugins that are enabled for the given guild",
+        usage: "plugin list <guild_id: u64>",
+        target: command_plugin_list(guild_id: Parsed<GuildId>)
+      },
+      command!{
+        name: "enable",
+        description: "Enables a plugin in the given guild",
+        usage: "plugin enable <plugin: string> <guild_id: u64>",
+        target: command_plugin_enable(plugin: String, guild_id: Parsed<GuildId>)
+      },
+      command!{
+        name: "disable",
+        description: "Disables a plugin in the given guild",
+        usage: "plugin disable <plugin: string> <guild_id: u64>",
+        target: command_plugin_disable(plugin: String, guild_id: Parsed<GuildId>)
+      }
+    ]
+  },
+  command!{
+    name: "inspect",
+    description: "Command group for data store inspection utilities",
+    usage: "inspect <activities|config|persist|persist-guild>",
+    group: [
+      command!{
+        name: "activities",
+        description: "Inspects the current state of the global 'activities' data store",
+        usage: "inspect activities",
+        target: command_inspect_activities()
+      },
+      command!{
+        name: "config",
+        description: "Inspects the current state of the global 'config' data store",
+        usage: "inspect config",
+        target: command_inspect_config()
+      },
+      command!{
+        name: "persist",
+        description: "Inspects the current state of the global 'persist' data store",
+        usage: "inspect persist",
+        target: command_inspect_persist()
+      },
+      command!{
+        name: "persist-guild",
+        description: "Inspects the current state of a guild's 'persist-guild' data store, given its respective guild-id",
+        usage: "inspect persist-guild <guild_id: u64>",
+        target: command_inspect_persist_guild(guild_id: Parsed<GuildId>)
+      }
+    ]
+  },
+  command!{
+    name: "reload",
+    description: "Command group for data store reloading utilities",
+    usage: "reload <activities>",
+    group: [
+      command!{
+        name: "activities",
+        description: "Reloads the global 'activities' data store from disk",
+        usage: "reload activities",
+        target: command_reload_activities()
+      }
+    ]
+  },
+  command!{
+    name: "update-yt-dlp",
+    description: "Updates the version of yt-dlp used by the bot",
+    usage: "update-yt-dlp",
+    target: command_update_yt_dlp(update_to: Option<String>)
+  }
 ];
+
+#[derive(Debug, Clone, Copy)]
+pub struct CommandHelp {
+  pub description: &'static str,
+  pub usage: &'static str
+}
 
 #[derive(Debug, Clone)]
 pub struct InputAgent {
@@ -148,6 +259,26 @@ impl InputAgent {
   async fn command_reload_activities(&mut self) -> MelodyResult {
     self.core.reload_activities().await?;
     self.output.info("Reloaded data/activities.json");
+
+    Ok(())
+  }
+
+  async fn command_help(&mut self, args: Box<[String]>) -> MelodyResult {
+    if args.is_empty() {
+      let list = COMMANDS.iter().map(|command| command.name).collect::<Vec<&str>>();
+      self.output.info(format!("Available commands: {list:?}"));
+    } else {
+      let command = melody_commander::find_command(&args, COMMANDS)?;
+      let mut message = format!("Command {}", command.name);
+      message.push_str(&format!("\n\t- Description: {}", command.help.description));
+      if let Some(subcommands) = command.subcommands() {
+        let list = subcommands.iter().map(|command| command.name).collect::<Vec<&str>>();
+        message.push_str(&format!("\n\t- Subcommands: {list:?}"));
+      } else {
+        message.push_str(&format!("\n\t- Usage: {}", command.help.usage));
+      };
+      self.output.info(message);
+    };
 
     Ok(())
   }
