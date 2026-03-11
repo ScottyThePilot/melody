@@ -85,18 +85,18 @@ rand_xoshiro = { version = "0.7.0" }
 regex = { version = "1.8.4" }
 reqwest = { version = "0.12" }
 serde = { version = "1.0", features = ["derive", "rc"] }
-singlefile = { version = "0.4.0-rc1", features = ["shared-async", "fs-err"] }
-singlefile-formats = { version = "0.4.0-rc1" }
+singlefile = { version = "0.4.0", features = ["shared-async", "fs-err"] }
+singlefile-formats = { version = "0.4.0" }
 thiserror = { version = "2" }
 tokio = { version = "1.35", features = ["parking_lot"] }
 tracing = { version = "0.1.40" }
 typemap_rev = { version = "0.3.0" }
+uord = { version = "0.1.0", features = ["serde"] }
 url = { version = "2.4", features = ["serde"] }
 
 build-info = { git = "https://github.com/ScottyThePilot/misc-crates", features = ["git", "chrono"] }
 defy = { git = "https://github.com/ScottyThePilot/misc-crates", features = ["log"] }
 ids = { git = "https://github.com/ScottyThePilot/misc-crates", features = ["serde"] }
-uord = { git = "https://github.com/ScottyThePilot/uord", features = ["serde"] }
 yggdrasil = { git = "https://github.com/ScottyThePilot/misc-crates" }
 
 cacheable = { path = "./libs/cacheable" }

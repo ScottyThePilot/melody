@@ -4,7 +4,7 @@ use crate::feature::feed::{FeedIdentifier, FeedState, FeedStates, RegisterFeedRe
 
 use serenity::model::id::{ChannelId, GuildId, UserId, RoleId};
 use singlefile::container_shared_async::StandardContainerSharedAsync;
-use singlefile::manager::StandardManagerOptions;
+use singlefile::manager::standard::StandardManagerOptions;
 use singlefile_formats::data::cbor_serde::Cbor;
 use tokio::sync::RwLock;
 

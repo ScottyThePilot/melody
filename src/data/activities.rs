@@ -9,7 +9,7 @@ use serenity::model::id::GuildId;
 use serenity::model::gateway::ActivityType;
 use serenity::gateway::ActivityData;
 use singlefile::container_shared_async::StandardContainerSharedAsync;
-use singlefile::manager::StandardManagerOptions;
+use singlefile::manager::standard::StandardManagerOptions;
 use singlefile_formats::data::json_serde::Json;
 
 use std::path::PathBuf;

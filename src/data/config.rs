@@ -4,7 +4,7 @@ use serde::de::{Deserialize, Deserializer, Unexpected};
 use serenity::model::gateway::GatewayIntents;
 use serenity::model::colour::Color;
 use singlefile::container_shared_async::StandardContainerSharedAsync;
-use singlefile::manager::StandardManagerOptions;
+use singlefile::manager::standard::StandardManagerOptions;
 use singlefile_formats::data::toml_serde::Toml;
 
 use std::path::PathBuf;
