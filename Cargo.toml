@@ -3,7 +3,7 @@ name = "melody"
 version = "0.1.0"
 authors = ["ScottyThePilot <scotty.codes@gmail.com>"]
 edition = "2024"
-rust-version = "1.87"
+rust-version = "1.88"
 
 [dependencies]
 ahash = { workspace = true }
@@ -39,8 +39,8 @@ serde = { workspace = true }
 serenity = { workspace = true, features = ["rustls_backend", "cache", "chrono", "http", "unstable_discord_api"] }
 singlefile = { workspace = true }
 singlefile-formats = { workspace = true, features = ["cbor-serde", "json-serde", "toml-serde"] }
-songbird = { version = "0.5" }
-symphonia = { version = "0.5.4", features = ["aac", "alac", "mp3"] }
+songbird = { version = "0.6" }
+symphonia = { version = "0.5.5", features = ["aac", "alac", "mp3"] }
 term-stratum = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
@@ -75,7 +75,7 @@ chrono = { version = "0.4", features = ["serde"] }
 float-ord = { version = "0.3.2" }
 fs-err = { version = "3" }
 futures = { version = "0.3.31" }
-image = { version = "0.25.6", default-features = false }
+image = { version = "0.25.10", default-features = false }
 indexmap = { version = "2.13.0", features = ["serde"] }
 itertools = { version = "0.14" }
 log = { version = "0.4" }
@@ -115,7 +115,7 @@ melody-timer = { path = "./libs/melody-timer" }
 term-stratum = { path = "./libs/term-stratum" }
 
 [workspace.dependencies.poise]
-version = "0.6.1"
+version = "0.6.2"
 
 [workspace.dependencies.serenity]
 default-features = false

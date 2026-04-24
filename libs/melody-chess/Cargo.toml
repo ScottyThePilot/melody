@@ -6,8 +6,8 @@ edition = "2024"
 [dependencies]
 chrono = { workspace = true }
 fontdue = { version = "0.9.3" }
-glam = { version = "0.30" }
+glam = { version = "0.32" }
 image = { workspace = true, features = ["png"] }
 serde = { workspace = true }
-shakmaty = { version = "0.29.1" }
+shakmaty = { version = "0.30.0" }
 uord = { workspace = true }
