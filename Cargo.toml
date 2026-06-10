@@ -40,7 +40,7 @@ serenity = { workspace = true, features = ["rustls_backend", "cache", "chrono", 
 singlefile = { workspace = true }
 singlefile-formats = { workspace = true, features = ["cbor-serde", "json-serde", "toml-serde"] }
 songbird = { version = "0.6" }
-symphonia = { version = "0.5.5", features = ["aac", "alac", "mp3"] }
+symphonia = { version = "0.6", features = ["aac", "alac", "mp3"] }
 term-stratum = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
