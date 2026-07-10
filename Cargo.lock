@@ -1248,13 +1248,13 @@ dependencies = [
 
 [[package]]
 name = "fs4"
-version = "0.13.1"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8640e34b88f7652208ce9e88b1a37a2ae95227d84abec377ccd3c5cfeb141ed4"
+checksum = "7e72ed92b67c146290f88e9c89d60ca163ea417a446f61ffd7b72df3e7f1dfd5"
 dependencies = [
  "fs-err",
  "rustix",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2391,6 +2391,7 @@ dependencies = [
  "melody-connect-four",
  "melody-flag",
  "melody-framework",
+ "melody-parsers",
  "melody-random",
  "melody-ratelimiter",
  "poise",
@@ -2456,6 +2457,14 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "melody-parsers"
+version = "0.1.0"
+dependencies = [
+ "chumsky",
+ "rand 0.9.4",
 ]
 
 [[package]]
@@ -4213,9 +4222,9 @@ checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
 
 [[package]]
 name = "singlefile"
-version = "0.4.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ddb58bc480dc59e9572c6bb5604eb680afeb64a642fbfcf85156cd4b0addf552"
+checksum = "640bc308416714ab54d863fb5d4760a0fc8960e08845ef75f96e0ed610be572d"
 dependencies = [
  "cfg-if",
  "dunce",
@@ -4227,9 +4236,9 @@ dependencies = [
 
 [[package]]
 name = "singlefile-formats"
-version = "0.4.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01dbc40e1c91ed4669613302b5f2178ec0351826883ecf0dca7b430ff440e030"
+checksum = "2048cd390bdb030303805cb24b140d2d6f352ec67b9c793746675743afbf2aca"
 dependencies = [
  "ciborium",
  "serde",

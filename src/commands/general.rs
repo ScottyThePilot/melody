@@ -1,12 +1,12 @@
 use crate::prelude::*;
 use crate::data::Core;
-use crate::feature::dice_roll::Roll;
 use crate::utils::Blockify;
 use super::{MelodyContext, CommandMetaData};
 
 use chrono::{Utc, Duration};
 use log::Level;
 use melody_random::SecureRng;
+use melody_parsers::dice_roll::Roll;
 use poise::reply::CreateReply;
 use serenity::http::Http;
 use serenity::model::guild::Member;

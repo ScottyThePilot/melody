@@ -28,6 +28,7 @@ melody-commander = { workspace = true }
 melody-connect-four = { workspace = true }
 melody-flag = { workspace = true }
 melody-framework = { workspace = true }
+melody-parsers = { workspace = true }
 melody-random = { workspace = true }
 melody-ratelimiter = { workspace = true }
 poise = { workspace = true }
@@ -60,6 +61,7 @@ members = [
   "libs/melody-connect-four",
   "libs/melody-flag",
   "libs/melody-framework",
+  "libs/melody-parsers",
   "libs/melody-random",
   "libs/melody-ratelimiter",
   "libs/melody-rss-feed",
@@ -68,6 +70,7 @@ members = [
 ]
 
 [workspace.dependencies]
+# crates.io dependencies
 ahash = { version = "0.8", features = ["serde"] }
 async-trait = { version = "0.1" }
 chrono = { version = "0.4", features = ["serde"] }
@@ -84,8 +87,8 @@ rand_xoshiro = { version = "0.7.0" }
 regex = { version = "1.8.4" }
 reqwest = { version = "0.12" }
 serde = { version = "1.0", features = ["derive", "rc"] }
-singlefile = { version = "0.4.0", features = ["shared-async", "fs-err"] }
-singlefile-formats = { version = "0.4.0" }
+singlefile = { version = "0.6.0", features = ["shared-async", "fs-err"] }
+singlefile-formats = { version = "0.6.0" }
 thiserror = { version = "2" }
 tokio = { version = "1.35", features = ["parking_lot"] }
 tracing = { version = "0.1.40" }
@@ -93,11 +96,13 @@ typemap_rev = { version = "0.3.0" }
 uord = { version = "0.1.0", features = ["serde"] }
 url = { version = "2.4", features = ["serde"] }
 
+# misc-crates dependencies
 build-info = { git = "https://github.com/ScottyThePilot/misc-crates", features = ["git", "chrono"] }
 defy = { git = "https://github.com/ScottyThePilot/misc-crates", features = ["log"] }
 ids = { git = "https://github.com/ScottyThePilot/misc-crates", features = ["serde"] }
 yggdrasil = { git = "https://github.com/ScottyThePilot/misc-crates" }
 
+# local library dependencies
 cacheable = { path = "./libs/cacheable" }
 cleverbot = { path = "./libs/cleverbot" }
 cleverbot-logs = { path = "./libs/cleverbot-logs" }
@@ -107,6 +112,7 @@ melody-commander = { path = "./libs/melody-commander" }
 melody-connect-four = { path = "./libs/melody-connect-four" }
 melody-flag = { path = "./libs/melody-flag" }
 melody-framework = { path = "./libs/melody-framework" }
+melody-parsers = { path = "./libs/melody-parsers" }
 melody-random = { path = "./libs/melody-random" }
 melody-ratelimiter = { path = "./libs/melody-ratelimiter" }
 melody-rss-feed = { path = "./libs/melody-rss-feed" }
