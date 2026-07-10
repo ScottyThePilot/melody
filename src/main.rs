@@ -12,7 +12,6 @@ extern crate ahash;
 extern crate build_info;
 extern crate cacheable;
 extern crate chrono;
-extern crate chumsky;
 extern crate cleverbot;
 extern crate cleverbot_logs;
 extern crate const_random;

@@ -9,7 +9,6 @@ ahash = { workspace = true }
 build-info = { workspace = true }
 cacheable = { workspace = true }
 chrono = { workspace = true }
-chumsky = { version = "0.9.2" }
 cleverbot = { workspace = true }
 cleverbot-logs = { workspace = true }
 const-random = { version = "0.1.15" }

@@ -1,11 +1,11 @@
+use crate::common::{Error, Extra, ParserExt};
+
 use chumsky::prelude::*;
-use chumsky::error::SimpleReason;
 use chumsky::text::whitespace;
 use rand::Rng;
 
 use std::fmt;
 use std::str::FromStr;
-use std::ops::Range;
 
 /*
 ROLL: (ROLL_COIN | ROLL_DICE)
@@ -163,11 +163,14 @@ impl FromStr for Roll {
   type Err = ParseRollError;
 
   fn from_str(s: &str) -> Result<Self, Self::Err> {
-    match roll().parse(s.to_ascii_lowercase()) {
+    let s = s.to_ascii_lowercase();
+    match roll().parse(s.as_str()).into_result() {
       Ok(roll) => Ok(roll.normalize()),
-      Err(mut err) => {
-        err.truncate(8);
-        Err(ParseRollError(err))
+      Err(errors) => {
+        let errors = errors.into_iter().take(8)
+          .map(Error::into_owned)
+          .collect::<Vec<Error>>();
+        Err(ParseRollError(errors))
       }
     }
   }
@@ -204,22 +207,14 @@ pub enum ModeType {
 }
 
 #[derive(Debug, Clone)]
-pub struct ParseRollError(Vec<Simple<char>>);
+pub struct ParseRollError(Vec<Error<'static>>);
 
 impl fmt::Display for ParseRollError {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     for (i, err) in self.0.iter().enumerate() {
       if i != 0 { writeln!(f)? };
 
-      if let SimpleReason::Custom(msg) = err.reason() {
-        write!(f, "{msg}")?;
-      } else {
-        write!(f, "{err}")?;
-      };
-
-      if let Some(label) = err.label() {
-        write!(f, " ({label})")?;
-      };
+      write!(f, "{err}")?;
     };
 
     Ok(())
@@ -280,16 +275,16 @@ macro_rules! spaced {
   };
 }
 
-fn or_not_with<P, T>(p: P, default: T) -> impl Parser<char, T, Error = Simple<char>> + Copy
-where P: Parser<char, T, Error = Simple<char>> + Copy, T: Copy {
+fn or_not_with<'src, P, T>(p: P, default: T) -> impl Parser<'src, &'src str, T, Extra<'src>> + Copy
+where P: Parser<'src, &'src str, T, Extra<'src>> + Copy, T: Copy {
   p.or_not().map(move |v| v.unwrap_or(default))
 }
 
-fn roll() -> impl Parser<char, Roll, Error = Simple<char>> {
+fn roll<'src>() -> impl Parser<'src, &'src str, Roll, Extra<'src>> {
   roll_coin().or(roll_dice()).padded().then_ignore(end())
 }
 
-fn roll_coin() -> impl Parser<char, Roll, Error = Simple<char>> {
+fn roll_coin<'src>() -> impl Parser<'src, &'src str, Roll, Extra<'src>> {
   let target = just(',').then(whitespace()).or_not()
     .ignore_then(target_coin()).or_not();
 
@@ -297,7 +292,7 @@ fn roll_coin() -> impl Parser<char, Roll, Error = Simple<char>> {
     .map(Roll::new_coin).labelled("coin syntax")
 }
 
-fn target_coin() -> impl Parser<char, bool, Error = Simple<char>> {
+fn target_coin<'src>() -> impl Parser<'src, &'src str, bool, Extra<'src>> {
   choice([
     just("heads").to(true),
     just("tails").to(false),
@@ -306,7 +301,7 @@ fn target_coin() -> impl Parser<char, bool, Error = Simple<char>> {
   ])
 }
 
-fn roll_dice() -> impl Parser<char, Roll, Error = Simple<char>> {
+fn roll_dice<'src>() -> impl Parser<'src, &'src str, Roll, Extra<'src>> {
   let dice = or_not_with(dice(), 1);
   let sides = just('d').then(whitespace()).ignore_then(sides());
   let modifier = or_not_with(modifier(), 0);
@@ -321,11 +316,11 @@ fn roll_dice() -> impl Parser<char, Roll, Error = Simple<char>> {
   choice((syntax2, syntax1))
 }
 
-fn target_dice() -> impl Parser<char, RollTarget, Error = Simple<char>> {
+fn target_dice<'src>() -> impl Parser<'src, &'src str, RollTarget, Extra<'src>> {
   spaced!(comparison(), int::<i64>()).map(|(comparison, total)| RollTarget { total, comparison })
 }
 
-fn comparison() -> impl Parser<char, Comparison, Error = Simple<char>> {
+fn comparison<'src>() -> impl Parser<'src, &'src str, Comparison, Extra<'src>> {
   choice([
     just("\u{2265}").to(Comparison::GreaterThanEqualTo),
     just(">=").to(Comparison::GreaterThanEqualTo),
@@ -340,52 +335,39 @@ fn comparison() -> impl Parser<char, Comparison, Error = Simple<char>> {
   ])
 }
 
-fn mode1() -> impl Parser<char, Mode, Error = Simple<char>> {
+fn mode1<'src>() -> impl Parser<'src, &'src str, Mode, Extra<'src>> {
   let min = choice((just("minimum"), just("min"))).to(ModeType::Min);
   let max = choice((just("maximum"), just("max"))).to(ModeType::Max);
-  let i = or_not_with(int::<u8>().validate(valid_int(1)), 1);
+  let i = or_not_with(int::<u8>().validate_simple_range(1..), 1);
   spaced!(choice((min, max)), i).map(Mode::from).labelled("mode: syntax 1")
 }
 
-fn mode2() -> impl Parser<char, ModeType, Error = Simple<char>> {
+fn mode2<'src>() -> impl Parser<'src, &'src str, ModeType, Extra<'src>> {
   let dis = choice((just("disadvantage"), just("dis"))).to(ModeType::Min);
   let adv = choice((just("advantage"), just("adv"))).to(ModeType::Max);
   choice((dis, adv)).labelled("mode: syntax 2")
 }
 
-fn dice() -> impl Parser<char, u8, Error = Simple<char>> + Copy {
-  int::<u8>().validate(valid_int(1)).labelled("dice count")
+fn dice<'src>() -> impl Parser<'src, &'src str, u8, Extra<'src>> + Copy {
+  int::<u8>().validate_simple_range(1..).labelled("dice count")
 }
 
-fn sides() -> impl Parser<char, u32, Error = Simple<char>> + Copy {
-  int::<u32>().validate(valid_int(2)).labelled("sides count")
+fn sides<'src>() -> impl Parser<'src, &'src str, u32, Extra<'src>> + Copy {
+  int::<u32>().validate_simple_range(2..).labelled("sides count")
 }
 
-fn modifier() -> impl Parser<char, i16, Error = Simple<char>> + Copy {
+fn modifier<'src>() -> impl Parser<'src, &'src str, i16, Extra<'src>> + Copy {
   let sign = choice((just('-'), just('+'))).then_ignore(whitespace());
-  from_str(sign.chain(digits()).collect::<String>()).labelled("modifier")
+  sign.then(digits()).to_slice().try_from_str::<i16>().labelled("modifier")
 }
 
-fn int<T: FromStr>() -> impl Parser<char, T, Error = Simple<char>> + Copy
+fn int<'src, T: FromStr>() -> impl Parser<'src, &'src str, T, Extra<'src>> + Copy
 where <T as FromStr>::Err: ToString {
-  from_str(digits().collect::<String>()).labelled("int")
+  digits().try_from_str::<T>().labelled("int")
 }
 
-fn digits() -> impl Parser<char, Vec<char>, Error = Simple<char>> + Copy {
-  filter(char::is_ascii_digit).repeated().at_least(1).labelled("digits")
-}
-
-fn from_str<T: FromStr, P, S>(p: P) -> impl Parser<char, T, Error = Simple<char>> + Copy
-where <T as FromStr>::Err: ToString, S: AsRef<str>, P: Parser<char, S, Error = Simple<char>> + Copy {
-  p.try_map(|s, span| s.as_ref().parse::<T>().map_err(|err| Simple::custom(span, err)))
-}
-
-fn valid_int<I: Copy + Ord + fmt::Display>(min: I)
--> impl Fn(I, Range<usize>, &mut dyn FnMut(Simple<char>)) -> I + Copy {
-  move |v, span, emit| {
-    if v < min { emit(Simple::custom(span, format!("int may not be less than {min}"))) };
-    v
-  }
+fn digits<'src>() -> impl Parser<'src, &'src str, &'src str, Extra<'src>> + Copy {
+  one_of("0123456789").repeated().at_least(1).to_slice().labelled("digits")
 }
 
 
