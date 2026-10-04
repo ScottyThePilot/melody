@@ -17,6 +17,8 @@ use std::sync::mpsc::Sender;
 const LOG_FILE_SIZE_LIMIT: u64 = 8 * 1024 * 1024;
 
 pub fn setup(sender: Sender<String>) -> Result<(), InitError> {
+  fs_err::create_dir_all("./data/")?;
+
   let me = env!("CARGO_PKG_NAME").replace('-', "_");
 
   let colors = ColoredLevelConfig::new()
@@ -52,7 +54,6 @@ pub fn setup(sender: Sender<String>) -> Result<(), InitError> {
       })
     })
     .chain({
-      fs_err::create_dir_all("./data/")?;
       let file = create_or_rotate_log_file()?;
       Output::writer(Box::new(BufWriter::new(file)), "\n")
     })

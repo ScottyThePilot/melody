@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 chrono = { workspace = true }
-feed = { version = "1.3.0", package = "feed-rs" }
+feed = { version = "1.5.3", package = "feed-rs" }
 mime = { version = "0.3" }
 reqwest = { workspace = true }
 serde = { workspace = true }

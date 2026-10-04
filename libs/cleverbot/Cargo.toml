@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 cacheable = { workspace = true }
 chrono = { workspace = true }
-md5 = { version = "0.8.0" }
-percent-encoding = { version = "2.2.0" }
+md5 = { version = "0.8.1" }
+percent-encoding = { version = "2.3.2" }
 reqwest = { workspace = true }
 thiserror = { workspace = true }

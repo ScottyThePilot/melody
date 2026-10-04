@@ -11,11 +11,11 @@ cacheable = { workspace = true }
 chrono = { workspace = true }
 cleverbot = { workspace = true }
 cleverbot-logs = { workspace = true }
-const-random = { version = "0.1.15" }
+const-random = { version = "0.1.18" }
 defy = { workspace = true }
 feed-machine = { workspace = true }
 fern = { version = "0.7.1", features = ["colored"] }
-flate2 = { version = "1.1.8" }
+flate2 = { version = "1.1.10" }
 float-ord = { workspace = true }
 fs-err = { workspace = true, features = ["tokio"] }
 futures = { workspace = true }
@@ -75,25 +75,26 @@ async-trait = { version = "0.1" }
 chrono = { version = "0.4", features = ["serde"] }
 float-ord = { version = "0.3.2" }
 fs-err = { version = "3" }
-futures = { version = "0.3.31" }
+futures = { version = "0.3.34" }
+glam = { version = "0.33.12", features = ["serde"] }
 image = { version = "0.25.10", default-features = false }
-indexmap = { version = "2.13.0", features = ["serde"] }
-itertools = { version = "0.14" }
+indexmap = { version = "2.14.2", features = ["serde"] }
+itertools = { version = "0.15" }
 log = { version = "0.4" }
 rand = { version = "0.9.3" }
 rand_chacha = { version = "0.9.0" }
 rand_xoshiro = { version = "0.7.0" }
-regex = { version = "1.8.4" }
+regex = { version = "1.13.1" }
 reqwest = { version = "0.12" }
 serde = { version = "1.0", features = ["derive", "rc"] }
 singlefile = { version = "0.6.0", features = ["shared-async", "fs-err"] }
 singlefile-formats = { version = "0.6.0" }
 thiserror = { version = "2" }
-tokio = { version = "1.35", features = ["parking_lot"] }
-tracing = { version = "0.1.40" }
+tokio = { version = "1.53", features = ["parking_lot"] }
+tracing = { version = "0.1.44" }
 typemap_rev = { version = "0.3.0" }
-uord = { version = "0.1.0", features = ["serde"] }
-url = { version = "2.4", features = ["serde"] }
+uord = { version = "0.2.0", features = ["serde"] }
+url = { version = "2.5", features = ["serde"] }
 
 # misc-crates dependencies
 build-info = { git = "https://github.com/ScottyThePilot/misc-crates", features = ["git", "chrono"] }
