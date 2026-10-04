@@ -1,9 +1,9 @@
 use crate::prelude::*;
 use crate::data::Core;
 
-use melody_random::{SecureReseedingRng, SecureReseedingRngError};
-use rand::Rng;
+use rand::{Rng, SeedableRng};
 use rand::distr::weighted::Error;
+use rand::rngs::StdRng;
 use rand::seq::IndexedRandom;
 use serenity::model::id::GuildId;
 use serenity::model::gateway::ActivityType;
@@ -38,7 +38,7 @@ impl Activities {
   pub async fn select(&self, core: &Core) -> Result<ActivityData, ActivityError> {
     let emulate_status_modes = core.operate_config(async |config| config.emulate_status_modes).await;
 
-    let mut rng = SecureReseedingRng::new().map_err(ActivityError::RngError)?;
+    let mut rng = StdRng::from_os_rng();
     let activity_data = self.activities.choose_weighted(&mut rng, |v| v.variant.weight.get())
       .map_err(ActivityError::CannotSelectRandomActivity)?
       .to_activity_data(&mut rng, emulate_status_modes, core)?;
@@ -253,8 +253,6 @@ impl ActivityMode {
 pub enum ActivityError {
   #[error("format error")]
   FormatError(#[from] fmt::Error),
-  #[error("failed to create rng")]
-  RngError(SecureReseedingRngError),
   #[error("failed to assemble template")]
   CannotAssembleTemplate,
   #[error("failed to select random activity: {0}")]

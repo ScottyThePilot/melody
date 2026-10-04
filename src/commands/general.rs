@@ -5,9 +5,10 @@ use super::{MelodyContext, CommandMetaData};
 
 use chrono::{Utc, Duration};
 use log::Level;
-use melody_random::SecureRng;
 use melody_parsers::dice_roll::Roll;
 use poise::reply::CreateReply;
+use rand::SeedableRng;
+use rand::rngs::StdRng;
 use serenity::http::Http;
 use serenity::model::guild::Member;
 use serenity::model::id::{GuildId, UserId};
@@ -320,7 +321,7 @@ pub async fn roll(
 ) -> MelodyResult {
   let response = match notation.parse::<Roll>() {
     Ok(roll) => {
-      let mut rng = SecureRng::new();
+      let mut rng = StdRng::from_os_rng();
       let roll_message = roll.execute(&mut rng).to_string();
       if roll_message.len() > 2000 {
         "The resulting message was too long to send...".to_owned()
