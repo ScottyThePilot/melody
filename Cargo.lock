@@ -2454,7 +2454,7 @@ dependencies = [
  "melody-random",
  "melody-ratelimiter",
  "poise",
- "rand 0.9.5",
+ "rand 0.10.3",
  "regex",
  "reqwest",
  "serde",
@@ -2523,14 +2523,14 @@ name = "melody-parsers"
 version = "0.1.0"
 dependencies = [
  "chumsky",
- "rand 0.9.5",
+ "rand 0.10.3",
 ]
 
 [[package]]
 name = "melody-random"
 version = "0.1.0"
 dependencies = [
- "rand 0.9.5",
+ "rand 0.10.3",
 ]
 
 [[package]]

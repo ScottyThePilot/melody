@@ -9,8 +9,9 @@ pub use crate::{
 };
 
 pub use defy::{Log, Print};
+pub use rand::{Rng, RngExt, SeedableRng};
 pub use itertools::Itertools;
-pub use melody_random::RandomUtils;
+pub use melody_random::{SeedableRngUtils, SliceRandomUtils, SliceMutRandomUtils};
 pub use serenity::model::mention::Mentionable;
 
 pub use std::collections::{HashMap, HashSet};

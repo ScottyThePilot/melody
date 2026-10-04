@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use crate::data::Core;
 
-use rand::{Rng, SeedableRng};
 use rand::distr::weighted::Error;
 use rand::rngs::StdRng;
 use rand::seq::IndexedRandom;
@@ -38,7 +37,7 @@ impl Activities {
   pub async fn select(&self, core: &Core) -> Result<ActivityData, ActivityError> {
     let emulate_status_modes = core.operate_config(async |config| config.emulate_status_modes).await;
 
-    let mut rng = StdRng::from_os_rng();
+    let mut rng = StdRng::from_sys_rng();
     let activity_data = self.activities.choose_weighted(&mut rng, |v| v.variant.weight.get())
       .map_err(ActivityError::CannotSelectRandomActivity)?
       .to_activity_data(&mut rng, emulate_status_modes, core)?;

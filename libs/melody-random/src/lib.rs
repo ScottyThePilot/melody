@@ -1,44 +1,61 @@
 pub extern crate rand;
 
+use rand::SeedableRng;
 use rand::distr::uniform::{SampleBorrow, SampleUniform};
 use rand::distr::weighted::Weight;
-use rand::seq::{IndexedMutRandom, IndexedRandom, SliceChooseIter, SliceRandom, WeightError};
+use rand::rngs::{SysRng, SysError};
+use rand::seq::{IndexedMutRandom, IndexedRandom, IndexedSamples, SliceRandom, WeightError};
 
-use std::ops::DerefMut;
+use std::ops::{Deref, DerefMut};
 
 
 
-pub type RandomUtilsIter<'a, T> = SliceChooseIter<'a, <T as RandomUtils>::Slice, <T as RandomUtils>::Output>;
+pub trait SeedableRngUtils: SeedableRng {
+  fn from_sys_rng() -> Self {
+    Self::try_from_sys_rng().expect("try_from_sys_rng failed")
+  }
 
-pub trait RandomUtils {
-  type Slice: ?Sized;
+  fn try_from_sys_rng() -> Result<Self, SysError>;
+}
+
+impl<R> SeedableRngUtils for R
+where R: ?Sized + SeedableRng {
+  fn try_from_sys_rng() -> Result<Self, SysError> {
+    Self::try_from_rng(&mut SysRng)
+  }
+}
+
+pub trait SliceRandomUtils {
   type Output: ?Sized;
 
-  fn shuffle_default(&mut self);
-
   fn choose_default(&self) -> Option<&Self::Output>;
-
-  fn choose_mut_default(&mut self) -> Option<&mut Self::Output>;
-
-  fn choose_multiple_default(&self, amount: usize) -> RandomUtilsIter<'_, Self>
-  where
-    Self::Output: Sized;
-
-  fn choose_multiple_array_default<const N: usize>(&self) -> Option<[Self::Output; N]>
-  where
-    Self::Output: Clone + Sized;
-
-  fn choose_multiple_weighted_default<F, X>(&self, amount: usize, weight: F) -> Result<RandomUtilsIter<'_, Self>, WeightError>
-  where
-    Self::Output: Sized,
-    F: Fn(&Self::Output) -> X,
-    X: Into<f64>;
 
   fn choose_weighted_default<F, B, X>(&self, weight: F) -> Result<&Self::Output, WeightError>
   where
     F: Fn(&Self::Output) -> B,
     B: SampleBorrow<X>,
     X: SampleUniform + Weight + PartialOrd<X>;
+
+  fn sample_default(&self, amount: usize) -> IndexedSamples<'_, [Self::Output], Self::Output>
+  where Self::Output: Sized;
+
+  fn sample_array_default<const N: usize>(&self) -> Option<[Self::Output; N]>
+  where Self::Output: Clone + Sized;
+
+  fn sample_weighted_default<F, X>(&self, amount: usize, weight: F) -> Result<IndexedSamples<'_, [Self::Output], Self::Output>, WeightError>
+  where
+    Self::Output: Sized,
+    F: Fn(&Self::Output) -> X,
+    X: Into<f64>;
+}
+
+pub trait SliceMutRandomUtils: SliceRandomUtils {
+  fn shuffle_default(&mut self);
+
+  fn partial_shuffle_default(&mut self, amount: usize) -> (&mut [Self::Output], &mut [Self::Output])
+  where Self::Output: Sized;
+
+  fn choose_mut_default(&mut self) -> Option<&mut Self::Output>;
 
   fn choose_weighted_mut_default<F, B, X>(&mut self, weight: F) -> Result<&mut Self::Output, WeightError>
   where
@@ -47,42 +64,13 @@ pub trait RandomUtils {
     X: SampleUniform + Weight + PartialOrd<X>;
 }
 
-impl<T> RandomUtils for T
-where T: DerefMut, T::Target: RandomUtils {
-  type Slice = <T::Target as RandomUtils>::Slice;
-  type Output = <T::Target as RandomUtils>::Output;
-
-  #[inline]
-  fn shuffle_default(&mut self) {
-    <T::Target>::shuffle_default(self)
-  }
+impl<T> SliceRandomUtils for T
+where T: Deref, T::Target: SliceRandomUtils {
+  type Output = <T::Target as SliceRandomUtils>::Output;
 
   #[inline]
   fn choose_default(&self) -> Option<&Self::Output> {
     <T::Target>::choose_default(self)
-  }
-
-  #[inline]
-  fn choose_mut_default(&mut self) -> Option<&mut Self::Output> {
-    <T::Target>::choose_mut_default(self)
-  }
-
-  #[inline]
-  fn choose_multiple_default(&self, amount: usize) -> RandomUtilsIter<'_, Self>
-  where Self::Output: Sized {
-    <T::Target>::choose_multiple_default(self, amount)
-  }
-
-  #[inline]
-  fn choose_multiple_array_default<const N: usize>(&self) -> Option<[Self::Output; N]>
-  where Self::Output: Clone + Sized {
-    <T::Target>::choose_multiple_array_default(self)
-  }
-
-  #[inline]
-  fn choose_multiple_weighted_default<F, X>(&self, amount: usize, weight: F) -> Result<RandomUtilsIter<'_, Self>, WeightError>
-  where Self::Output: Sized, F: Fn(&Self::Output) -> X, X: Into<f64> {
-    <T::Target>::choose_multiple_weighted_default(self, amount, weight)
   }
 
   #[inline]
@@ -96,6 +84,43 @@ where T: DerefMut, T::Target: RandomUtils {
   }
 
   #[inline]
+  fn sample_default(&self, amount: usize) -> IndexedSamples<'_, [Self::Output], Self::Output>
+  where Self::Output: Sized {
+    <T::Target>::sample_default(self, amount)
+  }
+
+  #[inline]
+  fn sample_array_default<const N: usize>(&self) -> Option<[Self::Output; N]>
+  where Self::Output: Clone + Sized {
+    <T::Target>::sample_array_default(self)
+  }
+
+  #[inline]
+  fn sample_weighted_default<F, X>(&self, amount: usize, weight: F) -> Result<IndexedSamples<'_, [Self::Output], Self::Output>, WeightError>
+  where Self::Output: Sized, F: Fn(&Self::Output) -> X, X: Into<f64> {
+    <T::Target>::sample_weighted_default(self, amount, weight)
+  }
+}
+
+impl<T> SliceMutRandomUtils for T
+where T: DerefMut, T::Target: SliceMutRandomUtils {
+  #[inline]
+  fn shuffle_default(&mut self) {
+    <T::Target>::shuffle_default(self)
+  }
+
+  #[inline]
+  fn partial_shuffle_default(&mut self, amount: usize) -> (&mut [Self::Output], &mut [Self::Output])
+  where Self::Output: Sized {
+    <T::Target>::partial_shuffle_default(self, amount)
+  }
+
+  #[inline]
+  fn choose_mut_default(&mut self) -> Option<&mut Self::Output> {
+    <T::Target>::choose_mut_default(self)
+  }
+
+  #[inline]
   fn choose_weighted_mut_default<F, B, X>(&mut self, weight: F) -> Result<&mut Self::Output, WeightError>
   where
     F: Fn(&Self::Output) -> B,
@@ -106,41 +131,12 @@ where T: DerefMut, T::Target: RandomUtils {
   }
 }
 
-impl<T> RandomUtils for [T] {
-  type Slice = Self;
+impl<T> SliceRandomUtils for [T] {
   type Output = T;
-
-  #[inline]
-  fn shuffle_default(&mut self) {
-    SliceRandom::shuffle(self, &mut rand::rng());
-  }
 
   #[inline]
   fn choose_default(&self) -> Option<&Self::Output> {
     IndexedRandom::choose(self, &mut rand::rng())
-  }
-
-  #[inline]
-  fn choose_mut_default(&mut self) -> Option<&mut Self::Output> {
-    IndexedMutRandom::choose_mut(self, &mut rand::rng())
-  }
-
-  #[inline]
-  fn choose_multiple_default(&self, amount: usize) -> SliceChooseIter<'_, Self, Self::Output>
-  where Self::Output: Sized {
-    IndexedRandom::choose_multiple(self, &mut rand::rng(), amount)
-  }
-
-  #[inline]
-  fn choose_multiple_array_default<const N: usize>(&self) -> Option<[Self::Output; N]>
-  where Self::Output: Clone + Sized {
-    IndexedRandom::choose_multiple_array(self, &mut rand::rng())
-  }
-
-  #[inline]
-  fn choose_multiple_weighted_default<F, X>(&self, amount: usize, weight: F) -> Result<SliceChooseIter<'_, Self, Self::Output>, WeightError>
-  where Self::Output: Sized, F: Fn(&Self::Output) -> X, X: Into<f64> {
-    IndexedRandom::choose_multiple_weighted(self, &mut rand::rng(), amount, weight)
   }
 
   #[inline]
@@ -151,6 +147,42 @@ impl<T> RandomUtils for [T] {
     X: SampleUniform + Weight + PartialOrd<X>
   {
     IndexedRandom::choose_weighted(self, &mut rand::rng(), weight)
+  }
+
+  #[inline]
+  fn sample_default(&self, amount: usize) -> IndexedSamples<'_, [Self::Output], Self::Output>
+  where Self::Output: Sized {
+    IndexedRandom::sample(self, &mut rand::rng(), amount)
+  }
+
+  #[inline]
+  fn sample_array_default<const N: usize>(&self) -> Option<[Self::Output; N]>
+  where Self::Output: Clone + Sized {
+    IndexedRandom::sample_array(self, &mut rand::rng())
+  }
+
+  #[inline]
+  fn sample_weighted_default<F, X>(&self, amount: usize, weight: F) -> Result<IndexedSamples<'_, [Self::Output], Self::Output>, WeightError>
+  where Self::Output: Sized, F: Fn(&Self::Output) -> X, X: Into<f64> {
+    IndexedRandom::sample_weighted(self, &mut rand::rng(), amount, weight)
+  }
+}
+
+impl<T> SliceMutRandomUtils for [T] {
+  #[inline]
+  fn shuffle_default(&mut self) {
+    SliceRandom::shuffle(self, &mut rand::rng());
+  }
+
+  #[inline]
+  fn partial_shuffle_default(&mut self, amount: usize) -> (&mut [Self::Output], &mut [Self::Output])
+  where Self::Output: Sized {
+    SliceRandom::partial_shuffle(self, &mut rand::rng(), amount)
+  }
+
+  #[inline]
+  fn choose_mut_default(&mut self) -> Option<&mut Self::Output> {
+    IndexedMutRandom::choose_mut(self, &mut rand::rng())
   }
 
   #[inline]

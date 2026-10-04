@@ -81,7 +81,7 @@ image = { version = "0.25.10", default-features = false }
 indexmap = { version = "2.14.2", features = ["serde"] }
 itertools = { version = "0.15" }
 log = { version = "0.4" }
-rand = { version = "0.9.3" }
+rand = { version = "0.10.3" }
 regex = { version = "1.13.1" }
 reqwest = { version = "0.12" }
 serde = { version = "1.0", features = ["derive", "rc"] }

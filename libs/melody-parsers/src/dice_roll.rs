@@ -2,7 +2,7 @@ use crate::common::{Error, Extra, ParserExt};
 
 use chumsky::prelude::*;
 use chumsky::text::whitespace;
-use rand::Rng;
+use rand::{Rng, RngExt};
 
 use std::fmt;
 use std::str::FromStr;
