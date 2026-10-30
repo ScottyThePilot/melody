@@ -1,4 +1,4 @@
-extern crate cacheable;
+extern crate abyss;
 extern crate chrono;
 extern crate md5;
 extern crate percent_encoding;
@@ -6,7 +6,7 @@ extern crate reqwest;
 #[macro_use]
 extern crate thiserror;
 
-use cacheable::{CacheAsync, CacheableAsync, async_trait};
+use abyss::cache::nonblocking::{Cache, ResourceFallible, ResourceValidity};
 use chrono::{DateTime, Utc};
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, percent_encode};
 use reqwest::{Client, Proxy, Error as ReqwestError, StatusCode};
@@ -21,7 +21,7 @@ const USER_AGENT: &str = "Opera/9.48 (Windows NT 6.0; sl-SI) Presto/2.11.249 Ver
 /// Facilitates communication with CleverBot by imitating the website's functionality.
 /// A single instance of this should be treated as if it were a single instance of your browser.
 pub struct CleverBotAgent {
-  data: CacheAsync<CleverBotData>,
+  data: Cache<CleverBotData>,
   client: Client
 }
 
@@ -42,7 +42,7 @@ impl CleverBotAgent {
   }
 
   pub const fn with_client(client: Client) -> Self {
-    CleverBotAgent { data: CacheAsync::new(), client }
+    CleverBotAgent { data: Cache::new(), client }
   }
 
   async fn get(&mut self) -> Result<(&mut CleverBotData, &Client), Error> {
@@ -120,17 +120,17 @@ impl CleverBotData {
   }
 }
 
-#[async_trait]
-impl CacheableAsync for CleverBotData {
-  type Args<'a> = (&'a Client, DateTime<Utc>);
+impl ResourceFallible<(&Client, DateTime<Utc>)> for CleverBotData {
   type Error = Error;
 
-  async fn operation((client, now): Self::Args<'_>) -> Result<Self, Self::Error> {
+  async fn try_get((client, now): (&Client, DateTime<Utc>)) -> Result<Self, Self::Error> {
     Self::request(client, now).await
   }
+}
 
-  fn is_invalid(&self, &(_, now): &Self::Args<'_>) -> bool {
-    self.is_expired(now)
+impl ResourceValidity<(&Client, DateTime<Utc>)> for CleverBotData {
+  fn is_valid(&self, (_, now): (&Client, DateTime<Utc>)) -> bool {
+    !self.is_expired(now)
   }
 }
 

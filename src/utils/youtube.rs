@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
+use abyss::cache::nonblocking::{Cache, ResourceFallible, ResourceValidity};
 use chrono::{DateTime, Utc, TimeDelta};
-use cacheable::{CacheAsync, CacheableAsync};
 use reqwest::Client as HttpClient;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde::de::DeserializeOwned;
@@ -135,19 +135,24 @@ struct VideoInfoExtended {
   timestamp: DateTime<Utc>
 }
 
-#[serenity::async_trait]
-impl CacheableAsync for VideoInfoExtended {
-  type Args<'a> = (&'a YtDlp, &'a str);
+impl VideoInfoExtended {
+  fn is_expired(&self, now: DateTime<Utc>) -> bool {
+    now.signed_duration_since(self.timestamp) > TimeDelta::seconds(3)
+  }
+}
+
+impl ResourceFallible<(&YtDlp, &str, DateTime<Utc>)> for VideoInfoExtended {
   type Error = YtDlpError;
 
-  async fn operation((yt_dlp, video_id): Self::Args<'_>) -> Result<Self, Self::Error> {
+  async fn try_get((yt_dlp, video_id, now): (&YtDlp, &str, DateTime<Utc>)) -> Result<Self, Self::Error> {
     let video_info = yt_dlp.get_video_info(video_id).await?;
-    let timestamp = Utc::now();
-    Ok(VideoInfoExtended { video_info, timestamp })
+    Ok(VideoInfoExtended { video_info, timestamp: now })
   }
+}
 
-  fn is_invalid(&self, _args: &Self::Args<'_>) -> bool {
-    Utc::now().signed_duration_since(self.timestamp) > TimeDelta::seconds(3)
+impl ResourceValidity<(&YtDlp, &str, DateTime<Utc>)> for VideoInfoExtended {
+  fn is_valid(&self, (_, _, now): (&YtDlp, &str, DateTime<Utc>)) -> bool {
+    !self.is_expired(now)
   }
 }
 
@@ -156,7 +161,7 @@ pub struct YtDlpSource {
   yt_dlp: YtDlp,
   video_id: String,
   http_client: HttpClient,
-  video_info_cache: CacheAsync<VideoInfoExtended>
+  video_info_cache: Cache<VideoInfoExtended>
 }
 
 impl YtDlpSource {
@@ -165,12 +170,12 @@ impl YtDlpSource {
       yt_dlp,
       video_id: video_id.into(),
       http_client,
-      video_info_cache: CacheAsync::new()
+      video_info_cache: Cache::new()
     }
   }
 
   pub async fn get_video_info(&mut self) -> Result<&VideoInfo, YtDlpError> {
-    self.video_info_cache.try_get_or_init((&self.yt_dlp, &self.video_id)).await
+    self.video_info_cache.try_get_or_init((&self.yt_dlp, &self.video_id, Utc::now())).await
       .map(|video_info_extended| &video_info_extended.video_info)
   }
 

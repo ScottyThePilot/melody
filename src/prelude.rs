@@ -1,14 +1,9 @@
 #![allow(unused)]
 
-pub use crate::utils::{Contextualize, Operate, OperateMut};
-pub use crate::{
-  MelodyResult,
-  MelodyError,
-  MelodyFileError,
-  MelodyCommandError
-};
+pub use crate::utils::{Operate, OperateMut};
+pub use crate::error::*;
 
-pub use defy::{Log, Print};
+pub use abyss::error::{Log, Print, Contextualize};
 pub use rand::{Rng, RngExt, SeedableRng};
 pub use itertools::Itertools;
 pub use melody_random::{SeedableRngUtils, SliceRandomUtils, SliceMutRandomUtils};

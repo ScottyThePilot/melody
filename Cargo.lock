@@ -3,6 +3,18 @@
 version = 4
 
 [[package]]
+name = "abyss"
+version = "0.1.0"
+source = "git+https://github.com/ScottyThePilot/abyss?rev=d7e592bc460bfb6d3a502c987d26238151483ed5#d7e592bc460bfb6d3a502c987d26238151483ed5"
+dependencies = [
+ "bytemuck",
+ "dunce",
+ "identity-hash",
+ "log",
+ "serde_core",
+]
+
+[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -208,7 +220,7 @@ dependencies = [
 [[package]]
 name = "build-info"
 version = "0.1.0"
-source = "git+https://github.com/ScottyThePilot/misc-crates#e2ced3bdd24f9189f71ad82f96e69766c0ff59a1"
+source = "git+https://github.com/ScottyThePilot/misc-crates?rev=e2ced3bdd24f9189f71ad82f96e69766c0ff59a1#e2ced3bdd24f9189f71ad82f96e69766c0ff59a1"
 dependencies = [
  "build-info-macros",
  "chrono",
@@ -217,7 +229,7 @@ dependencies = [
 [[package]]
 name = "build-info-macros"
 version = "0.1.0"
-source = "git+https://github.com/ScottyThePilot/misc-crates#e2ced3bdd24f9189f71ad82f96e69766c0ff59a1"
+source = "git+https://github.com/ScottyThePilot/misc-crates?rev=e2ced3bdd24f9189f71ad82f96e69766c0ff59a1#e2ced3bdd24f9189f71ad82f96e69766c0ff59a1"
 dependencies = [
  "chrono",
  "proc-macro2",
@@ -260,13 +272,6 @@ name = "bytes"
 version = "1.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
-
-[[package]]
-name = "cacheable"
-version = "0.1.0"
-dependencies = [
- "async-trait",
-]
 
 [[package]]
 name = "camino"
@@ -426,7 +431,7 @@ dependencies = [
 name = "cleverbot"
 version = "0.1.0"
 dependencies = [
- "cacheable",
+ "abyss",
  "chrono",
  "md5",
  "percent-encoding",
@@ -810,14 +815,6 @@ dependencies = [
  "subtle",
  "thiserror 2.0.21",
  "tracing",
-]
-
-[[package]]
-name = "defy"
-version = "0.1.0"
-source = "git+https://github.com/ScottyThePilot/misc-crates#e2ced3bdd24f9189f71ad82f96e69766c0ff59a1"
-dependencies = [
- "log",
 ]
 
 [[package]]
@@ -1970,6 +1967,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
 
 [[package]]
+name = "identity-hash"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dfdd7caa900436d8f13b2346fe10257e0c05c1f1f9e351f4f5d57c03bd5f45da"
+
+[[package]]
 name = "idna"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1988,15 +1991,6 @@ checksum = "cb68373c0d6620ef8105e855e7745e18b0d00d3bdb07fb532e434244cdb9a714"
 dependencies = [
  "icu_normalizer",
  "icu_properties",
-]
-
-[[package]]
-name = "ids"
-version = "0.1.0"
-source = "git+https://github.com/ScottyThePilot/misc-crates#e2ced3bdd24f9189f71ad82f96e69766c0ff59a1"
-dependencies = [
- "nohash-hasher",
- "serde",
 ]
 
 [[package]]
@@ -2428,21 +2422,19 @@ dependencies = [
 name = "melody"
 version = "0.1.0"
 dependencies = [
+ "abyss",
  "ahash",
  "build-info",
- "cacheable",
  "chrono",
  "cleverbot",
  "cleverbot-logs",
  "const-random",
- "defy",
  "feed-machine",
  "fern",
  "flate2",
  "float-ord",
  "fs-err",
  "futures",
- "ids",
  "indexmap",
  "itertools",
  "log",
@@ -2469,7 +2461,6 @@ dependencies = [
  "tracing",
  "uord",
  "url",
- "yggdrasil",
 ]
 
 [[package]]
@@ -5999,14 +5990,6 @@ dependencies = [
  "rand_core 0.6.4",
  "serde",
  "zeroize",
-]
-
-[[package]]
-name = "yggdrasil"
-version = "0.1.0"
-source = "git+https://github.com/ScottyThePilot/misc-crates#e2ced3bdd24f9189f71ad82f96e69766c0ff59a1"
-dependencies = [
- "dunce",
 ]
 
 [[package]]

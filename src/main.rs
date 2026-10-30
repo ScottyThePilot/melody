@@ -8,20 +8,18 @@
   missing_debug_implementations
 )]
 
+extern crate abyss;
 extern crate ahash;
 extern crate build_info;
-extern crate cacheable;
 extern crate chrono;
 extern crate cleverbot;
 extern crate cleverbot_logs;
 extern crate const_random;
-extern crate defy;
 extern crate feed_machine;
 extern crate fern;
 extern crate float_ord;
 extern crate fs_err;
 extern crate futures;
-extern crate ids;
 extern crate itertools;
 #[macro_use]
 extern crate log;
@@ -49,22 +47,21 @@ extern crate tokio;
 extern crate tracing;
 extern crate uord;
 extern crate url;
-extern crate yggdrasil;
 
 #[allow(unused)]
 macro_rules! println {
   ($($tt:tt)*) => (info!($($tt)*));
 }
 
-#[macro_use] pub(crate) mod utils;
-pub(crate) mod logger;
-pub(crate) mod prelude;
 pub(crate) mod commands;
 pub(crate) mod data;
+pub(crate) mod error;
 pub(crate) mod feature;
 pub(crate) mod handler;
+pub(crate) mod logger;
+pub(crate) mod prelude;
+pub(crate) mod utils;
 
-use serenity::prelude::SerenityError;
 use term_stratum::StratumEvent;
 use tokio::sync::mpsc::UnboundedReceiver as AsyncReceiver;
 
@@ -73,7 +70,7 @@ pub const BUILD_DATE: &str = build_info::build_datetime_local_fixed_format!("%-d
 pub const BUILD_GIT_HASH: &str = build_info::git_hash_short!();
 
 fn main() {
-  yggdrasil::reroot().expect("unable to set root dir");
+  abyss::sys::set_current_dir_to_exe_dir().expect("unable to set root dir");
   let (logger_sender, logger_receiver) = std::sync::mpsc::channel();
   let (event_sender, event_receiver) = tokio::sync::mpsc::unbounded_channel();
   crate::logger::setup(logger_sender).expect("failed to setup logger");
@@ -92,76 +89,4 @@ async fn run(event_reciever: AsyncReceiver<StratumEvent>) {
     Err(error) => error!("{error}"),
     Ok(()) => ()
   };
-}
-
-pub type MelodyResult<T = ()> = Result<T, MelodyError>;
-
-/// An error that can occur during operation of the bot.
-#[derive(Debug, Error)]
-pub enum MelodyError {
-  #[error("File Error: {0}")]
-  FileError(#[from] defy::ContextualError<MelodyFileError>),
-  #[error("Serenity Error: {0}")]
-  SerenityError(#[from] defy::ContextualError<SerenityError>),
-  #[error("Command Error: {0}")]
-  CommandError(#[from] MelodyCommandError),
-  #[error("Input Error: {0}")]
-  InputError(#[from] melody_commander::CommandError),
-  #[error("YT-DLP Error: {0}")]
-  YtDlpError(#[from] crate::utils::youtube::YtDlpError),
-  #[error("Feed Model Error: {0}")]
-  FeedModelError(#[from] feed_machine::model::ModelError<feed_machine::model::SchemaError>)
-}
-
-impl MelodyError {
-  pub const COMMAND_NOT_IN_GUILD: Self = MelodyError::CommandError(MelodyCommandError::NOT_IN_GUILD);
-  pub const COMMAND_PRECONDITION_VIOLATION_ARGUMENTS: Self = MelodyError::CommandError(MelodyCommandError::PRECONDITION_VIOLATION_ARGUMENTS);
-  pub const COMMAND_PRECONDITION_VIOLATION_ROOT_COMMAND: Self = MelodyError::CommandError(MelodyCommandError::PRECONDITION_VIOLATION_ROOT_COMMAND);
-
-  pub const fn command_cache_failure(message: &'static str) -> Self {
-    MelodyError::CommandError(MelodyCommandError::cache_failure(message))
-  }
-
-  pub const fn command_precondition_violation(message: &'static str) -> Self {
-    MelodyError::CommandError(MelodyCommandError::precondition_violation(message))
-  }
-}
-
-/// An error that can be caused by trying to read or parse a file.
-#[derive(Debug, Error)]
-pub enum MelodyFileError {
-  #[error(transparent)]
-  Io(#[from] std::io::Error),
-  #[error(transparent)]
-  Toml(#[from] singlefile::Error<singlefile_formats::data::toml_serde::TomlError>),
-  #[error(transparent)]
-  Json(#[from] singlefile::Error<singlefile_formats::data::json_serde::JsonError>),
-  #[error(transparent)]
-  Cbor(#[from] singlefile::Error<singlefile_formats::data::cbor_serde::CborError>),
-  #[error(transparent)]
-  CleverBotLog(#[from] cleverbot_logs::Error)
-}
-
-#[derive(Debug, Error, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum MelodyCommandError {
-  #[error("not in a guild")]
-  NotInGuild,
-  #[error("data not cached: {0}")]
-  CacheFailure(&'static str),
-  #[error("precondition violated: {0}")]
-  PreconditionViolation(&'static str)
-}
-
-impl MelodyCommandError {
-  pub const NOT_IN_GUILD: Self = MelodyCommandError::NotInGuild;
-  pub const PRECONDITION_VIOLATION_ARGUMENTS: Self = MelodyCommandError::precondition_violation("arguments");
-  pub const PRECONDITION_VIOLATION_ROOT_COMMAND: Self = MelodyCommandError::precondition_violation("root command");
-
-  pub const fn cache_failure(message: &'static str) -> Self {
-    Self::CacheFailure(message)
-  }
-
-  pub const fn precondition_violation(message: &'static str) -> Self {
-    Self::PreconditionViolation(message)
-  }
 }

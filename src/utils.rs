@@ -1,9 +1,6 @@
 pub mod youtube;
 
-use crate::prelude::*;
-
 use chrono::{DateTime, Utc};
-use defy::ContextualError;
 use melody_ratelimiter::RateLimiter;
 use poise::slash_argument::{SlashArgument, SlashArgError};
 use regex::{Captures, Match, Regex, Replacer};
@@ -164,68 +161,6 @@ impl fmt::Display for TimestampFormat {
       TimestampFormat::LongDateTime => "F",
       TimestampFormat::Relative => "R"
     })
-  }
-}
-
-pub trait Contextualize {
-  type Output;
-
-  fn context(self, context: impl Into<String>) -> Self::Output;
-}
-
-impl<T> Contextualize for std::io::Result<T> {
-  type Output = MelodyResult<T>;
-
-  fn context(self, context: impl Into<String>) -> Self::Output {
-    self.map_err(|error| {
-      MelodyError::FileError(ContextualError::new(MelodyFileError::Io(error), context.into()))
-    })
-  }
-}
-
-impl<T, FE> Contextualize for Result<T, singlefile::Error<FE>>
-where singlefile::Error<FE>: Into<MelodyFileError> {
-  type Output = MelodyResult<T>;
-
-  fn context(self, context: impl Into<String>) -> Self::Output {
-    self.map_err(|error| {
-      MelodyError::FileError(ContextualError::new(error.into(), context.into()))
-    })
-  }
-}
-
-impl<T, E> Contextualize for Result<T, singlefile::OrUserError<E, MelodyError>>
-where E: Into<MelodyFileError> {
-  type Output = MelodyResult<T>;
-
-  fn context(self, context: impl Into<String>) -> Self::Output {
-    self.map_err(|error| {
-      MelodyError::FileError(ContextualError::new(
-        match error {
-          singlefile::OrUserError::Base(error) => error.into(),
-          singlefile::OrUserError::User(error) => return error
-        },
-        context.into()
-      ))
-    })
-  }
-}
-
-impl<T> Contextualize for Result<T, cleverbot_logs::Error> {
-  type Output = MelodyResult<T>;
-
-  fn context(self, context: impl Into<String>) -> Self::Output {
-    self.map_err(|error| {
-      MelodyError::FileError(ContextualError::new(MelodyFileError::CleverBotLog(error), context.into()))
-    })
-  }
-}
-
-impl<T> Contextualize for Result<T, serenity::Error> {
-  type Output = MelodyResult<T>;
-
-  fn context(self, context: impl Into<String>) -> Self::Output {
-    self.map_err(|error| MelodyError::SerenityError(ContextualError::new(error, context.into())))
   }
 }
 

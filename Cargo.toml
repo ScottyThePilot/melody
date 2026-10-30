@@ -5,21 +5,19 @@ authors = ["ScottyThePilot <scotty.codes@gmail.com>"]
 edition = "2024"
 
 [dependencies]
+abyss = { workspace = true }
 ahash = { workspace = true }
 build-info = { workspace = true }
-cacheable = { workspace = true }
 chrono = { workspace = true }
 cleverbot = { workspace = true }
 cleverbot-logs = { workspace = true }
 const-random = { version = "0.1.18" }
-defy = { workspace = true }
 feed-machine = { workspace = true }
 fern = { version = "0.7.1", features = ["colored"] }
 flate2 = { version = "1.1.10" }
 float-ord = { workspace = true }
 fs-err = { workspace = true, features = ["tokio"] }
 futures = { workspace = true }
-ids = { workspace = true }
 indexmap = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
@@ -46,12 +44,10 @@ tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true, features = ["log-always"] }
 uord = { workspace = true }
 url = { workspace = true }
-yggdrasil = { workspace = true }
 
 [workspace]
 resolver = "3"
 members = [
-  "libs/cacheable",
   "libs/cleverbot",
   "libs/cleverbot-logs",
   "libs/feed-machine",
@@ -94,14 +90,7 @@ typemap_rev = { version = "0.4.0" }
 uord = { version = "0.2.0", features = ["serde"] }
 url = { version = "2.5", features = ["serde"] }
 
-# misc-crates dependencies
-build-info = { git = "https://github.com/ScottyThePilot/misc-crates", features = ["git", "chrono"] }
-defy = { git = "https://github.com/ScottyThePilot/misc-crates", features = ["log"] }
-ids = { git = "https://github.com/ScottyThePilot/misc-crates", features = ["serde"] }
-yggdrasil = { git = "https://github.com/ScottyThePilot/misc-crates" }
-
 # local library dependencies
-cacheable = { path = "./libs/cacheable" }
 cleverbot = { path = "./libs/cleverbot" }
 cleverbot-logs = { path = "./libs/cleverbot-logs" }
 feed-machine = { path = "./libs/feed-machine" }
@@ -117,6 +106,18 @@ melody-rss-feed = { path = "./libs/melody-rss-feed" }
 melody-timer = { path = "./libs/melody-timer" }
 term-stratum = { path = "./libs/term-stratum" }
 
+# git dependencies
+[workspace.dependencies.build-info]
+git = "https://github.com/ScottyThePilot/misc-crates"
+rev = "e2ced3bdd24f9189f71ad82f96e69766c0ff59a1"
+features = ["git", "chrono"]
+
+[workspace.dependencies.abyss]
+git = "https://github.com/ScottyThePilot/abyss"
+rev = "d7e592bc460bfb6d3a502c987d26238151483ed5"
+features = ["log", "serde"]
+
+# poise & serenity
 [workspace.dependencies.poise]
 version = "0.6.2"
 

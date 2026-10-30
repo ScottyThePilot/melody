@@ -363,7 +363,9 @@ impl InputAgent {
         operation(guild_plugins);
         Ok(guild_plugins.clone())
       }).await?
-    }).await.context("failed to register commands")
+    })
+      .await.context("failed to register commands")
+      .map_err(From::from)
   }
 }
 

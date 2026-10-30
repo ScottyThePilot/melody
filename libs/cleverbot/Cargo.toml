@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-cacheable = { workspace = true }
+abyss = { workspace = true }
 chrono = { workspace = true }
 md5 = { version = "0.8.1" }
 percent-encoding = { version = "2.3.2" }

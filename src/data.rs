@@ -249,7 +249,9 @@ impl Core {
   }
 
   pub async fn operate_persist_commit<R>(&self, operation: impl AsyncFnOnce(&mut Persist) -> MelodyResult<R>) -> MelodyResult<R> {
-    self.state.persist.operate_mut_commit(operation).await.context("failed to commit persist state")
+    self.state.persist.operate_mut_commit(operation)
+      .await.context("failed to commit persist state")
+      .map_err(From::from)
   }
 
   pub async fn operate_persist_guild<R>(&self, id: GuildId, operation: impl AsyncFnOnce(&PersistGuild) -> MelodyResult<R>) -> MelodyResult<R> {
@@ -258,7 +260,9 @@ impl Core {
 
   pub async fn operate_persist_guild_commit<R>(&self, id: GuildId, operation: impl AsyncFnOnce(&mut PersistGuild) -> MelodyResult<R>) -> MelodyResult<R> {
     PersistGuilds::get_default(&self.state.persist_guilds, id).await?
-      .operate_mut_commit(operation).await.context("failed to commit persist-guild state")
+      .operate_mut_commit(operation)
+      .await.context("failed to commit persist-guild state")
+      .map_err(From::from)
   }
 
   pub async fn operate_activities<R>(&self, operation: impl AsyncFnOnce(&Activities) -> R) -> R {
@@ -278,6 +282,7 @@ impl Core {
   pub async fn current_member(&self, guild_id: GuildId) -> MelodyResult<Member> {
     guild_id.member(self, self.current_user_id())
       .await.context(format!("failed to locate member for current user in guild ({guild_id})"))
+      .map_err(From::from)
   }
 
   pub fn current_user_id(&self) -> UserId {
