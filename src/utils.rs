@@ -7,12 +7,10 @@ use defy::ContextualError;
 use melody_ratelimiter::RateLimiter;
 use poise::slash_argument::{SlashArgument, SlashArgError};
 use regex::{Captures, Match, Regex, Replacer};
-use reqwest::IntoUrl;
 use serenity::cache::Cache;
 use serenity::model::id::{EmojiId, RoleId, UserId};
 use serenity::utils::{ContentSafeOptions, content_safe};
 use tokio::sync::{Mutex, RwLock};
-use url::Url;
 
 use std::borrow::Cow;
 use std::fmt;
@@ -21,15 +19,8 @@ use std::sync::{Arc, OnceLock};
 
 
 
-/// Terrible hack but I don't care, make your API public please
-#[inline]
-pub fn into_url(url: impl IntoUrl) -> reqwest::Result<Url> {
-  url.into_url()
-}
-
-
-
 pub fn message_content_human_readable(cache: impl AsRef<Cache>, content: &str) -> String {
+  // Yes, discriminators are deprecated, yet ContentSafeOptions still defaults to showing them, curious...
   #[allow(deprecated)]
   let options = ContentSafeOptions::new().show_discriminator(false);
   content_safe(cache, content.trim(), &options, &[])

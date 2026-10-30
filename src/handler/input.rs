@@ -74,13 +74,19 @@ const COMMANDS: Commands<CommandFunction, CommandHelp> = &[
   command!{
     name: "plugin",
     description: "Command group for plugin utilities",
-    usage: "plugin <list|enable|disable>",
+    usage: "plugin <list|list-all|enable|disable|disable-all>",
     group: [
       command!{
         name: "list",
         description: "Lists the plugins that are enabled for the given guild",
         usage: "plugin list <guild_id: u64>",
         target: command_plugin_list(guild_id: Parsed<GuildId>)
+      },
+      command!{
+        name: "list-all",
+        description: "Lists the plugins that are enabled for each guild",
+        usage: "plugin list-all",
+        target: command_plugin_list_all()
       },
       command!{
         name: "enable",
@@ -93,6 +99,12 @@ const COMMANDS: Commands<CommandFunction, CommandHelp> = &[
         description: "Disables a plugin in the given guild",
         usage: "plugin disable <plugin: string> <guild_id: u64>",
         target: command_plugin_disable(plugin: String, guild_id: Parsed<GuildId>)
+      },
+      command!{
+        name: "disable-all",
+        description: "Disables a plugin for all guilds",
+        usage: "plugin disable <plugin: string>",
+        target: command_plugin_disable_all(plugin: String)
       }
     ]
   },
@@ -195,6 +207,15 @@ impl InputAgent {
     Ok(())
   }
 
+  async fn command_plugin_list_all(&mut self) -> MelodyResult {
+    for guild_id in self.core.cache.guilds() {
+      let plugins = self.plugin_list(guild_id).await;
+      self.output.info(format!("Plugins for guild ({guild_id}): {}", plugins.iter().join(", ")));
+    };
+
+    Ok(())
+  }
+
   async fn command_plugin_enable(&mut self, plugin: String, guild_id: GuildId) -> MelodyResult {
     if self.get_allowed_plugins().await.contains(&plugin) {
       self.plugin_enable(&plugin, guild_id).await?;
@@ -210,6 +231,19 @@ impl InputAgent {
     if self.get_allowed_plugins().await.contains(&plugin) {
       self.plugin_disable(&plugin, guild_id).await?;
       self.output.info(format!("Disabled plugin {plugin} for guild ({guild_id})"));
+    } else {
+      self.output.info(format!("No such plugin {plugin}"));
+    };
+
+    Ok(())
+  }
+
+  async fn command_plugin_disable_all(&mut self, plugin: String) -> MelodyResult {
+    if self.get_allowed_plugins().await.contains(&plugin) {
+      for guild_id in self.core.cache.guilds() {
+        self.plugin_disable(&plugin, guild_id).await?;
+        self.output.info(format!("Disabled plugin {plugin} for guild ({guild_id})"));
+      };
     } else {
       self.output.info(format!("No such plugin {plugin}"));
     };

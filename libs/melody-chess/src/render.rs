@@ -10,6 +10,7 @@ use std::io::Cursor;
 
 
 const TILE_SIZE: u32 = 64;
+const TILE_SIZE_HALF: u32 = TILE_SIZE / 2;
 const MARGIN_SIZE: UVec2 = UVec2::new(16, 32);
 const BOARD_SIZE: UVec2 = UVec2::splat(TILE_SIZE * 8);
 const BOARD_SIZE_FULL: UVec2 = UVec2::new(
@@ -192,11 +193,11 @@ impl Assets {
 }
 
 fn generate_image_check() -> RgbaImage {
-  const CENTER: Vec2 = Vec2::splat((64.0 - 1.0) / 2.0);
-  RgbaImage::from_fn(64, 64, |x, y| {
+  const CENTER: Vec2 = Vec2::splat((TILE_SIZE as f32 - 1.0) / 2.0);
+  RgbaImage::from_fn(TILE_SIZE, TILE_SIZE, |x, y| {
     let pos = UVec2::new(x, y);
     let dist = pos.as_vec2().distance(CENTER);
-    let alpha = (1.0 - (dist / 32.0).powi(2)).clamp(0.0, 1.0);
+    let alpha = (1.0 - (dist / TILE_SIZE_HALF as f32).powi(2)).clamp(0.0, 1.0);
     Rgba([0xff, 0x00, 0x00, (alpha * 255.0) as u8])
   })
 }

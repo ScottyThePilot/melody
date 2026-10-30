@@ -17,6 +17,7 @@ use serenity::model::guild::{Guild, UnavailableGuild};
 use serenity::model::guild::Member;
 use serenity::model::id::{GuildId, UserId, RoleId};
 use songbird::{SerenityInit, Config as SongbirdConfig};
+use singlefile::container::shared_async::InstantiateSharedAsync;
 use term_stratum::StratumEvent;
 use tokio::sync::mpsc::UnboundedReceiver as MpscReceiver;
 use tokio::time::MissedTickBehavior;
@@ -35,10 +36,10 @@ pub type MelodyHandlerContext<'a> = melody_framework::MelodyHandlerContext<'a, S
 
 /// Performs a clean launch of the bot
 pub async fn launch(event_receiver: MpscReceiver<StratumEvent>) -> MelodyResult {
-  let config = Config::create().await?;
-  let persist = Persist::create().await?;
-  let persist_guilds = PersistGuildsWrapper::from(PersistGuilds::create().await?);
-  let activities = Activities::create().await?;
+  let config = Config::instantiate(()).await?;
+  let persist = Persist::instantiate(()).await?;
+  let persist_guilds = PersistGuilds::instantiate_all_wrapped().await?;
+  let activities = Activities::instantiate(()).await?;
 
   let (token, intents) = config.operate_mut(async |config| {
     // clear the token from the config state, but don't commit it

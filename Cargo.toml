@@ -76,7 +76,7 @@ chrono = { version = "0.4", features = ["serde"] }
 float-ord = { version = "0.3.2" }
 fs-err = { version = "3" }
 futures = { version = "0.3.34" }
-glam = { version = "0.33.12", features = ["serde"] }
+glam = { version = "0.34.1", features = ["serde"] }
 image = { version = "0.25.10", default-features = false }
 indexmap = { version = "2.14.2", features = ["serde"] }
 itertools = { version = "0.15" }
@@ -85,12 +85,12 @@ rand = { version = "0.10.3" }
 regex = { version = "1.13.1" }
 reqwest = { version = "0.12" }
 serde = { version = "1.0", features = ["derive", "rc"] }
-singlefile = { version = "0.6.0", features = ["shared-async", "fs-err"] }
-singlefile-formats = { version = "0.6.0" }
+singlefile = { version = "0.7.0", features = ["shared-async", "fs-err"] }
+singlefile-formats = { version = "0.7.0" }
 thiserror = { version = "2" }
-tokio = { version = "1.53", features = ["parking_lot"] }
+tokio = { version = "1.54", features = ["parking_lot"] }
 tracing = { version = "0.1.44" }
-typemap_rev = { version = "0.3.0" }
+typemap_rev = { version = "0.4.0" }
 uord = { version = "0.2.0", features = ["serde"] }
 url = { version = "2.5", features = ["serde"] }
 

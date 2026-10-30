@@ -38,7 +38,7 @@ where
   where F: Fn(&O) -> Result<(), OE> + Copy, OE: ToString, Self: Sized {
     self.validate(move |value, map_extra, emitter| -> O {
       if let Err(err) = f(&value) {
-        emitter.emit(Rich::custom(map_extra.span(), err));
+        emitter.emit(Rich::custom(map_extra.span(), err.to_string()));
       };
 
       value
@@ -48,7 +48,7 @@ where
   fn try_from_str<U: FromStr>(self) -> chumsky::combinator::TryMap<Self, O, fn(O, I::Span) -> Result<U, E::Error>>
   where O: AsRef<str>, U: FromStr, <U as FromStr>::Err: ToString, Self: Sized {
     self.try_map(|value: O, span: I::Span| -> Result<U, E::Error> {
-      value.as_ref().parse::<U>().map_err(|err| Rich::custom(span, err))
+      value.as_ref().parse::<U>().map_err(|err| Rich::custom(span, err.to_string()))
     })
   }
 }

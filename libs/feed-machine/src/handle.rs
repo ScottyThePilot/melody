@@ -4,7 +4,6 @@ use reqwest::Client;
 use tokio::sync::{Notify, RwLock, RwLockWriteGuard, RwLockReadGuard};
 use tokio::task::JoinHandle;
 use tokio::time::{sleep_until, Instant};
-use url::Url;
 
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -17,7 +16,7 @@ use crate::model::{HasDateTime, ModelError};
 
 #[async_trait::async_trait]
 pub trait Context<M: Model>: Send + Sync + 'static {
-  type Error: From<crate::model::ModelError<<M::Entry as TryFrom<Entry>>::Error>> + Send;
+  type Error: From<ModelError<<M::Entry as TryFrom<Entry>>::Error>> + Send;
 
   /// Returns the client that the model should use for making HTTP requests.
   fn client(&self) -> &Client;
@@ -65,7 +64,7 @@ pub trait Model: Send + Sync + 'static {
   type Identifier: std::fmt::Debug + Clone + PartialEq + Send + Sync + 'static;
   type Entry: TryFrom<Entry> + HasDateTime + Send + Sync + 'static;
 
-  fn url(&self, identifier: &Self::Identifier) -> reqwest::Result<Url>;
+  fn url(&self, identifier: &Self::Identifier) -> String;
   fn delay(&self, queue_len: usize) -> Duration;
 
   #[allow(unused)]
@@ -79,7 +78,7 @@ impl<T> Model for Arc<T> where T: Model {
   type Entry = T::Entry;
 
   #[inline]
-  fn url(&self, identifier: &Self::Identifier) -> reqwest::Result<Url> {
+  fn url(&self, identifier: &Self::Identifier) -> String {
     T::url(self, identifier)
   }
 
@@ -312,7 +311,7 @@ impl<M: Model> HandleInner<M> {
   }
 
   async fn task_advance<C: Context<M>>(&self, identifier: M::Identifier, context: &C) -> Result<(), C::Error> {
-    let url = self.model.url(&identifier).map_err(ModelError::from)?;
+    let url = self.model.url(&identifier);
     let last_update = context.load_update_datetime(&identifier).await?.unwrap_or(DateTime::UNIX_EPOCH);
 
     debug!("requesting feed entries for model `{}` and feed identifier `{:?}`", std::any::type_name::<M>(), identifier);

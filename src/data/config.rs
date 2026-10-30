@@ -3,8 +3,8 @@ use crate::prelude::*;
 use serde::de::{Deserialize, Deserializer, Unexpected};
 use serenity::model::gateway::GatewayIntents;
 use serenity::model::colour::Color;
-use singlefile::container_shared_async::StandardContainerSharedAsync;
-use singlefile::manager::standard::StandardManagerOptions;
+use singlefile::container::shared_async::{StandardContainerSharedAsync, InstantiateSharedAsync};
+use singlefile::manager::standard::{StandardManager, StandardManagerOptions};
 use singlefile_formats::data::toml_serde::Toml;
 
 use std::path::PathBuf;
@@ -38,9 +38,12 @@ pub struct Config {
   pub emulate_status_modes: bool
 }
 
-impl Config {
+impl InstantiateSharedAsync<()> for Config {
+  type Error = MelodyError;
+  type Manager = StandardManager<Toml>;
+
   #[inline]
-  pub async fn create() -> MelodyResult<ConfigContainer> {
+  async fn instantiate(_: ()) -> MelodyResult<ConfigContainer> {
     let path = PathBuf::from(format!("./config.toml"));
     let container = ConfigContainer::create_or_default(path, Toml, OPTIONS)
       .await.context("failed to load config.toml")?;

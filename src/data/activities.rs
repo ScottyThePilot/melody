@@ -7,8 +7,8 @@ use rand::seq::IndexedRandom;
 use serenity::model::id::GuildId;
 use serenity::model::gateway::ActivityType;
 use serenity::gateway::ActivityData;
-use singlefile::container_shared_async::StandardContainerSharedAsync;
-use singlefile::manager::standard::StandardManagerOptions;
+use singlefile::container::shared_async::{StandardContainerSharedAsync, InstantiateSharedAsync};
+use singlefile::manager::standard::{StandardManager, StandardManagerOptions};
 use singlefile_formats::data::json_serde::Json;
 
 use std::path::PathBuf;
@@ -24,16 +24,20 @@ pub struct Activities {
   pub activities: Vec<Activity>
 }
 
-impl Activities {
-  #[inline]
-  pub async fn create() -> MelodyResult<ActivitiesContainer> {
+impl InstantiateSharedAsync<()> for Activities {
+  type Error = MelodyError;
+  type Manager = StandardManager<Json>;
+
+  async fn instantiate(_: ()) -> MelodyResult<ActivitiesContainer> {
     let path = PathBuf::from(format!("./data/activities.json"));
     let container = ActivitiesContainer::create_or_default(path, Json::<true>, OPTIONS)
       .await.context("failed to load data/activities.json")?;
     trace!("Loaded data/activities.json");
     Ok(container)
   }
+}
 
+impl Activities {
   pub async fn select(&self, core: &Core) -> Result<ActivityData, ActivityError> {
     let emulate_status_modes = core.operate_config(async |config| config.emulate_status_modes).await;
 

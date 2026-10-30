@@ -9,7 +9,6 @@ use reqwest::Client;
 use serenity::model::id::{ChannelId, GuildId};
 use tokio::sync::{RwLock, RwLockWriteGuard, RwLockMappedWriteGuard};
 use tokio::time::sleep;
-use url::Url;
 
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -479,8 +478,8 @@ impl Model for FeedModelYouTube {
   type Identifier = FeedIdentifierYouTube;
   type Entry = YouTubeVideo;
 
-  fn url(&self, identifier: &Self::Identifier) -> reqwest::Result<Url> {
-    crate::utils::into_url(self.config.url(&identifier.channel))
+  fn url(&self, identifier: &Self::Identifier) -> String {
+    self.config.url(&identifier.channel)
   }
 
   fn delay(&self, queue_len: usize) -> Duration {
@@ -525,8 +524,8 @@ impl Model for FeedModelTwitter {
   type Identifier = FeedIdentifierTwitter;
   type Entry = TwitterPost;
 
-  fn url(&self, identifier: &Self::Identifier) -> reqwest::Result<Url> {
-    crate::utils::into_url(self.config.url(&identifier.handle))
+  fn url(&self, identifier: &Self::Identifier) -> String {
+    self.config.url(&identifier.handle)
   }
 
   fn delay(&self, queue_len: usize) -> Duration {

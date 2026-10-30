@@ -3,8 +3,8 @@ use crate::feature::roles::{Granter, JoinRoleFilter};
 use crate::feature::feed::{FeedIdentifier, FeedState, FeedStates, RegisterFeedResult, UnregisterFeedResult};
 
 use serenity::model::id::{ChannelId, GuildId, UserId, RoleId};
-use singlefile::container_shared_async::StandardContainerSharedAsync;
-use singlefile::manager::standard::StandardManagerOptions;
+use singlefile::container::shared_async::{StandardContainerSharedAsync, InstantiateSharedAsync};
+use singlefile::manager::standard::{StandardManager, StandardManagerOptions};
 use singlefile_formats::data::cbor_serde::Cbor;
 use tokio::sync::RwLock;
 
@@ -29,8 +29,11 @@ pub struct Persist {
   pub feed_states: FeedStates
 }
 
-impl Persist {
-  pub async fn create() -> MelodyResult<PersistContainer> {
+impl InstantiateSharedAsync<()> for Persist {
+  type Error = MelodyError;
+  type Manager = StandardManager<Cbor>;
+
+  async fn instantiate(_: ()) -> MelodyResult<PersistContainer> {
     fs_err::tokio::create_dir_all("./data/")
       .await.context("failed to create data/guilds/")?;
     let path = PathBuf::from(format!("./data/persist.bin"));
@@ -38,15 +41,11 @@ impl Persist {
       .await.context("failed to load data/persist.bin")?;
     trace!("Loaded data/persist.bin");
 
-    //// TODO: remove this eventually
-    container.operate_mut(async |persist| {
-      #[allow(deprecated)]
-      persist.feed_states.extend(persist.feeds.drain());
-    }).await;
-
     Ok(container)
   }
+}
 
+impl Persist {
   pub fn swap_build_id(&mut self) -> u64 {
     std::mem::replace(&mut self.build_id, crate::BUILD_ID)
   }
@@ -111,8 +110,12 @@ pub struct PersistGuilds {
 }
 
 impl PersistGuilds {
+  pub async fn instantiate_all_wrapped() -> MelodyResult<PersistGuildsWrapper> {
+    Self::instantiate_all().await.map(PersistGuildsWrapper::from)
+  }
+
   #[inline]
-  pub async fn create() -> MelodyResult<PersistGuilds> {
+  pub async fn instantiate_all() -> MelodyResult<PersistGuilds> {
     fs_err::tokio::create_dir_all("./data/guilds/")
       .await.context("failed to create data/guilds/")?;
     let mut guilds = HashMap::new();
@@ -122,7 +125,7 @@ impl PersistGuilds {
       let file_type = entry.file_type().await.context("failed to read entry in data/guilds/")?;
       if !file_type.is_file() { continue };
       if let Some(id) = parse_file_name(&entry.file_name()).map(GuildId::new) {
-        let persist_guild = PersistGuild::create(id).await?;
+        let persist_guild = PersistGuild::instantiate(id).await?;
         guilds.insert(id, persist_guild);
       };
     };
@@ -138,7 +141,7 @@ impl PersistGuilds {
     use std::collections::hash_map::Entry;
     match wrapper.write().await.guilds.entry(id) {
       Entry::Occupied(occupied) => Ok(occupied.get().clone()),
-      Entry::Vacant(vacant) => Ok(vacant.insert(PersistGuild::create(id).await?).clone())
+      Entry::Vacant(vacant) => Ok(vacant.insert(PersistGuild::instantiate(id).await?).clone())
     }
   }
 }
@@ -161,8 +164,11 @@ pub struct PersistGuild {
   pub grant_roles: HashMap<RoleId, HashSet<Granter>>
 }
 
-impl PersistGuild {
-  pub async fn create(id: GuildId) -> MelodyResult<PersistGuildContainer> {
+impl InstantiateSharedAsync<GuildId> for PersistGuild {
+  type Error = MelodyError;
+  type Manager = StandardManager<Cbor>;
+
+  async fn instantiate(id: GuildId) -> MelodyResult<PersistGuildContainer> {
     let path = PathBuf::from(format!("./data/guilds/{id}.bin"));
     let container = PersistGuildContainer::create_or_default(path, Cbor, OPTIONS)
       .await.context(format!("failed to load data/guilds/{id}.bin"))?;

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-base64 = { version = "0.22.1" }
+base64 = { version = "0.23.1" }
 chrono = { workspace = true }
 ciborium = { version = "0.2.2" }
 fs-err = { workspace = true }
