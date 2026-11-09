@@ -5,13 +5,26 @@ version = 4
 [[package]]
 name = "abyss"
 version = "0.1.0"
-source = "git+https://github.com/ScottyThePilot/abyss?rev=d7e592bc460bfb6d3a502c987d26238151483ed5#d7e592bc460bfb6d3a502c987d26238151483ed5"
+source = "git+https://github.com/ScottyThePilot/abyss?rev=2ca350891ceae74c7e3736658ce53ad00a28f202#2ca350891ceae74c7e3736658ce53ad00a28f202"
 dependencies = [
+ "abyss-macros",
  "bytemuck",
+ "chrono",
  "dunce",
  "identity-hash",
  "log",
  "serde_core",
+]
+
+[[package]]
+name = "abyss-macros"
+version = "0.1.0"
+source = "git+https://github.com/ScottyThePilot/abyss?rev=2ca350891ceae74c7e3736658ce53ad00a28f202#2ca350891ceae74c7e3736658ce53ad00a28f202"
+dependencies = [
+ "chrono",
+ "proc-macro2",
+ "quote",
+ "syn 3.0.9",
 ]
 
 [[package]]
@@ -215,26 +228,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3b5ab9db53bcda568284df0fd39f6eac24ad6f7ba7ff1168b9e76eba6576b976"
 dependencies = [
  "num-traits",
-]
-
-[[package]]
-name = "build-info"
-version = "0.1.0"
-source = "git+https://github.com/ScottyThePilot/misc-crates?rev=e2ced3bdd24f9189f71ad82f96e69766c0ff59a1#e2ced3bdd24f9189f71ad82f96e69766c0ff59a1"
-dependencies = [
- "build-info-macros",
- "chrono",
-]
-
-[[package]]
-name = "build-info-macros"
-version = "0.1.0"
-source = "git+https://github.com/ScottyThePilot/misc-crates?rev=e2ced3bdd24f9189f71ad82f96e69766c0ff59a1#e2ced3bdd24f9189f71ad82f96e69766c0ff59a1"
-dependencies = [
- "chrono",
- "proc-macro2",
- "quote",
- "syn 2.0.119",
 ]
 
 [[package]]
@@ -2424,7 +2417,6 @@ version = "0.1.0"
 dependencies = [
  "abyss",
  "ahash",
- "build-info",
  "chrono",
  "cleverbot",
  "cleverbot-logs",

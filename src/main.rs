@@ -10,7 +10,6 @@
 
 extern crate abyss;
 extern crate ahash;
-extern crate build_info;
 extern crate chrono;
 extern crate cleverbot;
 extern crate cleverbot_logs;
@@ -49,6 +48,7 @@ extern crate uord;
 extern crate url;
 
 #[allow(unused)]
+#[macro_export]
 macro_rules! println {
   ($($tt:tt)*) => (info!($($tt)*));
 }
@@ -66,8 +66,8 @@ use term_stratum::StratumEvent;
 use tokio::sync::mpsc::UnboundedReceiver as AsyncReceiver;
 
 pub const BUILD_ID: u64 = const_random::const_random!(u64);
-pub const BUILD_DATE: &str = build_info::build_datetime_local_fixed_format!("%-d %b %Y %-H:%M:%S %z");
-pub const BUILD_GIT_HASH: &str = build_info::git_hash_short!();
+pub const BUILD_DATE: &str = abyss::macros::build_chrono_datetime_local_fixed_format!("%-d %b %Y %-H:%M:%S %z");
+pub const BUILD_GIT_HASH: &str = abyss::macros::git_hash_short!();
 
 fn main() {
   abyss::sys::set_current_dir_to_exe_dir().expect("unable to set root dir");

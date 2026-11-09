@@ -7,7 +7,6 @@ edition = "2024"
 [dependencies]
 abyss = { workspace = true }
 ahash = { workspace = true }
-build-info = { workspace = true }
 chrono = { workspace = true }
 cleverbot = { workspace = true }
 cleverbot-logs = { workspace = true }
@@ -107,15 +106,10 @@ melody-timer = { path = "./libs/melody-timer" }
 term-stratum = { path = "./libs/term-stratum" }
 
 # git dependencies
-[workspace.dependencies.build-info]
-git = "https://github.com/ScottyThePilot/misc-crates"
-rev = "e2ced3bdd24f9189f71ad82f96e69766c0ff59a1"
-features = ["git", "chrono"]
-
 [workspace.dependencies.abyss]
 git = "https://github.com/ScottyThePilot/abyss"
-rev = "d7e592bc460bfb6d3a502c987d26238151483ed5"
-features = ["log", "serde"]
+rev = "2ca350891ceae74c7e3736658ce53ad00a28f202"
+features = ["chrono", "git", "log", "serde"]
 
 # poise & serenity
 [workspace.dependencies.poise]
