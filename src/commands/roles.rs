@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::feature::roles::{Granter, JoinRoleFilter};
+use crate::features::roles::{Granter, JoinRoleFilter};
 use crate::data::{Core, PersistGuild};
 use crate::utils::RoleOrUser;
 use super::{MelodyContext, CommandMetaData};

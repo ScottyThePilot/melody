@@ -33,7 +33,7 @@ regex = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serenity = { workspace = true, features = ["rustls_backend", "cache", "chrono", "http", "unstable_discord_api"] }
-singlefile = { workspace = true }
+singlefile = { workspace = true, features = ["shared-async"] }
 singlefile-formats = { workspace = true, features = ["cbor-serde", "json-serde", "toml-serde"] }
 songbird = { version = "0.6" }
 symphonia = { version = "0.5.5", features = ["aac", "alac", "mp3", "isomp4"] }
@@ -59,7 +59,6 @@ members = [
   "libs/melody-parsers",
   "libs/melody-random",
   "libs/melody-ratelimiter",
-  "libs/melody-rss-feed",
   "libs/melody-timer",
   "libs/term-stratum",
 ]
@@ -81,7 +80,7 @@ rand = { version = "0.10.3" }
 regex = { version = "1.13.1" }
 reqwest = { version = "0.12" }
 serde = { version = "1.0", features = ["derive", "rc"] }
-singlefile = { version = "0.7.0", features = ["shared-async", "fs-err"] }
+singlefile = { version = "0.7.0", features = ["fs-err"] }
 singlefile-formats = { version = "0.7.0" }
 thiserror = { version = "2" }
 tokio = { version = "1.54", features = ["parking_lot"] }
@@ -102,7 +101,6 @@ melody-logger = { path = "./libs/melody-logger" }
 melody-parsers = { path = "./libs/melody-parsers" }
 melody-random = { path = "./libs/melody-random" }
 melody-ratelimiter = { path = "./libs/melody-ratelimiter" }
-melody-rss-feed = { path = "./libs/melody-rss-feed" }
 melody-timer = { path = "./libs/melody-timer" }
 term-stratum = { path = "./libs/term-stratum" }
 

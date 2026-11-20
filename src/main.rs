@@ -57,7 +57,7 @@ macro_rules! println {
 pub(crate) mod commands;
 pub(crate) mod data;
 pub(crate) mod error;
-pub(crate) mod feature;
+pub(crate) mod features;
 pub(crate) mod handler;
 pub(crate) mod logging;
 pub(crate) mod prelude;

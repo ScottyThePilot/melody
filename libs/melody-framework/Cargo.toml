@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-indexmap = { version = "2.14.2", optional = true }
+indexmap = { workspace = true, optional = true }
 itertools = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["sync"] }
@@ -20,4 +20,4 @@ features = ["builder", "client", "gateway", "model", "utils", "collector", "fram
 
 [features]
 default = []
-feature = ["dep:indexmap"]
+features = ["dep:indexmap"]

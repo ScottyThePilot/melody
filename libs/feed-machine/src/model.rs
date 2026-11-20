@@ -83,7 +83,7 @@ impl TryFrom<Entry> for EntryMinimal {
     let title = entry.title.map(|text| text.content);
     let content = entry.content.and_then(|content| content.body);
     let summary = entry.summary.map(|text| text.content);
-    let author = join(entry.authors.into_iter().map(|person| person.name));
+    let author = join(entry.authors.into_iter().filter_map(|person| person.name));
     let link = entry.links.into_iter()
       .find_map(|link| Url::parse(&link.href).ok());
     let time = entry.published.ok_or(SchemaError)?;

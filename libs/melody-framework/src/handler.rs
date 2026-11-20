@@ -177,9 +177,9 @@ macro_rules! handler {
       }
     }
 
-    #[cfg(feature = "feature")]
+    #[cfg(feature = "features")]
     #[serenity::async_trait]
-    impl<S, E> MelodyHandler<S, E> for crate::feature::MelodyFeatureContainer<S, E>
+    impl<S, E> MelodyHandler<S, E> for crate::features::MelodyFeatureContainer<S, E>
     where S: Send + Sync, E: Send + Sync {
       $(async fn $method(&self, ctx: $crate::MelodyHandlerContext<'_, S, E>, $($arg: $Arg),*) {
         for handler in self.values() {

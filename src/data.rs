@@ -4,10 +4,10 @@ mod config;
 mod persist;
 
 use crate::prelude::*;
-use crate::feature::cleverbot::{CleverBotLoggerWrapper, CleverBotWrapper};
-use crate::feature::feed::FeedManager;
-use crate::feature::message_chains::{MessageChains, MessageChainsWrapper};
-use crate::feature::music_player::MusicPlayer;
+use crate::features::cleverbot::{CleverBotLoggerWrapper, CleverBotWrapper};
+use crate::features::feed::FeedManager;
+use crate::features::message_chains::{MessageChains, MessageChainsWrapper};
+use crate::features::music_player::MusicPlayer;
 use crate::utils::youtube::YtDlp;
 pub use self::activities::{ActivitiesContainer, Activities};
 pub use self::config::*;

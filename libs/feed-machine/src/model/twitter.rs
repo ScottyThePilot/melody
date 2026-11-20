@@ -20,7 +20,7 @@ impl TryFrom<Entry> for TwitterPost {
 
   fn try_from(entry: Entry) -> Result<Self, Self::Error> {
     let title = entry.title.map(|text| text.content).ok_or(SchemaError)?;
-    let author = entry.authors.into_iter().map(|person| person.name).join(", ");
+    let author = entry.authors.into_iter().filter_map(|person| person.name).join(", ");
     let mut link = entry.links.into_iter()
       .find_map(|link| Url::parse(&link.href).ok())
       .ok_or(SchemaError)?;

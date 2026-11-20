@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::feature::feed::{FeedIdentifier, FeedIdentifierTwitter, FeedIdentifierYouTube, RegisterFeedResult, UnregisterFeedResult};
+use crate::features::feed::{FeedIdentifier, FeedIdentifierTwitter, FeedIdentifierYouTube, RegisterFeedResult, UnregisterFeedResult};
 use crate::data::Core;
 use crate::utils::{Timestamp, TimestampFormat, LazyRegex};
 use super::{MelodyContext, CommandMetaData};

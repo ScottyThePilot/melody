@@ -177,7 +177,7 @@ impl MelodyHandler<State, MelodyError> for Handler {
         Ok(reply) => {
           info!("Recieved reply from cleverbot: {reply:?}");
           let reply = crate::utils::message_content_human_readable(&core, &reply);
-          crate::feature::cleverbot::send_reply(&core, &message, &reply).await.log_error();
+          crate::features::cleverbot::send_reply(&core, &message, &reply).await.log_error();
           core.state.cleverbot_logger.clone()
             .log(message.channel_id, content, reply).await.log_error();
         },
@@ -243,7 +243,7 @@ fn is_mentioning_user(message: &Message, who: UserId) -> bool {
 }
 
 fn clean_message_for_cleverbot(cache: impl AsRef<Cache>, content: &str, me: UserId) -> String {
-  use crate::feature::cleverbot::CLEVERBOT_CANONICAL_NAME;
+  use crate::features::cleverbot::CLEVERBOT_CANONICAL_NAME;
 
   let content = crate::utils::replace_user_mentions(content.trim(), |user_id, m| {
     // only replace when mentions target the current user

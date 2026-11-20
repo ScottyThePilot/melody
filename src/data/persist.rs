@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use crate::feature::roles::{Granter, JoinRoleFilter};
-use crate::feature::feed::{FeedIdentifier, FeedState, FeedStates, RegisterFeedResult, UnregisterFeedResult};
+use crate::features::roles::{Granter, JoinRoleFilter};
+use crate::features::feed::{FeedIdentifier, FeedState, FeedStates, RegisterFeedResult, UnregisterFeedResult};
 
 use serenity::model::id::{ChannelId, GuildId, UserId, RoleId};
 use singlefile::container::shared_async::{StandardContainerSharedAsync, InstantiateSharedAsync};
@@ -159,7 +159,7 @@ pub type PersistGuildContainer = StandardContainerSharedAsync<PersistGuild, Cbor
 pub struct PersistGuild {
   pub connect_four: melody_connect_four::Manager<UserId>,
   #[serde(alias = "emoji_statistics")]
-  pub emoji_stats: crate::feature::emoji_stats::EmojiStats,
+  pub emoji_stats: crate::features::emoji_stats::EmojiStats,
   pub join_roles: HashMap<RoleId, JoinRoleFilter>,
   pub grant_roles: HashMap<RoleId, HashSet<Granter>>
 }

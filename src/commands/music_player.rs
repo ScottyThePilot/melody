@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use crate::data::{Core, State};
-use crate::feature::music_player::{MusicPlayer, QueueItem, AttachmentItem, YouTubeItem};
+use crate::features::music_player::{MusicPlayer, QueueItem, AttachmentItem, YouTubeItem};
 use crate::utils::youtube;
 use super::{MelodyContext, CommandMetaData};
 
