@@ -232,3 +232,24 @@ impl<T> OperateMut<T> for RateLimiter<T> {
     operation(&mut *guard).await
   }
 }
+
+
+
+#[allow(unused)]
+pub mod convert {
+  macro_rules! conversion {
+    ($vis:vis fn $name:ident = |$arg:ident| $expr:expr) => (
+      #[inline] $vis const fn $name($arg: u64) -> u64 { $expr }
+    );
+  }
+
+  conversion!(pub fn kb = |value| value * 1000);
+  conversion!(pub fn mb = |value| kb(value) * 1000);
+  conversion!(pub fn gb = |value| mb(value) * 1000);
+  conversion!(pub fn pb = |value| gb(value) * 1000);
+
+  conversion!(pub fn kib = |value| value * 1024);
+  conversion!(pub fn mib = |value| kib(value) * 1024);
+  conversion!(pub fn gib = |value| mib(value) * 1024);
+  conversion!(pub fn pib = |value| gib(value) * 1024);
+}

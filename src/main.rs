@@ -13,9 +13,9 @@ extern crate ahash;
 extern crate chrono;
 extern crate cleverbot;
 extern crate cleverbot_logs;
+extern crate colored;
 extern crate const_random;
 extern crate feed_machine;
-extern crate fern;
 extern crate float_ord;
 extern crate fs_err;
 extern crate futures;
@@ -26,6 +26,7 @@ extern crate melody_commander;
 extern crate melody_connect_four;
 extern crate melody_flag;
 extern crate melody_framework;
+extern crate melody_logger;
 extern crate melody_random;
 extern crate melody_ratelimiter;
 extern crate poise;
@@ -58,7 +59,7 @@ pub(crate) mod data;
 pub(crate) mod error;
 pub(crate) mod feature;
 pub(crate) mod handler;
-pub(crate) mod logger;
+pub(crate) mod logging;
 pub(crate) mod prelude;
 pub(crate) mod utils;
 
@@ -73,7 +74,9 @@ fn main() {
   abyss::sys::set_current_dir_to_exe_dir().expect("unable to set root dir");
   let (logger_sender, logger_receiver) = std::sync::mpsc::channel();
   let (event_sender, event_receiver) = tokio::sync::mpsc::unbounded_channel();
-  crate::logger::setup(logger_sender).expect("failed to setup logger");
+  crate::logging::setup(logger_sender).expect("failed to setup logger");
+
+  trace!("Initializing...");
 
   term_stratum::run(
     env!("CARGO_PKG_NAME"),

@@ -10,10 +10,9 @@ ahash = { workspace = true }
 chrono = { workspace = true }
 cleverbot = { workspace = true }
 cleverbot-logs = { workspace = true }
+colored = { version = "3.1.1" }
 const-random = { version = "0.1.18" }
 feed-machine = { workspace = true }
-fern = { version = "0.7.1", features = ["colored"] }
-flate2 = { version = "1.1.10" }
 float-ord = { workspace = true }
 fs-err = { workspace = true, features = ["tokio"] }
 futures = { workspace = true }
@@ -24,6 +23,7 @@ melody-commander = { workspace = true }
 melody-connect-four = { workspace = true }
 melody-flag = { workspace = true }
 melody-framework = { workspace = true }
+melody-logger = { workspace = true }
 melody-parsers = { workspace = true }
 melody-random = { workspace = true }
 melody-ratelimiter = { workspace = true }
@@ -55,6 +55,7 @@ members = [
   "libs/melody-connect-four",
   "libs/melody-flag",
   "libs/melody-framework",
+  "libs/melody-logger",
   "libs/melody-parsers",
   "libs/melody-random",
   "libs/melody-ratelimiter",
@@ -85,7 +86,6 @@ singlefile-formats = { version = "0.7.0" }
 thiserror = { version = "2" }
 tokio = { version = "1.54", features = ["parking_lot"] }
 tracing = { version = "0.1.44" }
-typemap_rev = { version = "0.4.0" }
 uord = { version = "0.2.0", features = ["serde"] }
 url = { version = "2.5", features = ["serde"] }
 
@@ -98,6 +98,7 @@ melody-commander = { path = "./libs/melody-commander" }
 melody-connect-four = { path = "./libs/melody-connect-four" }
 melody-flag = { path = "./libs/melody-flag" }
 melody-framework = { path = "./libs/melody-framework" }
+melody-logger = { path = "./libs/melody-logger" }
 melody-parsers = { path = "./libs/melody-parsers" }
 melody-random = { path = "./libs/melody-random" }
 melody-ratelimiter = { path = "./libs/melody-ratelimiter" }
@@ -108,7 +109,7 @@ term-stratum = { path = "./libs/term-stratum" }
 # git dependencies
 [workspace.dependencies.abyss]
 git = "https://github.com/ScottyThePilot/abyss"
-rev = "2ca350891ceae74c7e3736658ce53ad00a28f202"
+rev = "69ee183577508cffbc8cc9b400319fa0ff145619"
 features = ["chrono", "git", "log", "serde"]
 
 # poise & serenity

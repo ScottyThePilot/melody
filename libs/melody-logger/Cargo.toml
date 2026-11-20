@@ -1,0 +1,11 @@
+[package]
+name = "melody-logger"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+abyss = { workspace = true }
+chrono = { workspace = true }
+flate2 = { version = "1.1.11" }
+fs-err = { workspace = true }
+log = { workspace = true }
